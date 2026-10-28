@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sobrevida — guia</title>
+<style>
+/* Guia no visual do PokéSurvivor (caixas "Mundo Misterioso"): azul #2c519f→#1a3170, borda branca com contorno escuro, dourado #ffd23f. */
+:root { --box1: #2c519f; --box2: #1a3170; --edge: #f4f8ff; --edge-in: #5b83d6; --edge-out: #0b1838; --gold: #ffd23f; --muted: #b9cbf0; --shadow: #0a1430; }
+* { box-sizing: border-box; }
+body { margin: 0; background: radial-gradient(circle at 50% 0%, #142a5e, #050914 70%) fixed; color: #fff; font: 16px/1.55 "Segoe UI", system-ui, sans-serif; }
+.top { position: sticky; top: 0; z-index: 2; background: rgba(5,9,20,.92); border-bottom: 3px solid var(--edge-out); }
+.top .in { max-width: 820px; margin: 0 auto; height: 60px; padding: 0 16px; display: flex; align-items: center; gap: 12px; }
+.top img { image-rendering: pixelated; }
+.top b { font-size: 19px; text-shadow: 2px 2px 0 var(--shadow); }
+nav.langs { margin-left: auto; display: flex; gap: 4px; }
+nav.langs button { border: 2px solid rgba(244,248,255,.3); background: rgba(0,0,0,.25); color: var(--muted); font: 700 12px/1 system-ui, sans-serif; padding: 6px 8px; border-radius: 6px; cursor: pointer; }
+nav.langs button.on { border-color: var(--gold); color: var(--gold); background: rgba(255,210,63,.14); }
+main { max-width: 820px; margin: 0 auto; padding: 32px 16px 56px; }
+.hero h1 { margin: 0; font-size: 36px; text-shadow: 3px 3px 0 var(--shadow); }
+.hero .tag { margin: 4px 0 0; color: var(--gold); text-shadow: 2px 2px 0 var(--shadow); }
+section { background: linear-gradient(180deg, var(--box1), var(--box2)); border: 3px solid var(--edge); border-radius: 12px;
+  box-shadow: 0 0 0 3px var(--edge-out), inset 0 0 0 2px var(--edge-in), 0 14px 40px rgba(0,0,0,.45); padding: 20px 22px; margin-top: 24px; text-shadow: 1px 1px 0 var(--shadow); }
+h2 { margin: 0 0 10px; font-size: 22px; }
+h3 { margin: 18px 0 6px; color: var(--gold); font-size: 14px; letter-spacing: .05em; text-transform: uppercase; }
+p, li { color: #e6eeff; } b { color: #fff; }
+ol, ul { padding-left: 22px; margin: 8px 0; } li { margin: 6px 0; } li::marker { color: var(--gold); font-weight: 700; }
+code { background: rgba(0,0,0,.3); color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 14px; text-shadow: none; }
+.note { color: var(--muted); font-size: 14px; padding: 10px 12px; border-left: 3px solid var(--gold); background: rgba(255,210,63,.08); border-radius: 0 8px 8px 0; }
+footer { margin-top: 32px; color: var(--muted); font-size: 14px; text-align: center; }
+footer a { color: var(--gold); font-weight: 700; text-decoration: none; } footer a:hover { text-decoration: underline; }
+[data-l] { display: none; } body.pt [data-l="pt"], body.en [data-l="en"], body.es [data-l="es"] { display: block; }
+body.pt span[data-l="pt"], body.en span[data-l="en"], body.es span[data-l="es"] { display: inline; }
+</style>
+</head>
+<body class="pt">
+<div class="top"><div class="in">
+  <img src="icons/icon-48.png" alt="" width="36" height="36"><b>Sobrevida</b>
+  <nav class="langs"><button data-set="pt">PT</button><button data-set="en">EN</button><button data-set="es">ES</button></nav>
+</div></div>
+<main>
+  <div class="hero"><h1>Sobrevida</h1>
+    <p class="tag"><span data-l="pt">Extensão para o PokéSurvivor</span><span data-l="en">Extension for PokéSurvivor</span><span data-l="es">Extensión para PokéSurvivor</span></p></div>
+
+  <section id="usar">
+    <div data-l="pt"><h2>Como usar</h2>
+      <ol>
+        <li>Abra <code>pokesurvivor.com</code> e vá em <b>Criar conta</b> (ou <b>Jogar como convidado</b>). O menu <b>Escolha seu parceiro</b> abre do lado, com os 29 Pokémon iniciais do jogo. O <b>⭐</b> marca o melhor.</li>
+        <li>Clique no Pokémon e em <b>Quero o …</b>. Pronto: ele fica guardado.</li>
+        <li>Quando o teste de 8 perguntas aparecer, a Sobrevida responde sozinha e confirma. Em 4 Pokémon (Treecko/Froakie e Piplup/Quaxly têm os mesmos traços) o jogo sorteia entre os dois; aí ela termina pelo <b>Escolher outro</b> do próprio jogo. Sai sempre o que você escolheu.</li>
+        <li>O <b>botão de coração</b> no canto (ou <b>Alt+S</b>) abre o menu: trocar o parceiro, ligar/desligar a resposta automática, e no rodapé <b>Relatar bug</b>, <b>Procurar atualização</b>, <b>Novidades</b>, idioma e <b>?</b> (tutorial). Dá para arrastar o botão. Durante a partida ele some.</li>
+      </ol>
+      <p class="note">Conta que já tem parceiro não vê o teste de novo. A Sobrevida só clica nos botões do jogo; não mexe no save nem no ranking.</p></div>
+    <div data-l="en"><h2>How to use</h2>
+      <ol>
+        <li>Open <code>pokesurvivor.com</code> and go to <b>Create account</b> (or <b>Play as guest</b>). The <b>Choose your partner</b> menu opens on the side with the game's 29 starters. <b>⭐</b> marks the best.</li>
+        <li>Click the Pokémon and <b>I want …</b>. Done: it's saved.</li>
+        <li>When the 8-question quiz shows up, Sobrevida answers it and confirms. For 4 Pokémon (Treecko/Froakie and Piplup/Quaxly share both traits) the game picks one of the pair at random; then it finishes through the game's own <b>Choose another</b>. You always get the one you picked.</li>
+        <li>The <b>heart button</b> in the corner (or <b>Alt+S</b>) opens the menu: change partner, turn automatic answers on/off, and in the footer <b>Report a bug</b>, <b>Check for updates</b>, <b>What's new</b>, language and <b>?</b> (tutorial). You can drag the button. It hides during a run.</li>
+      </ol>
+      <p class="note">An account that already has a partner won't see the quiz again. Sobrevida only clicks the game's buttons; it doesn't touch your save or the leaderboard.</p></div>
+    <div data-l="es"><h2>Cómo usar</h2>
+      <ol>
+        <li>Abre <code>pokesurvivor.com</code> y ve a <b>Crear cuenta</b> (o <b>Jugar como invitado</b>). El menú <b>Elige a tu compañero</b> se abre al lado con los 29 iniciales del juego. <b>⭐</b> marca el mejor.</li>
+        <li>Haz clic en el Pokémon y en <b>Quiero a …</b>. Listo: queda guardado.</li>
+        <li>Cuando salga el test de 8 preguntas, Sobrevida lo responde y confirma. En 4 Pokémon (Treecko/Froakie y Piplup/Quaxly tienen los mismos rasgos) el juego sortea entre los dos; entonces termina por el <b>Elegir otro</b> del propio juego. Siempre sale el que elegiste.</li>
+        <li>El <b>botón del corazón</b> en la esquina (o <b>Alt+S</b>) abre el menú: cambiar de compañero, activar/desactivar las respuestas automáticas, y abajo <b>Reportar un fallo</b>, <b>Buscar actualización</b>, <b>Novedades</b>, idioma y <b>?</b> (tutorial). Se puede arrastrar. Durante la partida se esconde.</li>
+      </ol>
+      <p class="note">Una cuenta que ya tiene compañero no vuelve a ver el test. Sobrevida solo pulsa los botones del juego; no toca tu partida guardada ni el ranking.</p></div>
+  </section>
+
+  <section id="instalar">
+    <div data-l="pt"><h2>Instalar</h2>
+      <h3>Chrome, Edge, Brave e Opera GX</h3>
+      <ol><li>Baixe o <code>sobrevida-vX.Y.Z.zip</code> do Release no GitHub e extraia numa pasta fixa (ela vai ficar lá).</li>
+        <li>Abra <code>chrome://extensions</code> (ou <code>edge://extensions</code>, <code>brave://extensions</code>, <code>opera://extensions</code>).</li>
+        <li>Ligue o <b>Modo do desenvolvedor</b>, clique em <b>Carregar sem compactação</b> e escolha a pasta.</li></ol>
+      <p class="note">Opera GX: se a extensão sumir depois de fechar o navegador, carregue de novo (problema conhecido do Opera).</p>
+      <h3>Firefox 140+</h3>
+      <ol><li>Baixe o <code>sobrevida-vX.Y.Z.xpi</code> do Release e confirme a instalação (ou <code>about:addons</code> → engrenagem → <b>Instalar extensão de arquivo</b>).</li>
+        <li>Ele se atualiza sozinho.</li></ol></div>
+    <div data-l="en"><h2>Install</h2>
+      <h3>Chrome, Edge, Brave and Opera GX</h3>
+      <ol><li>Download <code>sobrevida-vX.Y.Z.zip</code> from the GitHub Release and extract it to a fixed folder (it stays there).</li>
+        <li>Open <code>chrome://extensions</code> (or <code>edge://extensions</code>, <code>brave://extensions</code>, <code>opera://extensions</code>).</li>
+        <li>Turn on <b>Developer mode</b>, click <b>Load unpacked</b> and pick the folder.</li></ol>
+      <p class="note">Opera GX: if the extension disappears after closing the browser, load it again (known Opera issue).</p>
+      <h3>Firefox 140+</h3>
+      <ol><li>Download <code>sobrevida-vX.Y.Z.xpi</code> from the Release and confirm the install (or <code>about:addons</code> → gear → <b>Install Add-on From File</b>).</li>
+        <li>It updates itself.</li></ol></div>
+    <div data-l="es"><h2>Instalar</h2>
+      <h3>Chrome, Edge, Brave y Opera GX</h3>
+      <ol><li>Descarga <code>sobrevida-vX.Y.Z.zip</code> del Release en GitHub y extráelo en una carpeta fija (se queda ahí).</li>
+        <li>Abre <code>chrome://extensions</code> (o <code>edge://extensions</code>, <code>brave://extensions</code>, <code>opera://extensions</code>).</li>
+        <li>Activa el <b>Modo de desarrollador</b>, haz clic en <b>Cargar descomprimida</b> y elige la carpeta.</li></ol>
+      <p class="note">Opera GX: si la extensión desaparece al cerrar el navegador, cárgala de nuevo (problema conocido de Opera).</p>
+      <h3>Firefox 140+</h3>
+      <ol><li>Descarga <code>sobrevida-vX.Y.Z.xpi</code> del Release y confirma la instalación (o <code>about:addons</code> → engranaje → <b>Instalar complemento desde archivo</b>).</li>
+        <li>Se actualiza solo.</li></ol></div>
+  </section>
+
+  <section id="atualizar">
+    <div data-l="pt"><h2>Atualizar</h2>
+      <p>A Sobrevida procura versão nova sozinha (a cada 30 min e quando você volta para a aba do PokéSurvivor). Quando acha, aparece um aviso no meio da tela, na hora. O <b>X</b> só adia por 1 hora. Se a versão for <b>urgente</b>, o aviso não tem X e a Sobrevida fica pausada até você atualizar. O botão <b>Atualizar</b> baixa o zip novo para Downloads: extraia <b>por cima da mesma pasta</b>. A extensão percebe em até 1 minuto e se recarrega sozinha. No Firefox, confirme a instalação do .xpi (ou espere: ele atualiza sozinho).</p></div>
+    <div data-l="en"><h2>Update</h2>
+      <p>Sobrevida checks for new versions by itself (every 30 min and whenever you come back to the PokéSurvivor tab). When it finds one, a notice shows up in the middle of the screen right away. The <b>X</b> only postpones it for 1 hour. If the version is <b>urgent</b>, the notice has no X and Sobrevida stays paused until you update. The <b>Update</b> button downloads the new zip to Downloads: extract it <b>over the same folder</b>. The extension notices within a minute and reloads itself. On Firefox, confirm the .xpi install (or wait: it updates itself).</p></div>
+    <div data-l="es"><h2>Actualizar</h2>
+      <p>Sobrevida busca versiones nuevas sola (cada 30 min y cuando vuelves a la pestaña de PokéSurvivor). Cuando encuentra una, aparece un aviso en el medio de la pantalla al instante. La <b>X</b> solo lo pospone 1 hora. Si la versión es <b>urgente</b>, el aviso no tiene X y Sobrevida queda en pausa hasta que actualices. El botón <b>Actualizar</b> descarga el zip nuevo a Descargas: extráelo <b>sobre la misma carpeta</b>. La extensión lo nota en hasta 1 minuto y se recarga sola. En Firefox, confirma la instalación del .xpi (o espera: se actualiza solo).</p></div>
+  </section>
+
+  <section id="problema">
+    <div data-l="pt"><h2>Não respondeu o teste?</h2>
+      <ul><li>Confira no menu (coração) se há um Pokémon escolhido e se <b>Responder o teste sozinha</b> está ligado.</li>
+        <li>Firefox: em <code>about:addons</code> → Sobrevida → <b>Permissões</b>, deixe ligado o acesso a <code>pokesurvivor.com</code>.</li>
+        <li>Se o jogo mudou o teste, a Sobrevida usa o <b>Escolher outro</b>. Se mesmo assim falhar, use <b>Relatar bug</b> no menu.</li></ul></div>
+    <div data-l="en"><h2>Didn't answer the quiz?</h2>
+      <ul><li>Check in the menu (heart) that a Pokémon is chosen and <b>Answer the quiz for me</b> is on.</li>
+        <li>Firefox: in <code>about:addons</code> → Sobrevida → <b>Permissions</b>, keep access to <code>pokesurvivor.com</code> on.</li>
+        <li>If the game changed the quiz, Sobrevida uses <b>Choose another</b>. If it still fails, use <b>Report a bug</b> in the menu.</li></ul></div>
+    <div data-l="es"><h2>¿No respondió el test?</h2>
+      <ul><li>Revisa en el menú (corazón) que haya un Pokémon elegido y que <b>Responder el test por mí</b> esté activado.</li>
+        <li>Firefox: en <code>about:addons</code> → Sobrevida → <b>Permisos</b>, deja activado el acceso a <code>pokesurvivor.com</code>.</li>
+        <li>Si el juego cambió el test, Sobrevida usa <b>Elegir otro</b>. Si aun así falla, usa <b>Reportar un fallo</b> en el menú.</li></ul></div>
+  </section>
+  <footer><span data-l="pt">feito por</span><span data-l="en">made by</span><span data-l="es">hecho por</span> <a href="https://github.com/DredsGG" target="_blank" rel="noopener noreferrer">Dreds</a> · v<span id="ver"></span>
+    · <span data-l="pt">Projeto de fã, sem ligação com o PokéSurvivor, Nintendo ou The Pokémon Company.</span><span data-l="en">Fan project, not affiliated with PokéSurvivor, Nintendo or The Pokémon Company.</span><span data-l="es">Proyecto de fan, sin relación con PokéSurvivor, Nintendo ni The Pokémon Company.</span></footer>
+</main>
+<script src="src/i18n.js"></script>
+<script src="guia.js"></script>
+</body>
+</html>

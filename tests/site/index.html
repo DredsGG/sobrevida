@@ -1,0 +1,101 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><title>PokéSurvivor (mock de teste)</title>
+<link rel="stylesheet" href="css/style.css"><style>body{background:#0d1a3a url() center/cover} #game{background:radial-gradient(circle at 40% 30%,#3a6b3a,#1d3b22 60%,#0b1a10)}</style></head>
+<body><canvas id="game"></canvas>
+<section id="scr-login" class="scr hidden">
+  <div class="box" style="width:min(420px,100%)">
+    <div class="logo">
+      <div class="t1">PokéSurvivor</div>
+      <div class="t2">Mundo Misterioso</div>
+    </div>
+    <p class="login-tag">Sobrevive a las hordas con tu compañero Pokémon · gratis, en PC y móvil</p>
+    <p class="login-official">Web oficial: pokesurvivor.com · si alguien te pide pagar, no somos nosotros</p>
+    <div class="tabs">
+      <div class="tab on" data-tab="login">Entrar</div>
+      <div class="tab" data-tab="register">Crear cuenta</div>
+    </div>
+    <form id="login-form" autocomplete="off">
+      <label for="f-user">Nombre</label>
+      <input id="f-user" class="field" maxlength="16" spellcheck="false" autocomplete="username" autocapitalize="none" autocorrect="off">
+      <label for="f-pass">Contraseña</label>
+      <input id="f-pass" class="field" type="password" maxlength="64">
+      <p id="login-err" class="err"></p>
+      <p class="note"><a href="#" id="f-forgot">¿Olvidaste tu contraseña?</a></p>
+      <p id="forgot-note" class="note hidden">Si vinculaste tu Gmail, pulsa <b>Entrar con Google</b> con ese Gmail: es tu misma cuenta.
+        Si no lo vinculaste, no se puede recuperar: crea una cuenta nueva (y esta vez vincula tu Gmail desde el aviso que sale al entrar).</p>
+      <div class="row">
+        <button id="btn-auth" class="btn gold grow" type="submit">Entrar</button>
+      </div>
+    </form>
+    <div class="row" style="margin-top:10px">
+      <button id="btn-google" class="btn google grow hidden" type="button">Entrar con Google</button>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button id="btn-guest" class="btn ghost grow" type="button">Jugar como invitado</button>
+    </div>
+    <p class="note center" id="login-mode"></p>
+    <p class="note center"><a href="guia/">Guía</a> · <a href="pokedex/">Pokédex</a> · <a href="#" class="legal-link" data-legal>Aviso legal y privacidad</a></p>
+  </div>
+</section>
+
+<!-- ====== Test de personalidad ====== -->
+<section id="scr-test" class="scr dim hidden">
+  <div class="box test-box">
+    <div class="progress"><i id="test-bar"></i></div>
+    <p class="sub" id="test-count"></p>
+    <p class="q" id="test-q"></p>
+    <div class="answers" id="test-a"></div>
+  </div>
+</section>
+
+<!-- ====== Resultado del test ====== -->
+<section id="scr-result" class="scr dim hidden">
+  <div class="box result">
+    <p class="sub">Tu personalidad es…</p>
+    <div class="trait" id="res-trait"></div>
+    <p id="res-text"></p>
+    <canvas id="res-stage" class="stage" width="200" height="150"></canvas>
+    <h3>Tu compañero: <span class="gold" id="res-name"></span></h3>
+    <div class="row" style="justify-content:center;margin-top:14px">
+      <button id="res-ok" class="btn gold">¡Vamos juntos!</button>
+      <button id="res-other" class="btn">Elegir otro</button>
+    </div>
+  </div>
+</section>
+
+<!-- ====== Elegir compañero ====== -->
+<section id="scr-starters" class="scr dim hidden">
+  <div class="box wide">
+    <h2>Elige a tu compañero</h2>
+    <p class="sub">Los iniciales de todas las regiones, y dos amigos más.</p>
+    <div class="grid" id="starter-grid"></div>
+    <div class="row between" style="margin-top:14px">
+      <button id="starter-back" class="btn ghost">Volver</button>
+      <span id="starter-info" class="grow" style="color:var(--muted)"></span>
+      <button id="starter-ok" class="btn gold" disabled>Elegir</button>
+    </div>
+  </div>
+</section>
+
+
+<section id="scr-menu" class="scr hidden"><div class="box"><h2>Menú</h2><p id="menu-partner"></p></div></section>
+<script>
+// MOCK de teste da Sobrevida: reproduz js/ui/test.js e G.personalityResult do PokéSurvivor (mesmos IDs, mesma regra, empate sorteado).
+const Q=[{"q": "¡Hay una pelea en mitad del pueblo! ¿Qué haces?", "a": [{"t": "Me meto a ayudar sin pensarlo.", "p": {"valiente": 2, "impulsivo": 1}}, {"t": "Busco a alguien que pueda pararla.", "p": {"prudente": 2, "leal": 1}}, {"t": "Lo observo todo desde lejos.", "p": {"sereno": 1, "tímido": 1, "solitario": 1}}, {"t": "Me río y animo a los dos.", "p": {"travieso": 2, "caótico": 1}}]}, {"q": "Te encuentras una cartera en el suelo.", "a": [{"t": "La llevo enseguida a la policía.", "p": {"leal": 2, "dulce": 1}}, {"t": "Busco a su dueño aunque tarde horas.", "p": {"tenaz": 2, "paciente": 1}}, {"t": "Primero miro qué hay dentro…", "p": {"astuto": 2, "travieso": 1}}, {"t": "Ni la toco, no vaya a ser.", "p": {"prudente": 1, "tímido": 2}}]}, {"q": "Tu día libre ideal es…", "a": [{"t": "Una aventura sin ningún plan.", "p": {"impulsivo": 2, "alegre": 1}}, {"t": "Leer, pensar, estar tranquilo.", "p": {"sereno": 2, "tranquilo": 1}}, {"t": "Quedar con todos mis amigos.", "p": {"alegre": 2, "leal": 1}}, {"t": "Entrenar para ser mejor.", "p": {"tenaz": 2, "orgulloso": 1}}]}, {"q": "Mañana tienes un examen importante.", "a": [{"t": "Estudio hasta las tantas.", "p": {"tenaz": 2, "prudente": 1}}, {"t": "Repaso lo justo: confío en mí.", "p": {"orgulloso": 2, "sereno": 1}}, {"t": "Me agobio muchísimo.", "p": {"tímido": 2, "dulce": 1}}, {"t": "¿Examen? Ya veré mañana.", "p": {"caótico": 2, "tranquilo": 1}}]}, {"q": "¿Qué dicen de ti tus amigos?", "a": [{"t": "Que soy lo más divertido del grupo.", "p": {"alegre": 2, "travieso": 1}}, {"t": "Que siempre pueden contar conmigo.", "p": {"leal": 2, "dulce": 1}}, {"t": "Que soy un poco misterioso.", "p": {"solitario": 2, "astuto": 1}}, {"t": "Que no me rindo nunca.", "p": {"valiente": 1, "tenaz": 2}}]}, {"q": "El camino se divide: uno oscuro y corto, otro largo y soleado.", "a": [{"t": "El oscuro, ¡más emoción!", "p": {"valiente": 2, "impulsivo": 1}}, {"t": "El largo, sin prisa.", "p": {"paciente": 2, "prudente": 1}}, {"t": "Me siento a pensarlo un rato.", "p": {"tranquilo": 2, "sereno": 1}}, {"t": "Ninguno: abro un atajo nuevo.", "p": {"astuto": 2, "caótico": 1}}]}, {"q": "Alguien se burla de ti delante de todos.", "a": [{"t": "Le contesto en el acto.", "p": {"orgulloso": 2, "impulsivo": 1}}, {"t": "Le ignoro por completo.", "p": {"sereno": 2, "solitario": 1}}, {"t": "Me afecta, aunque no lo diga.", "p": {"tímido": 2, "dulce": 1}}, {"t": "Le devuelvo una broma mejor.", "p": {"travieso": 2, "astuto": 1}}]}, {"q": "¿Qué es lo más importante para ti?", "a": [{"t": "La amistad.", "p": {"leal": 2, "alegre": 1}}, {"t": "La libertad.", "p": {"solitario": 2, "impulsivo": 1}}, {"t": "La calma.", "p": {"tranquilo": 2, "paciente": 1}}, {"t": "Ser el mejor.", "p": {"orgulloso": 2, "tenaz": 1}}]}];
+const ST=[{"dex": 1, "name": "Bulbasaur", "traits": ["leal", "paciente"]}, {"dex": 4, "name": "Charmander", "traits": ["valiente", "impulsivo"]}, {"dex": 7, "name": "Squirtle", "traits": ["prudente", "leal"]}, {"dex": 152, "name": "Chikorita", "traits": ["dulce", "paciente"]}, {"dex": 155, "name": "Cyndaquil", "traits": ["tímido", "impulsivo"]}, {"dex": 158, "name": "Totodile", "traits": ["travieso", "valiente"]}, {"dex": 252, "name": "Treecko", "traits": ["sereno", "astuto"]}, {"dex": 255, "name": "Torchic", "traits": ["alegre", "valiente"]}, {"dex": 258, "name": "Mudkip", "traits": ["tenaz", "leal"]}, {"dex": 387, "name": "Turtwig", "traits": ["paciente", "tenaz"]}, {"dex": 390, "name": "Chimchar", "traits": ["travieso", "alegre"]}, {"dex": 393, "name": "Piplup", "traits": ["orgulloso", "prudente"]}, {"dex": 495, "name": "Snivy", "traits": ["orgulloso", "astuto"]}, {"dex": 498, "name": "Tepig", "traits": ["tenaz", "alegre"]}, {"dex": 501, "name": "Oshawott", "traits": ["valiente", "travieso"]}, {"dex": 650, "name": "Chespin", "traits": ["travieso", "tenaz"]}, {"dex": 653, "name": "Fennekin", "traits": ["astuto", "sereno"]}, {"dex": 656, "name": "Froakie", "traits": ["sereno", "astuto"]}, {"dex": 722, "name": "Rowlet", "traits": ["sereno", "dulce"]}, {"dex": 725, "name": "Litten", "traits": ["solitario", "orgulloso"]}, {"dex": 728, "name": "Popplio", "traits": ["alegre", "dulce"]}, {"dex": 810, "name": "Grookey", "traits": ["alegre", "travieso"]}, {"dex": 813, "name": "Scorbunny", "traits": ["impulsivo", "alegre"]}, {"dex": 816, "name": "Sobble", "traits": ["tímido", "astuto"]}, {"dex": 906, "name": "Sprigatito", "traits": ["solitario", "astuto"]}, {"dex": 909, "name": "Fuecoco", "traits": ["tranquilo", "tenaz"]}, {"dex": 912, "name": "Quaxly", "traits": ["orgulloso", "prudente"]}, {"dex": 54, "name": "Psyduck", "traits": ["caótico", "tímido"]}, {"dex": 79, "name": "Slowpoke", "traits": ["tranquilo", "paciente"]}];
+const $=id=>document.getElementById(id);
+const show=id=>{for(const s of document.querySelectorAll('.scr'))s.classList.add('hidden');$(id).classList.remove('hidden');};
+let idx=0,scores={},result=null,picked=null;
+window.__log=[];
+function personalityResult(sc){const trait=Object.keys(sc).sort((a,b)=>sc[b]-sc[a])[0];let best=[],top=-1;for(const s of ST){const v=2*(sc[s.traits[0]]||0)+(sc[s.traits[1]]||0);if(v>top){top=v;best=[s]}else if(v===top)best.push(s)}window.__tie=best.map(s=>s.dex);return{trait,dex:best[Math.floor(Math.random()*best.length)].dex}}
+function start(){idx=0;scores={};result=null;show('scr-test');render()}
+function render(){const q=Q[idx];$('test-bar').style.width=(idx/Q.length*100)+'%';$('test-count').textContent=`Pregunta ${idx+1} de ${Q.length}`;$('test-q').textContent=q.q;const box=$('test-a');box.innerHTML='';(location.hash.includes('shuffle')?q.a.slice().reverse():q.a).forEach(a=>{const b=document.createElement('button');b.className='answer';b.textContent=a.t;b.onclick=()=>answer(a);box.appendChild(b)})}
+function answer(a){__log.push(a.t);for(const k in a.p)scores[k]=(scores[k]||0)+a.p[k];idx++;if(idx<Q.length)render();else showResult()}
+function showResult(){result=personalityResult(scores);const m=ST.find(s=>s.dex===result.dex);$('res-trait').textContent=result.trait;$('res-name').textContent=m.name;show('scr-result')}
+function openStarters(){picked=null;$('starter-ok').disabled=true;const g=$('starter-grid');g.innerHTML='';for(const s of ST){const c=document.createElement('div');c.className='cell'+(result&&s.dex===result.dex?' on':'');const cv=document.createElement('canvas');cv.width=92;cv.height=80;c.appendChild(cv);c.insertAdjacentHTML('beforeend','<b>'+s.name+'</b>');c.onclick=()=>{g.querySelectorAll('.cell').forEach(x=>x.classList.remove('on'));c.classList.add('on');picked=s.dex;$('starter-ok').disabled=false};if(result&&s.dex===result.dex){picked=s.dex;$('starter-ok').disabled=false}g.appendChild(c)}show('scr-starters')}
+function choose(dex){window.__chosen=dex;window.__via=$('scr-result').classList.contains('hidden')?'grade':'teste';$('menu-partner').textContent='partner '+dex;show('scr-menu')}
+$('res-ok').onclick=()=>choose(result.dex);$('res-other').onclick=openStarters;$('starter-back').onclick=()=>show('scr-result');$('starter-ok').onclick=()=>{if(picked)choose(picked)};
+$('btn-guest').onclick=start;
+for(const t of document.querySelectorAll('#scr-login .tab'))t.onclick=()=>{document.querySelectorAll('#scr-login .tab').forEach(x=>x.classList.toggle('on',x===t));$('btn-auth').textContent=t.dataset.tab==='register'?'Crear cuenta':'Entrar'};
+$('login-form').onsubmit=e=>{e.preventDefault();start()};
+show('scr-login');
+</script></body></html>

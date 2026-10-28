@@ -1,0 +1,4 @@
+node_modules/
+tests/.game
+tests/prints/
+out/
