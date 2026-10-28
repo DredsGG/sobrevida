@@ -132,8 +132,9 @@ const ate = async (fn, ms = 6000) => { const t0 = Date.now(); while (Date.now() 
   // 8. Parar no meio
   await store({ 'sv.alvo': 1 });
   await abrir();
-  await page.click('#btn-guest'); await sleep(700);
-  await shadow('.bar .stop').click(); await sleep(1500);
+  await page.click('#btn-guest');
+  await page.waitForFunction(() => window.__log.length >= 1, null, { timeout: 8000 }).catch(() => {});   // pega no meio, também em máquina lenta
+  await shadow('.bar .stop').click({ force: true }); await sleep(1500);
   const n = await page.evaluate(() => window.__log.length);
   ok(n < 8 && !(await page.evaluate(() => window.__chosen)), `"Parar" interrompe (respondeu ${n} de 8)`);
 
