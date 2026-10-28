@@ -117,7 +117,8 @@ try:
     js("document.querySelector('#btn-guest').click();")
     menu = wait_for(lambda: 'scr-menu' in visible_screens(), 40)
     shot('ff-03-menu-jogo.png')
-    st = js(ST) or {}
+    # o status do piloto chega a cada 0,5 s: espera ele trazer o parceiro novo antes de conferir
+    st = wait_for(lambda: (lambda s: s if s and (s.get('partner') or {}).get('dex') else None)(js(ST)), 10) or {}
     check('teste respondido sozinho → Psyduck', menu and (st.get('partner') or {}).get('dex') == 54, {'screens': visible_screens(), 'partner': st.get('partner')})
 
     # farm: abre o menu do coração e liga
