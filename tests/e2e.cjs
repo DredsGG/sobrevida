@@ -72,9 +72,8 @@ const ate = async (fn, ms = 6000) => { const t0 = Date.now(); while (Date.now() 
   await page.screenshot({ path: path.join(SHOTS, '04-pronto.png') });
   ok(await shadow('.fab').isVisible(), 'botão de coração aparece no menu do jogo');
   await sleep(1000);   // a troca de telas do jogo (resultado → menu) pode fechar um menu aberto cedo demais
-  await shadow('.fab').click(); await sleep(500);
-  if (!await shadow('.menu.on').count()) { await shadow('.fab').click(); await sleep(500); }
-  ok(await shadow('.menu.on').count() === 1, 'clique no coração abre o menu da Sobrevida');
+  await shadow('.fab').click();
+  ok(await ate(async () => await shadow('.menu.on').count() === 1, 3000), 'clique no coração abre o menu da Sobrevida');
   const rod = await shadow('.menu .ft').innerText();
   ok(/Relatar bug/.test(rod) && /Procurar atualização/.test(rod) && /feito por/.test(rod) && rod.includes('v' + JSON.parse(fs.readFileSync(path.join(EXT, 'manifest.json'))).version), 'rodapé com Relatar bug, Procurar atualização e "feito por Dreds · vX"');
   ok(await shadow('.menu .sig a[href="https://github.com/DredsGG"][target="_blank"]').count() === 1, '"Dreds" abre o GitHub em aba nova');
