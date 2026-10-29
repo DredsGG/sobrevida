@@ -532,7 +532,7 @@
     try { const v = JSON.parse(e.detail); if (v && typeof v === 'object') { aprendido = v; ext.storage.local.set({ 'sv.learn': v }).catch(() => {}); } } catch (_) {}
   });
   function mandarCfg() {
-    try { document.dispatchEvent(new CustomEvent('sobrevida:cfg', { detail: JSON.stringify(Object.assign({}, farm, { on: !!farm.on && dono && !pausado(), learn: aprendido })) })); } catch (_) {}
+    try { document.dispatchEvent(new CustomEvent('sobrevida:cfg', { detail: JSON.stringify(Object.assign({}, farm, { on: !!farm.on && dono && !pausado(), learn: aprendido, lang })) })); } catch (_) {}
   }
   // uma aba só joga por vez (duas abas na mesma conta brigariam pelo save): a aba "dona" renova a posse a cada 3 s;
   // se ela fechar, outra assume em até 10 s
@@ -594,17 +594,14 @@
     .sv-cola-t{color:#ffd23f;font-weight:700;margin-bottom:6px}
     .sv-cola-r{display:grid;grid-template-columns:84px 1fr;gap:8px;margin:5px 0}
     .sv-cola-r .k{color:#b9cbf0}.sv-cola small{font-size:12px}.sv-cola .m{color:#b9cbf0}.sv-cola .ok{color:#7fe8a0}
-    .sv-cola-tot{margin:8px 0 2px;color:#7fe8a0}.sv-cola-p{margin:6px 0 0;color:#8fa3c4;font-size:11px}`;
-  function desenharCola() {
-    const d = document.getElementById('dex-detail'), ext = d && d.querySelector('.mon-extra');
-    let box = d && d.querySelector('.sv-cola');
-    if (!farm.cola || !ext || dead) { if (box) box.remove(); return; }
+    .sv-cola-tot{margin:8px 0 2px;color:#7fe8a0}.pause-box .sv-cola{max-width:460px;margin:14px auto 4px}.sv-cola-p{margin:6px 0 0;color:#8fa3c4;font-size:11px}`;
+  // painel da colinha num lugar da página: a ficha da coleção ou a tela de pausa (0.8.0)
+  function painelCola(onde, depoisDe, dex, extra) {
+    let box = onde.querySelector('.sv-cola');
     if (!document.getElementById('sv-cola-css')) { const st = document.createElement('style'); st.id = 'sv-cola-css'; st.textContent = COLA_CSS; document.head.appendChild(st); }
-    const dex = dexDaFicha();
-    if (!dex) return;
     // a chave inclui o que a ficha mostra (natureza, habilidade, MT): depois de uma Menta/Cápsula/MT, recalcula
-    const chave = dex + '|' + (ext.textContent || '').replace(/\s+/g, ' ').trim();
-    if (!box) { box = document.createElement('div'); box.className = 'sv-cola'; box.setAttribute('translate', 'no'); ext.insertAdjacentElement('afterend', box); }
+    const chave = dex + '|' + extra;
+    if (!box) { box = document.createElement('div'); box.className = 'sv-cola'; box.setAttribute('translate', 'no'); depoisDe.insertAdjacentElement('afterend', box); }
     const r = COLA.dados[chave];
     if (r === undefined) {
       if (COLA.chave !== chave || Date.now() - COLA.pedidoEm > 4000) {
@@ -619,6 +616,19 @@
     if (box.dataset.sig === sig) return;
     box.innerHTML = htmlCola(r); box.dataset.sig = sig;
   }
+  function desenharCola() {
+    const d = document.getElementById('dex-detail'), ext = d && d.querySelector('.mon-extra');
+    const pausa = document.querySelector('#scr-pause:not(.hidden) .pause-box');
+    if (!farm.cola || dead) { document.querySelectorAll('.sv-cola').forEach((x) => x.remove()); return; }
+    if (ext) { const dex = dexDaFicha(); if (dex) painelCola(d, ext, dex, (ext.textContent || '').replace(/\s+/g, ' ').trim()); }
+    else if (d) { const x = d.querySelector('.sv-cola'); if (x) x.remove(); }
+    // pausa: a colinha do Pokémon desta partida (o parceiro), embaixo dos botões
+    if (pausa && pst && pst.partner && pst.partner.dex) {
+      const linha = pausa.querySelector('.row') || pausa.lastElementChild;
+      if (linha) painelCola(pausa, linha, pst.partner.dex, 'pausa');
+    }
+  }
+
 
   async function setFarm(patch) {
     Object.assign(farm, patch);
@@ -662,6 +672,7 @@
       case 'moves': return T.aMoves(x.nome, x.start, x.start2, (x.bans || []).join(', '));
       case 'shop': return T.aShop(x.nome, x.tipo, x.alvo, x.ganho, x.preco);
       case 'skins': return T.aSkins(x.n);
+      case 'video': return T.aVideo;
       case 'save': return T.aSave;
       default: return a.k;
     }
@@ -925,6 +936,7 @@
     if (dead || !alive()) return;
     ui();
     try { desenharCola(); } catch (_) {}
+    if (tick.lang !== lang) { tick.lang = lang; mandarCfg(); }
     const t = tela();
     const fab = root.querySelector('.fab');
     // o botão só aparece fora da partida (nas telas de entrar, teste, escolha e menu); durante a run fica escondido

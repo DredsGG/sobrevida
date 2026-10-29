@@ -9,7 +9,7 @@ Choose your partner Pokémon before the 8-question personality quiz and get exac
 
 ![Manifest V3](https://img.shields.io/badge/Manifest-V3-4285F4?logo=googlechrome&logoColor=white)
 ![Firefox](https://img.shields.io/badge/Firefox-140%2B-FF7139?logo=firefoxbrowser&logoColor=white)
-![Version](https://img.shields.io/badge/version-0.7.1-f4b400)
+![Version](https://img.shields.io/badge/version-0.8.0-f4b400)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 **Works on:** Chrome · Edge · Brave · Opera GX · Firefox 140+
@@ -58,7 +58,7 @@ Open the heart menu and press **Start farm** (or **Alt+F** anywhere in the game)
 
 ### Cheat sheet in the collection
 
-For anyone who plays by hand: open one of your Pokémon in the game's collection and, right under its nature and ability, Sobrevida shows the best nature, the best ability (and whether it's the hidden one), the build (two main attacks, buffs and the switch move), which move to start with, what to ban and the TMs worth buying. When yours isn't the best, it says how much strength you'd gain by changing it. It uses the same calculations as the farm, but against every enemy and boss that can show up, so it doesn't change from run to run. It's an estimate from the game's own data (and the real damage from your runs), not a guarantee. You can turn it off in the menu.
+For anyone who plays by hand: open one of your Pokémon in the game's collection and, right under its nature and ability, Sobrevida shows the best nature, the best ability (and whether it's the hidden one), the build (two main attacks, buffs and the switch move), which move to start with, what to ban and the TMs worth buying. When yours isn't the best, it says how much strength you'd gain by changing it. It uses the same calculations as the farm, but against every enemy and boss that can show up, so it doesn't change from run to run. In a run, the level-up card (or item, or bond) that the build would take gets a gold "Cheat sheet" badge (or the reroll button, when nothing fits), the pause screen shows the full cheat sheet for the Pokémon you're playing, and the new HUD has a strip with the build's moves, lit up once you have them. It's an estimate from the game's own data (and the real damage from your runs), not a guarantee. You can turn it off in the menu.
 
 <img src="docs/sobrevida-cheat-sheet.png" width="270" alt="Sobrevida cheat sheet panel for Marill in the collection: Nature Lonely (+Attack −Defense), yours Naughty does just as well; Ability Huge Power, +50% damage with physical moves, yours Thick Fat, +23% strength by switching; Build Substitute + Water Gun (physical), buffs Harden and Swords Dance, switch Dazzling Gleam; Start with Substitute, 2nd Water Gun, ban Nasty Plot, Agility, Aqua Ring; TMs worth it: none makes a difference; With all of it +23% strength over today">
 

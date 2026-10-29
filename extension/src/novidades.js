@@ -2,6 +2,11 @@
 // Frases curtas, do ponto de vista de quem usa. Aparece uma vez, na primeira abertura depois da atualização.
 globalThis.SV_NOVIDADES = {
   pt: {
+    '0.8.0': [
+      "Colinha também na partida: ao subir de nível, a carta que a build da Sobrevida pegaria ganha o selo \"Colinha\" (ou o botão de trocar cartas, quando nenhuma serve). O mesmo vale para o item e o vínculo.",
+      "Na pausa aparece a colinha completa do Pokémon da partida, e no HUD novo uma faixa mostra os golpes da build (acesos os que você já tem).",
+      "Farm: o jogo passou a mostrar no menu o aviso de vídeo novo do canal, e ele ficava aberto por cima da partida. Agora o farm fecha o aviso (\"Agora não\") antes de começar.",
+    ],
     '0.7.1': [
       "Visual novo da partida: o golpe pronto esperando um inimigo no alcance não pisca mais na barra de golpes (ficava completando e voltando).",
     ],
@@ -77,6 +82,11 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   en: {
+    '0.8.0': [
+      "Cheat sheet in the run too: on level-up, the card Sobrevida's build would take gets a \"Cheat sheet\" badge (or the reroll button, when none fits). Same for items and bonds.",
+      "The pause screen shows the full cheat sheet for the Pokémon you're playing, and the new HUD has a strip with the build's moves (lit up once you have them).",
+      "Farm: the game now shows a new channel video notice in the menu, and it stayed open on top of the run. The farm now closes it (\"Not now\") before starting.",
+    ],
     '0.7.1': [
       "New in-run look: a ready move waiting for an enemy in range no longer flickers in the moves bar (it kept filling up and going back).",
     ],
@@ -152,6 +162,11 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   es: {
+    '0.8.0': [
+      "Chuleta también en la partida: al subir de nivel, la carta que cogería la build de Sobrevida lleva el sello \"Chuleta\" (o el botón de cambiar cartas, si ninguna sirve). Lo mismo con el objeto y el vínculo.",
+      "En la pausa sale la chuleta completa del Pokémon de la partida, y en el HUD nuevo una franja muestra los golpes de la build (encendidos los que ya tienes).",
+      "Farm: el juego ahora muestra en el menú el aviso de vídeo nuevo del canal, y se quedaba abierto encima de la partida. Ahora el farm lo cierra (\"Ahora no\") antes de empezar.",
+    ],
     '0.7.1': [
       "Visual nuevo de la partida: el golpe listo esperando un enemigo a su alcance ya no parpadea en la barra de golpes (se completaba y volvía).",
     ],

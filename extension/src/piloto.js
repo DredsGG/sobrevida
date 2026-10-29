@@ -47,6 +47,8 @@
     gacha: true,        // tirar gacha com os tickets
     partner: true,      // trocar de parceiro sozinho: o melhor que ainda não está 100%
     skins: true,        // Halloween: comprar as skins de bruja com os doces
+    cola: true,         // 0.7.0/0.8.0: colinha (coleção, cartas de nível, pausa e faixa no HUD)
+    lang: 'pt',         // idioma da Sobrevida (textos que o piloto desenha)
     hud: true,          // 0.6.0: visual novo da partida (card do Pokémon, relógio, chefe, golpes); vale com o farm desligado
     shop: true,         // 0.5.0: Loja Kecleon — Menta, Cápsula e MT para o parceiro quando a conta mostra ganho
     missions: true,     // recolher prêmios de missões
@@ -62,9 +64,10 @@
     try {
       const c = JSON.parse(e.detail || '{}');
       const was = cfg.on;
-      for (const k of ['on', 'upgrades', 'gacha', 'partner', 'skins', 'missions', 'shop', 'hud']) if (typeof c[k] === 'boolean') cfg[k] = c[k];
+      for (const k of ['on', 'upgrades', 'gacha', 'partner', 'skins', 'missions', 'shop', 'hud', 'cola']) if (typeof c[k] === 'boolean') cfg[k] = c[k];
       if (typeof c.reserve === 'number' && c.reserve >= 0) cfg.reserve = c.reserve;
       if (c.modo === 'solo' || c.modo === 'grupo') cfg.modo = c.modo;
+      if (c.lang === 'pt' || c.lang === 'en' || c.lang === 'es') cfg.lang = c.lang;
       if (c.learn && typeof c.learn === 'object') try {
         for (const [k, v] of Object.entries(c.learn)) if (v && v.eff > 0 && v.eff < 60 && v.n > 0 && !(k in KB.learn)) KB.learn[k] = { eff: +v.eff, n: Math.min(5000, v.n | 0) };
         KB.plans = {}; KB.vals = {};
@@ -108,24 +111,32 @@
     };
     // cartas de nível (guarda a última oferta: o "trocar cartas" chama offer de novo)
     const origOffer = ns.LevelUp.offer;
-    ns.LevelUp.offer = function () { return (S.lastOffer = origOffer.apply(this, arguments)); };
+    ns.LevelUp.offer = function () {
+      const r = (S.lastOffer = origOffer.apply(this, arguments));
+      // "trocar cartas" desenha as cartas novas sem passar por showLevelUp: marca a colinha de novo
+      setTimeout(() => { try { if (ns.UI.isOpen('scr-levelup')) colaCartas(ns, r); } catch (_) {} }, 40);
+      return r;
+    };
     const R = ns.RunUI;
     const origLevel = R.showLevelUp;
     R.showLevelUp = function (level, cards) {
       const r = origLevel.apply(this, arguments);
       M.lvlOpenAt = performance.now();
+      try { colaCartas(ns, cards); } catch (e) { log('colaCartas', e); }
       if (ativo(ns) && cfg.cards) schedule(() => chooseCard(ns, cards), 700); // 700 ms: o jogo ignora cliques nos primeiros 0,6 s
       return r;
     };
     const origBond = R.showBond;
     R.showBond = function (opt) {
       const r = origBond.apply(this, arguments);
+      try { colaVinculo(ns, opt); } catch (e) { log('colaVinculo', e); }
       if (ativo(ns) && cfg.bonds) schedule(() => chooseBond(ns, opt), 700);
       return r;
     };
     const origItem = R.showItemChoice;
     R.showItemChoice = function (cur, next) {
       const r = origItem.apply(this, arguments);
+      try { colaItem(ns, cur, next); } catch (e) { log('colaItem', e); }
       if (ativo(ns) && cfg.items) schedule(() => {
         const keep = itemRank(ns, cur) <= itemRank(ns, next);
         const el = document.querySelectorAll('#item-cards .card')[keep ? 0 : 1];
@@ -211,6 +222,8 @@
     if (st === 'playing') M.userPausedAt = 0;
     M.lastState = st;
     if (naRun && !ativo(ns)) return;
+    // 0.8.0: aviso "vídeo novo no canal" (jogo de 29-10) ficava aberto por cima da partida que o farm começava
+    if (cfg.on && open('scr-video')) fecharVideo();
     if (st === 'playing' || st === 'levelup' || st === 'choice' || st === 'held') { housekeeping(ns); levelWatch(ns); return; }
     // fora da partida, só o modo solo faz alguma coisa (rotina, voltar da tela final, começar partida)
     if (!cfg.on || grupo()) return;
@@ -267,7 +280,13 @@
     await sleep(250);
   }
 
+  // "Ahora no" do aviso de vídeo novo: o jogo já guardou que mostrou esse vídeo, então ele não volta
+  function fecharVideo() {
+    const b = document.getElementById('video-close');
+    if (b && open('scr-video')) { b.click(); act('video', {}); log('aviso de vídeo fechado'); }
+  }
   async function routine(ns) {
+    if (open('scr-video')) { fecharVideo(); await sleep(300); }
     if (M.needMaint) {
       M.needMaint = false;
       if (cfg.missions) { M.task = 'missions'; await missoes(ns); }
@@ -280,7 +299,8 @@
       M.task = 'save'; await guardar(ns);
       if (!cfg.on) return;
     }
-    // começa outra partida
+    // começa outra partida (antes, fecha o aviso de vídeo novo do canal, se estiver aberto)
+    if (open('scr-video')) { fecharVideo(); await sleep(300); }
     if (cfg.restart && open('scr-menu') && now() - M.lastPlay > 6000 && now() - M.overAt > 4000) {
       M.task = 'play';
       M.lastPlay = now();
@@ -1310,7 +1330,7 @@
   }
   // chips de buff embaixo do card: acúmulos, segundos e barrinha do tempo (pisca nos 2 últimos segundos)
   function desenharBuffs(ns, ctx, pl, L) {
-    let bx = L.card.x, by = L.card.y + L.card.h + 8;
+    let bx = L.card.x, by = L.card.y + L.card.h + 8 + (L.desvio || 0);
     const chips = [];
     for (const k in pl.buffs) {
       const b = pl.buffs[k];
@@ -1506,7 +1526,7 @@
       ctx.save();
       try {
         ctx.textBaseline = 'alphabetic';
-        if (L.card) { desenharCard(ns, ctx, pl, L, dt); desenharBuffs(ns, ctx, pl, L); }
+        if (L.card) { desenharCard(ns, ctx, pl, L, dt); L.desvio = cfg.cola ? desenharFaixaCola(ns, ctx, pl, L) : 0; desenharBuffs(ns, ctx, pl, L); }
         desenharRelogio(ns, ctx, pl, st, L);
         if (L.chefe) desenharChefe(ns, ctx, L, dt);
         desenharGolpes(ns, ctx, pl, L);
@@ -1516,6 +1536,83 @@
       } finally { ctx.restore(); }
       return r;
     };
+  }
+
+  // ======================= colinha na partida (0.8.0) =======================
+  // Para quem joga na mão: marca nas cartas de nível, no vínculo e no item o que a build da Sobrevida pegaria (a
+  // mesma conta do farm: scoreCard / bondRank / itemRank), e desenha uma faixa da build embaixo do card do HUD.
+  const COLA_TXT = { pt: { selo: 'Colinha', trocar: 'Colinha: trocar as cartas', faixa: 'Colinha' },
+                     en: { selo: 'Cheat sheet', trocar: 'Cheat sheet: reroll', faixa: 'Cheat sheet' },
+                     es: { selo: 'Chuleta', trocar: 'Chuleta: cambiar cartas', faixa: 'Chuleta' } };
+  const ct = () => COLA_TXT[cfg.lang] || COLA_TXT.pt;
+  function colaCss() {
+    if (document.getElementById('sv-cola-jogo')) return;
+    const st = document.createElement('style');
+    st.id = 'sv-cola-jogo';
+    st.textContent = `.sv-reco{position:relative;outline:3px solid #ffd23f !important;outline-offset:2px;box-shadow:0 0 22px rgba(255,210,63,.55) !important}
+      .sv-reco::before{content:attr(data-sv);position:absolute;top:-12px;left:50%;transform:translateX(-50%);z-index:2;white-space:nowrap;
+        background:linear-gradient(180deg,#ffe37a,#f0a31e);color:#1a3170;font:700 12px Pixelify,'Segoe UI',sans-serif;padding:2px 10px;border-radius:9px;
+        border:2px solid #0b1838;text-shadow:none;pointer-events:none}`;
+    (document.head || document.documentElement).appendChild(st);
+  }
+  function marcar(el, txt) {
+    document.querySelectorAll('.sv-reco').forEach((x) => { if (x !== el) { x.classList.remove('sv-reco'); x.removeAttribute('data-sv'); } });
+    if (!el) return;
+    colaCss();
+    el.classList.add('sv-reco');
+    el.setAttribute('data-sv', txt);
+    el.setAttribute('translate', 'no');
+  }
+  function colaCartas(ns, cards) {
+    if (!cfg.cola || !Array.isArray(cards)) return;
+    const p = ns.Game.player;
+    if (!p) return;
+    let best = 0, bestS = -Infinity;
+    cards.forEach((c, i) => { const s = scoreCard(ns, p, c); if (s > bestS) { bestS = s; best = i; } });
+    const rr = document.getElementById('lvl-reroll');
+    const els = document.querySelectorAll('#cards .card');
+    // nenhuma carta boa e ainda dá para trocar: a colinha manda trocar (o farm faz o mesmo)
+    if (bestS < 500 && rr && !rr.classList.contains('hidden')) return marcar(rr, ct().trocar);
+    marcar(els[best] || null, ct().selo);
+  }
+  function colaVinculo(ns, opt) {
+    if (!cfg.cola || !opt || !opt.loose) return;
+    const p = ns.Game.player;
+    if (!p) return;
+    const order = opt.loose.map((m, i) => ({ m, i })).sort((a, b) => bondRank(ns, p, a.m) - bondRank(ns, p, b.m));
+    setTimeout(() => marcar(document.querySelectorAll('#bond-cards .card')[order[0] ? order[0].i : -1] || null, ct().selo), 30);
+  }
+  function colaItem(ns, cur, next) {
+    if (!cfg.cola) return;
+    const keep = itemRank(ns, cur) <= itemRank(ns, next);
+    setTimeout(() => marcar(document.querySelectorAll('#item-cards .card')[keep ? 0 : 1] || null, ct().selo), 30);
+  }
+  // faixa da build no HUD: os 2 ataques, o de troca e os buffs; aceso = já tem nesta partida
+  function desenharFaixaCola(ns, ctx, pl, L) {
+    let plano = null;
+    try { plano = planoDe(ns, pl.mon.dex); } catch (_) {}
+    if (!plano) return 0;
+    const ids = [plano.a, plano.b, plano.parceiro].filter(Boolean), buffs = plano.buffs || [];
+    const tem = new Set((pl.moves || []).map((m) => m.id));
+    const x = L.card.x, y = L.card.y + L.card.h + 8, I = 18, G = 4;
+    ctx.font = FNT(800, 10);
+    const lw = ctx.measureText(ct().faixa).width;
+    const w = 12 + lw + 8 + (ids.length + buffs.length) * (I + G) + 10 + 6;
+    rr(ctx, x - 1.5, y - 1.5, w + 3, 27, 9); ctx.fillStyle = COR.edgeOut; ctx.fill();
+    rr(ctx, x, y, w, 24, 8); ctx.fillStyle = 'rgba(26,49,112,.94)'; ctx.fill();
+    ctx.lineWidth = 1.5; ctx.strokeStyle = COR.gold; ctx.stroke();
+    txt(ctx, ct().faixa, x + 8, y + 16, COR.gold, FNT(800, 10));
+    let cx = x + 12 + lw + 4;
+    const icone = (id) => {
+      ctx.globalAlpha = tem.has(id) ? 1 : 0.35;
+      if (ns.Icons) ns.Icons.draw(ctx, 'move:' + id, cx, y + 3, I);
+      ctx.globalAlpha = 1;
+      cx += I + G;
+    };
+    ids.forEach(icone);
+    cx += 6; ctx.fillStyle = 'rgba(244,248,255,.35)'; ctx.fillRect(cx - 5, y + 5, 1, 14);
+    buffs.forEach(icone);
+    return 32;
   }
 
   // ======================= motor da partida (adaptado do PSBot, MIT) =======================
