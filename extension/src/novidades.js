@@ -2,6 +2,10 @@
 // Frases curtas, do ponto de vista de quem usa. Aparece uma vez, na primeira abertura depois da atualização.
 globalThis.SV_NOVIDADES = {
   pt: {
+    '0.2.6': [
+      "Farm com dois modos separados no menu do coração: Sozinho (partidas sozinho em loop, com missões, gacha, parceiro e melhorias) e Em grupo (partidas com amigos: joga só o seu Pokémon e nunca mexe no menu).",
+      "Em grupo: se você criou a sala, ligue quando quiser; como convidado, ligue na sala antes de a partida começar. O painel diz se o modo escolhido não serve para a partida em que você está.",
+    ],
     '0.2.5': [
       "Na partida, a barrinha da Sobrevida aparece sempre no canto superior direito, mesmo com o farm desligado: clique nela para abrir o menu, ou em \"Ligar\" para o farm assumir na hora.",
       "Cooperativo: se você criou a sala, pode ligar o farm no meio da partida em grupo. Como convidado, ligue antes de a partida começar.",
@@ -37,6 +41,10 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   en: {
+    '0.2.6': [
+      "The farm has two separate modes in the heart menu: Solo (solo runs in a loop, with missions, gacha, partner and upgrades) and Group (runs with friends: it only plays your Pokémon and never touches the menu).",
+      "Group: if you created the room, turn it on any time; as a guest, turn it on in the room before the run starts. The panel tells you when the chosen mode doesn't fit the run you're in.",
+    ],
     '0.2.5': [
       "During a run, the Sobrevida bar always shows in the top-right corner, even with the farm off: click it to open the menu, or \"Start\" to let the farm take over right away.",
       "Co-op: if you created the room, you can turn the farm on in the middle of a group run. As a guest, turn it on before the run starts.",
@@ -72,6 +80,10 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   es: {
+    '0.2.6': [
+      "El farm tiene dos modos separados en el menú del corazón: Solo (partidas en solitario en bucle, con misiones, gacha, compañero y mejoras) y En grupo (partidas con amigos: solo juega tu Pokémon y nunca toca el menú).",
+      "En grupo: si creaste la sala, actívalo cuando quieras; como invitado, actívalo en la sala antes de que empiece la partida. El panel avisa si el modo elegido no sirve para la partida en la que estás.",
+    ],
     '0.2.5': [
       "En la partida, la barrita de Sobrevida aparece siempre en la esquina superior derecha, aunque el farm esté apagado: haz clic para abrir el menú, o en \"Activar\" para que el farm tome el control al momento.",
       "Cooperativo: si creaste la sala, puedes activar el farm en medio de la partida en grupo. Como invitado, actívalo antes de que empiece.",

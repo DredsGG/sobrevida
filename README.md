@@ -9,7 +9,7 @@ Choose your partner Pokémon before the 8-question personality quiz and get exac
 
 ![Manifest V3](https://img.shields.io/badge/Manifest-V3-4285F4?logo=googlechrome&logoColor=white)
 ![Firefox](https://img.shields.io/badge/Firefox-140%2B-FF7139?logo=firefoxbrowser&logoColor=white)
-![Version](https://img.shields.io/badge/version-0.2.5-f4b400)
+![Version](https://img.shields.io/badge/version-0.2.6-f4b400)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 **Works on:** Chrome · Edge · Brave · Opera GX · Firefox 140+
@@ -48,7 +48,7 @@ Open the heart menu and press **Start farm** (or **Alt+F** anywhere in the game)
 
 <img src="docs/sobrevida-farm-run.png" width="420" alt="A run in progress in a forest with the Sobrevida bar in the top-right corner: Farm, Picking up XP, 0:46, Lv 5, 147/147 HP and a Stop button">&nbsp;&nbsp;<img src="docs/sobrevida-farm-panel.png" width="420" alt="The Sobrevida panel open under the bar during a run: Stop, Picking up XP at 0:47 level 5, partner Slurpuff with Upgrades 35/92, collection 27 Pokémon, and the log: bought 35 upgrades, partner Psyduck to Slurpuff, Gacha Kalos x30 with 26 new">
 
-**Co-op.** The farm also plays group runs with your friends, as the host or as a guest: each player steers their own Pokémon, so it only plays yours. As a guest, turn it on **before** the group run starts (a group run that started with the farm off is left alone); the host can turn it on at any time. In a room it never touches the menu between runs (no gacha, partner switch or solo run) and doesn't leave the results screen by itself. A group run with the farm on never reaches the leaderboard, for anyone in the group: the game only posts a group run with every member's seal, and Sobrevida blocks yours.
+**Co-op.** The farm has a separate **Group** mode (a tab next to **Solo** in the heart menu) for runs with your friends, as the host or as a guest: each player steers their own Pokémon, so it only plays yours. As a guest, turn it on **before** the group run starts (a group run that started with the farm off is left alone); the host can turn it on at any time. In a room it never touches the menu between runs (no gacha, partner switch or solo run) and doesn't leave the results screen by itself. A group run with the farm on never reaches the leaderboard, for anyone in the group: the game only posts a group run with every member's seal, and Sobrevida blocks yours.
 
 **Keep the game tab visible.** Browsers pause a game in a hidden tab and slow it down a lot in a minimized or covered window, so the farm can't play there. The panel tells you when that happens. Only one PokéSurvivor tab farms at a time; a second tab says the farm is running in the first one.
 

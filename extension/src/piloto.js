@@ -42,6 +42,7 @@
   // A extensão (mundo isolado) manda 'sobrevida:cfg' com JSON; o piloto responde 'sobrevida:st' com JSON a cada 500 ms.
   const cfg = {
     on: false,          // farm ligado
+    modo: 'solo',       // 'solo': partidas sozinho + rotina do menu · 'grupo': só o seu Pokémon nas partidas com amigos
     upgrades: true,     // comprar melhorias do parceiro
     gacha: true,        // tirar gacha com os tickets
     partner: true,      // trocar de parceiro sozinho: o melhor que ainda não está 100%
@@ -60,6 +61,7 @@
       const was = cfg.on;
       for (const k of ['on', 'upgrades', 'gacha', 'partner', 'skins', 'missions']) if (typeof c[k] === 'boolean') cfg[k] = c[k];
       if (typeof c.reserve === 'number' && c.reserve >= 0) cfg.reserve = c.reserve;
+      if (c.modo === 'solo' || c.modo === 'grupo') cfg.modo = c.modo;
       if (cfg.on && !was) { M.needMaint = true; M.lastPlay = -1e9; sess.start = sess.start || Date.now(); }
       if (cfg.on && NS && NS.Game && NS.Game.state !== 'ui' && NS.Game.state !== 'over') M.touched = true;
     } catch (_) {}
@@ -94,7 +96,7 @@
     ns.Input.axis = function () {
       const manual = origAxis();
       if (manual && (manual[0] || manual[1])) return manual;
-      if (!cfg.on || !cfg.move || bloqueadoGrupo(ns)) return manual;
+      if (!cfg.move || !jogaAgora(ns)) return manual;
       try { return steer(ns); } catch (e) { log('steer', e); return manual; }
     };
     // cartas de nível (guarda a última oferta: o "trocar cartas" chama offer de novo)
@@ -165,7 +167,11 @@
   // Convidado não: o selo dele já foi para o anfitrião no começo e lá não dá para bloquear.
   const anfitriao = (ns) => !!(ns.Coop && ns.Coop.isHost);
   const bloqueadoGrupo = (ns) => emGrupo(ns) && !M.coopOk && !anfitriao(ns);
-  const ativo = (ns) => cfg.on && !bloqueadoGrupo(ns);
+  // 0.2.6: dois modos separados. "solo" só joga partida sozinho (e faz a rotina do menu); "grupo" só joga partida
+  // em grupo (e nunca mexe no menu). Partida do tipo errado: o farm não toca em nada e o painel diz por quê.
+  const grupo = () => cfg.modo === 'grupo';
+  const jogaAgora = (ns) => cfg.on && (emGrupo(ns) ? grupo() && !bloqueadoGrupo(ns) : !grupo());
+  const ativo = jogaAgora;
   const now = () => performance.now();
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const $ = (s) => document.querySelector(s);
@@ -177,12 +183,14 @@
     const st = ns.Game.state;
     const naRun = st !== 'ui' && st !== 'over';
     // começo de partida (saiu do menu): marca se o farm está nela; se o farm ligar no meio, também conta (ranking bloqueado)
-    if (naRun && (M.lastState === 'ui' || !M.lastState)) { M.touched = cfg.on; M.coopRun = emGrupo(ns); M.coopOk = M.coopRun && cfg.on; }
+    if (naRun && (M.lastState === 'ui' || !M.lastState)) { M.touched = cfg.on; M.coopRun = emGrupo(ns); M.coopOk = M.coopRun && cfg.on && grupo(); }
     if (cfg.on && naRun) M.touched = true;
     if (st === 'playing') M.userPausedAt = 0;
     M.lastState = st;
-    if (!ativo(ns)) return;
+    if (naRun && !ativo(ns)) return;
     if (st === 'playing' || st === 'levelup' || st === 'choice' || st === 'held') { housekeeping(ns); levelWatch(ns); return; }
+    // fora da partida, só o modo solo faz alguma coisa (rotina, voltar da tela final, começar partida)
+    if (!cfg.on || grupo()) return;
     if (st === 'paused') return autoResume(ns);
     if (M.busy) return;
     if (st === 'over' && M.coopRun) return;     // em grupo: o resumo é do time; quem volta para a sala é você
@@ -484,7 +492,7 @@
     const scr = document.querySelector('#app > .scr:not(.hidden), body > .scr:not(.hidden), .scr:not(.hidden)');
     emit({
       ok: true, on: cfg.on, st, fps: FPS.v, scr: scr ? scr.id : null, mode: inRun ? (S.mode || '') : '', task: M.task, err: M.err,
-      coop: emGrupo(ns), coopOk: !!M.coopOk || anfitriao(ns), coopHost: !!(ns.Coop && ns.Coop.active && ns.Coop.isHost), party: naSala(ns), hidden: document.visibilityState !== 'visible', userPaused: M.userPausedAt > 0 && st === 'paused',
+      modo: cfg.modo, coop: emGrupo(ns), coopOk: !!M.coopOk || anfitriao(ns), coopHost: !!(ns.Coop && ns.Coop.active && ns.Coop.isHost), party: naSala(ns), hidden: document.visibilityState !== 'visible', userPaused: M.userPausedAt > 0 && st === 'paused',
       run: inRun ? { hp: Math.round(p.hp), max: Math.round(p.maxHp), lv: p.level, t: Math.round((ns.Game.st && ns.Game.st.time) || 0), k: p.kills, dex: p.dex } : null,
       coins: s ? s.coins : null, t1: s && s.tickets ? s.tickets.t1 : null, t10: s && s.tickets ? s.tickets.t10 : null,
       candy: s && s.bag ? s.bag.candy || 0 : 0, hw: !!(ns.Halloween && ns.Halloween.on), guest: !!(ns.DB && ns.DB.guest),

@@ -55,6 +55,16 @@ const CT = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
   await sleep(800);
   await shadow('.fab').click(); await sleep(700);
   ok(await shadow('.menu .farm .fgo').count() === 1, 'menu do coração tem a seção Farm automático');
+  // 0.2.6: dois modos separados, Sozinho e Em grupo
+  ok(await shadow('.menu .farm .modos button').count() === 2, 'farm com duas abas: Sozinho e Em grupo');
+  await shadow('.menu .farm .modos button[data-modo="grupo"]').click(); await sleep(600);
+  const fg = await shadow('.menu .farm').innerText();
+  ok(/Ligar farm em grupo/.test(fg) && /nunca mexe no menu/.test(fg) && await shadow('.menu .farm .fopts').count() === 0,
+    'aba Em grupo: botão "Ligar farm em grupo", explicação própria e sem as opções da rotina');
+  ok((await sw.evaluate(() => chrome.storage.local.get('sv.farm')))['sv.farm'].modo === 'grupo', 'modo Em grupo fica salvo');
+  await page.screenshot({ path: path.join(SHOTS, '10-farm-modo-grupo.png') });
+  await shadow('.menu .farm .modos button[data-modo="solo"]').click(); await sleep(600);
+  ok(/Ligar farm/.test(await shadow('.menu .farm .fgo').innerText()) && await shadow('.menu .farm .fopts').count() === 1, 'volta para Sozinho: opções da rotina de novo');
   await page.screenshot({ path: path.join(SHOTS, '11-farm-menu.png') });
   // reabrir o menu com o farm parado mostra a seção inteira (bug achado no PC do André: ficava vazia)
   await page.keyboard.press('Escape'); await sleep(400);

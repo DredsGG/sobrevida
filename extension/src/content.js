@@ -158,6 +158,13 @@
 
   /* farm automático */
   .farm .fgo { flex: 1; }
+  /* 0.2.6: modos separados (Sozinho / Em grupo), no estilo de abas do jogo */
+  .modos { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .modos button { appearance: none; border: 2px solid rgba(244,248,255,.3); background: rgba(0,0,0,.22); border-radius: 8px; padding: 6px 4px;
+    font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .modos button.on { border-color: var(--gold); color: var(--gold); background: rgba(255,210,63,.14); }
+  .modos button i { font-style: normal; font-size: 11px; color: #3a2300; background: var(--gold); border-radius: 6px; padding: 0 5px; text-shadow: none; }
+  .farm .fdesc { font-size: 12px; color: var(--muted); margin: 0; text-align: left; }
   .farm .fst { font-size: 14px; margin: 0; }
   .farm .fst.w { color: #ffd6a0; }
   .pbar { height: 8px; background: rgba(0,0,0,.35); border-radius: 8px; overflow: hidden; margin: 4px 0 2px; }
@@ -508,7 +515,7 @@
 
   // ───────────────────────── farm automático (v0.2.0) ─────────────────────────
   // O piloto (src/piloto.js, mundo da página) joga e cuida da rotina; aqui ficam a configuração, a ponte e o painel.
-  const FARM_DEF = { on: false, upgrades: true, gacha: true, partner: true, missions: true, skins: true };
+  const FARM_DEF = { on: false, modo: 'solo', upgrades: true, gacha: true, partner: true, missions: true, skins: true };
   let farm = Object.assign({}, FARM_DEF), pst = null, pstAt = 0, farmCanvas = null, farmSig = '';
   const mmss = I.mmss;
   function mandarCfg() {
@@ -545,7 +552,7 @@
     try { await ext.storage.local.set({ 'sv.farm': farm }); } catch (_) {}
     if ('on' in patch) await vigiaDono();
     mandarCfg();
-    if ('on' in patch) { registrar({ type: patch.on ? 'farm-on' : 'farm-off', ok: true }); toast(patch.on ? L().f.onToast : L().f.offToast, patch.on); }
+    if ('on' in patch) { registrar({ type: patch.on ? 'farm-on' : 'farm-off', ok: true }); toast(patch.on ? (farm.modo === 'grupo' ? L().f.onToastG : L().f.onToast) : L().f.offToast, patch.on); }
     farmSig = ''; renderFarm(); pill();
   }
   const pronto = () => pst && pst.ok && Date.now() - pstAt < 5000;
@@ -553,11 +560,16 @@
     const T = L().f;
     if (semPiloto()) return { t: T.reload, w: true, reload: true };
     if (!pronto()) return { t: pst && pst.ok === false && pst.err === 'namespace' ? T.broken : T.waiting, w: !!(pst && pst.ok === false) };
-    if (!farm.on) return { t: T.off };
+    const G = farm.modo === 'grupo';
+    if (!farm.on) return { t: G ? (pst.party ? T.gOffRoom : T.gOff) : (pst.party ? T.sInRoom : T.off), w: !G && pst.party };
     if (!dono) return { t: T.otherTab, w: true };
     if (pausado()) return { t: L().pausedUrg, w: true };
+    // partida do tipo errado para o modo escolhido: o farm não toca em nada e diz por quê
+    if (pst.run && pst.coop && !G) return { t: T.sWrong, w: true };
+    if (pst.run && !pst.coop && G) return { t: T.gWrong, w: true };
     if (pst.coop && !pst.coopOk) return { t: T.coopLate, w: true };
-    if (pst.party && !pst.run) return { t: T.party };
+    if (G && !pst.run) return { t: pst.party ? T.gReady : T.gNoRoom, w: !pst.party };
+    if (!G && pst.party && !pst.run) return { t: T.sInRoom, w: true };
     if (pst.hidden) return { t: T.hidden, w: true };
     if (pst.userPaused) return { t: T.userPaused, w: true };
     if (pst.fps != null && pst.fps < 15) return { t: T.slow(pst.fps), w: true };
@@ -591,8 +603,11 @@
     const sig = JSON.stringify([lang, farm, st, pr, ss, p && p.acts && p.acts.map((a) => a.t), p && p.owned, p && p.maxed, p && p.guest, p && p.hw]);
     if (sig === farmSig) return;
     farmSig = sig;
+    const G = farm.modo === 'grupo';
     box.innerHTML = `<h4>${esc(F.title)}</h4>
-      <div class="row"><button class="btn ${farm.on ? 'ghost' : 'gold'} fgo" type="button"${pausado() ? ' disabled' : ''}>${esc(farm.on ? F.stop : F.start)}</button><span class="note">Alt+F</span></div>
+      <div class="modos" role="radiogroup">${['solo', 'grupo'].map((m) => `<button type="button" role="radio" data-modo="${m}" class="${farm.modo === m ? 'on' : ''}" aria-checked="${farm.modo === m}">${esc(m === 'solo' ? F.mSolo : F.mGrupo)}${farm.on && farm.modo === m ? `<i>${esc(F.onTag)}</i>` : ''}</button>`).join('')}</div>
+      <p class="fdesc">${esc(G ? F.dGrupo : F.dSolo)}</p>
+      <div class="row"><button class="btn ${farm.on ? 'ghost' : 'gold'} fgo" type="button"${pausado() ? ' disabled' : ''}>${esc(farm.on ? F.stop : G ? F.startG : F.start)}</button><span class="note">Alt+F</span></div>
       <p class="fst${st.w ? ' w' : ''}">${esc(st.t)}</p>
       ${st.reload ? `<button class="btn gold sm frl" type="button">${esc(F.reloadBtn)}</button>` : ''}
       ${p && p.guest ? `<p class="warn">${esc(F.guest)}</p>` : ''}
@@ -600,9 +615,9 @@
         <div class="pbar"><i style="width:${pct}%"></i></div><small>${esc(F.prog(pr.have, pr.total, pct))}</small><br><small>${esc(F.col(p.owned, p.maxed))}</small></div></div>` : ''}
       ${ss && ss.start ? `<div class="kv">${esc(F.sess(ss.runs, fmt(ss.coins), fmt(Math.round(ss.coins / horas)), ss.t1 + ss.t10 * 10, ss.best ? mmss(ss.best) : '—'))}${p.hw ? ' · ' + esc(F.candy(ss.candy)) : ''}</div>` : ''}
       ${p && p.acts && p.acts.length ? `<div class="acts">${p.acts.slice(0, 4).map((a) => `<div>· ${esc(actTxt(a))}</div>`).join('')}</div>` : ''}
-      <details class="fopts"${farmOptsOpen ? ' open' : ''}><summary>${esc(F.opts)}</summary><div class="opts">
+      ${G ? '' : `<details class="fopts"${farmOptsOpen ? ' open' : ''}><summary>${esc(F.opts)}</summary><div class="opts">
         ${['upgrades', 'gacha', 'partner', 'missions', 'skins'].map((k) => `<label class="sw"><input type="checkbox" data-f="${k}"${farm[k] ? ' checked' : ''}> ${esc(F.opt[k])}</label>`).join('')}
-      </div></details>
+      </div></details>`}
       <p class="note">${esc(F.rank)}</p>`;
     if (pr) {
       if (!farmCanvas || farmCanvas._dex !== pr.dex) { farmCanvas = spriteCanvas(pr.dex, 64, 64, 2); farmCanvas.style.setProperty('--cc', corTipo((pr.types || [])[0])); }
@@ -610,7 +625,8 @@
     }
     box.querySelector('.fgo').addEventListener('click', () => setFarm({ on: !farm.on }));
     const rl = box.querySelector('.frl'); if (rl) rl.addEventListener('click', () => location.reload());
-    box.querySelector('.fopts').addEventListener('toggle', (e) => { farmOptsOpen = e.target.open; placeMenu(); });
+    const fo = box.querySelector('.fopts'); if (fo) fo.addEventListener('toggle', (e) => { farmOptsOpen = e.target.open; placeMenu(); });
+    for (const b of box.querySelectorAll('[data-modo]')) b.addEventListener('click', () => { if (farm.modo !== b.dataset.modo) setFarm({ modo: b.dataset.modo }); });
     for (const i of box.querySelectorAll('[data-f]')) i.addEventListener('change', () => setFarm({ [i.dataset.f]: i.checked }));
     placeMenu();
   }
@@ -624,6 +640,7 @@
     const show = fab.hidden;
     if (!show) { if (!el.hidden) el.hidden = true; return; }
     const st = farm.on ? farmStatus() : { t: L().f.offShort };
+    const pre = farm.modo === 'grupo' ? L().f.shortG : L().f.short;
     // monta uma vez (por idioma) e depois só troca o texto: o clique não pode cair num elemento que acabou de ser trocado
     if (el._lang !== lang) {
       el._lang = lang; el._on = null;
@@ -637,7 +654,7 @@
       bt.textContent = farm.on ? `■ ${L().f.stop}` : `▶ ${L().f.startShort}`;
       bt.className = `btn sm ${farm.on ? 'ghost' : 'gold'}`;
     }
-    const txt = `${L().f.short} · ${st.t}`;
+    const txt = `${pre} · ${st.t}`;
     if (el._txt !== txt) { el._txt = txt; el.querySelector('span').textContent = txt; }
     if (el.hidden) el.hidden = false;
   }
