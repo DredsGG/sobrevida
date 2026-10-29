@@ -45,6 +45,7 @@
     modo: 'solo',       // 'solo': partidas sozinho + rotina do menu · 'grupo': só o seu Pokémon nas partidas com amigos
     upgrades: true,     // comprar melhorias do parceiro
     gacha: true,        // tirar gacha com os tickets
+    gachaMenos: false,  // 0.9.0: gacha na região onde você tem menos Pokémon (padrão: a mais perto de completar)
     partner: true,      // trocar de parceiro sozinho: o melhor que ainda não está 100%
     skins: true,        // Halloween: comprar as skins de bruja com os doces
     cola: true,         // 0.7.0/0.8.0: colinha (coleção, cartas de nível, pausa e faixa no HUD)
@@ -64,7 +65,7 @@
     try {
       const c = JSON.parse(e.detail || '{}');
       const was = cfg.on;
-      for (const k of ['on', 'upgrades', 'gacha', 'partner', 'skins', 'missions', 'shop', 'hud', 'cola']) if (typeof c[k] === 'boolean') cfg[k] = c[k];
+      for (const k of ['on', 'upgrades', 'gacha', 'partner', 'skins', 'missions', 'shop', 'hud', 'cola', 'gachaMenos']) if (typeof c[k] === 'boolean') cfg[k] = c[k];
       if (typeof c.reserve === 'number' && c.reserve >= 0) cfg.reserve = c.reserve;
       if (c.modo === 'solo' || c.modo === 'grupo') cfg.modo = c.modo;
       if (c.lang === 'pt' || c.lang === 'en' || c.lang === 'es') cfg.lang = c.lang;
@@ -338,7 +339,28 @@
       const ghosts = ns.DEX.filter((p) => p.types.includes('ghost'));
       if (ghosts.some((p) => !s.owned[p.dex])) return G.SPOOKY.gen;
     }
-    // senão: a região onde faltam MENOS Pokémon (fecha uma região → Amuleto Iris, shiny ×2); empate: mais pity
+    // 0.9.0 (opção "Gacha: região onde você tem menos Pokémon"): o banner com a maior chance de Pokémon NOVO por tiro.
+    // Chance = soma por raridade de (peso da raridade no gacha × fração que falta dessa raridade na região), com os
+    // pesos do próprio jogo (G.Gacha.RATES). Na prática: a região onde você tem menos, contando que lendário é raro.
+    if (cfg.gachaMenos) {
+      const RATES = Array.isArray(G.RATES) && G.RATES.length ? G.RATES : [[1, 45], [2, 30], [3, 17], [4, 6.5], [5, 1.5]];
+      const tot = RATES.reduce((a, [, w]) => a + w, 0);
+      let best = null, bs = -1;
+      for (const b of G.BANNERS) {
+        if (!G.isOpen(b.gen)) continue;
+        const all = ns.DEX.filter((p) => p.gen === b.gen && (!ns.SPRITE_META || ns.SPRITE_META[p.dex]));
+        if (!all.some((p) => !s.owned[p.dex])) continue;
+        let chance = 0;
+        for (const [r, w] of RATES) {
+          const da = all.filter((p) => p.rarity === r);
+          if (da.length) chance += (w / tot) * (da.filter((p) => !s.owned[p.dex]).length / da.length);
+        }
+        const sc = chance + ((s.pity || {})[b.gen] || 0) / 1e6;
+        if (sc > bs) { bs = sc; best = b.gen; }
+      }
+      return best;
+    }
+    // padrão: a região onde faltam MENOS Pokémon (fecha uma região → Amuleto Iris, shiny ×2); empate: mais pity
     let best = null, bs = Infinity;
     for (const b of G.BANNERS) {
       if (!G.isOpen(b.gen)) continue;

@@ -2,6 +2,9 @@
 // Frases curtas, do ponto de vista de quem usa. Aparece uma vez, na primeira abertura depois da atualização.
 globalThis.SV_NOVIDADES = {
   pt: {
+    '0.9.0': [
+      "Gacha automático com opção nova: priorizar a região onde você tem menos Pokémon. O farm tira no banner com mais chance de Pokémon novo por tiro (conta a raridade: lendário é raro). Desmarcada, continua como antes: fecha primeiro a região mais perto de completar, que dá o Amuleto Íris.",
+    ],
     '0.8.0': [
       "Colinha também na partida: ao subir de nível, a carta que a build da Sobrevida pegaria ganha o selo \"Colinha\" (ou o botão de trocar cartas, quando nenhuma serve). O mesmo vale para o item e o vínculo.",
       "Na pausa aparece a colinha completa do Pokémon da partida, e no HUD novo uma faixa mostra os golpes da build (acesos os que você já tem).",
@@ -82,6 +85,9 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   en: {
+    '0.9.0': [
+      "Auto gacha has a new option: prioritize the region where you have the fewest Pokémon. The farm pulls on the banner with the best chance of a new Pokémon per pull (rarity counts: legendaries are rare). Unchecked, it works as before: it first finishes the region closest to complete, which gives the Iris Charm.",
+    ],
     '0.8.0': [
       "Cheat sheet in the run too: on level-up, the card Sobrevida's build would take gets a \"Cheat sheet\" badge (or the reroll button, when none fits). Same for items and bonds.",
       "The pause screen shows the full cheat sheet for the Pokémon you're playing, and the new HUD has a strip with the build's moves (lit up once you have them).",
@@ -162,6 +168,9 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   es: {
+    '0.9.0': [
+      "Gacha automático con opción nueva: priorizar la región donde tienes menos Pokémon. El farm tira en el banner con más probabilidad de Pokémon nuevo por tirada (cuenta la rareza: los legendarios son raros). Sin marcar, sigue como antes: completa primero la región más cerca del final, que da el Amuleto Iris.",
+    ],
     '0.8.0': [
       "Chuleta también en la partida: al subir de nivel, la carta que cogería la build de Sobrevida lleva el sello \"Chuleta\" (o el botón de cambiar cartas, si ninguna sirve). Lo mismo con el objeto y el vínculo.",
       "En la pausa sale la chuleta completa del Pokémon de la partida, y en el HUD nuevo una franja muestra los golpes de la build (encendidos los que ya tienes).",

@@ -522,7 +522,7 @@
 
   // ───────────────────────── farm automático (v0.2.0) ─────────────────────────
   // O piloto (src/piloto.js, mundo da página) joga e cuida da rotina; aqui ficam a configuração, a ponte e o painel.
-  const FARM_DEF = { on: false, modo: 'solo', upgrades: true, gacha: true, partner: true, missions: true, skins: true, shop: true, hud: true, cola: true };
+  const FARM_DEF = { on: false, modo: 'solo', upgrades: true, gacha: true, partner: true, missions: true, skins: true, shop: true, hud: true, cola: true, gachaMenos: false };
   let farm = Object.assign({}, FARM_DEF), pst = null, pstAt = 0, farmCanvas = null, farmSig = '';
   const mmss = I.mmss;
   // 0.4.0: o que o farm aprendeu nas partidas (acertos reais por golpe) fica guardado aqui e volta para o piloto
@@ -702,7 +702,7 @@
       ${ss && ss.start ? `<div class="kv">${esc(F.sess(ss.runs, fmt(ss.coins), fmt(Math.round(ss.coins / horas)), ss.t1 + ss.t10 * 10, ss.best ? mmss(ss.best) : '—'))}${p.hw ? ' · ' + esc(F.candy(ss.candy)) : ''}</div>` : ''}
       ${p && p.acts && p.acts.length ? `<div class="acts">${p.acts.slice(0, 4).map((a) => `<div>· ${esc(actTxt(a))}</div>`).join('')}</div>` : ''}
       ${G ? '' : `<details class="fopts"${farmOptsOpen ? ' open' : ''}><summary>${esc(F.opts)}</summary><div class="opts">
-        ${['upgrades', 'shop', 'gacha', 'partner', 'missions', 'skins'].map((k) => `<label class="sw"><input type="checkbox" data-f="${k}"${farm[k] ? ' checked' : ''}> ${esc(F.opt[k])}</label>`).join('')}
+        ${['upgrades', 'shop', 'gacha', 'gachaMenos', 'partner', 'missions', 'skins'].map((k) => `<label class="sw"><input type="checkbox" data-f="${k}"${farm[k] ? ' checked' : ''}> ${esc(F.opt[k])}</label>`).join('')}
       </div></details>`}
       <label class="sw hudsw"><input type="checkbox" data-f="hud"${farm.hud ? ' checked' : ''}> ${esc(F.hud)}</label>
       <label class="sw hudsw"><input type="checkbox" data-f="cola"${farm.cola ? ' checked' : ''}> ${esc(F.colaOpt)}</label>

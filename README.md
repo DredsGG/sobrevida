@@ -9,7 +9,7 @@ Choose your partner Pokémon before the 8-question personality quiz and get exac
 
 ![Manifest V3](https://img.shields.io/badge/Manifest-V3-4285F4?logo=googlechrome&logoColor=white)
 ![Firefox](https://img.shields.io/badge/Firefox-140%2B-FF7139?logo=firefoxbrowser&logoColor=white)
-![Version](https://img.shields.io/badge/version-0.8.0-f4b400)
+![Version](https://img.shields.io/badge/version-0.9.0-f4b400)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 **Works on:** Chrome · Edge · Brave · Opera GX · Firefox 140+
@@ -43,7 +43,7 @@ Open the heart menu and press **Start farm** (or **Alt+F** anywhere in the game)
 - **Switches attacks for you.** Only the active move slot attacks in PokéSurvivor, and switching slots leaves the new slot almost ready. Right after a move fires, the farm switches to the slot that will be ready first (preferring super-effective moves), and slips buffs like Swords Dance and Harden in between so they stay stacked. In our lab runs this gave 3 to 7 times more damage per second than staying on one slot. It also fights bosses at the range of the move it's using instead of running away. Touch the arrow keys and you're in control; let go and it takes over again.
 - **Between runs, in this order:**
   1. claims finished missions;
-  2. pulls the gacha with your tickets: during Halloween on the ghost banner, otherwise on the region with the fewest Pokémon missing (closer to the Iris charm, which doubles shiny odds);
+  2. pulls the gacha with your tickets: during Halloween on the ghost banner, otherwise on the region with the fewest Pokémon missing (closer to the Iris charm, which doubles shiny odds), or, with the option "prioritize the region where you have the fewest Pokémon", on the banner with the best chance of a new Pokémon per pull (rarity counts);
   3. switches your partner to **the strongest Pokémon you own that isn't at 100% yet**;
   4. buys that partner's upgrades, best value first, keeping a reserve of 10% of your coins (at most 1,500);
   5. saves to the cloud and starts the next run.
