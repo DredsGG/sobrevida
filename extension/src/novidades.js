@@ -2,6 +2,9 @@
 // Frases curtas, do ponto de vista de quem usa. Aparece uma vez, na primeira abertura depois da atualização.
 globalThis.SV_NOVIDADES = {
   pt: {
+    '0.7.1': [
+      "Visual novo da partida: o golpe pronto esperando um inimigo no alcance não pisca mais na barra de golpes (ficava completando e voltando).",
+    ],
     '0.7.0': [
       "Colinha na coleção: abra qualquer Pokémon seu na coleção do jogo e, embaixo de natureza e habilidade, aparece a melhor natureza, a melhor habilidade (e se é a oculta), a build (2 ataques, buffs e o de troca), com que golpe começar, o que vetar e as MT que valem a pena.",
       "Quando a sua natureza ou habilidade não é a melhor, a colinha diz quanto de força você ganha trocando.",
@@ -74,6 +77,9 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   en: {
+    '0.7.1': [
+      "New in-run look: a ready move waiting for an enemy in range no longer flickers in the moves bar (it kept filling up and going back).",
+    ],
     '0.7.0': [
       "Cheat sheet in the collection: open any of your Pokémon in the game's collection and, under nature and ability, you'll see the best nature, the best ability (and whether it's the hidden one), the build (2 attacks, buffs and the switch move), which move to start with, what to ban and the TMs worth buying.",
       "When your nature or ability isn't the best, it tells you how much strength you'd gain by changing it.",
@@ -146,6 +152,9 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   es: {
+    '0.7.1': [
+      "Visual nuevo de la partida: el golpe listo esperando un enemigo a su alcance ya no parpadea en la barra de golpes (se completaba y volvía).",
+    ],
     '0.7.0': [
       "Chuleta en la colección: abre cualquiera de tus Pokémon en la colección del juego y, debajo de naturaleza y habilidad, verás la mejor naturaleza, la mejor habilidad (y si es la oculta), la build (2 ataques, buffs y el de cambio), con qué golpe empezar, qué vetar y las MT que valen la pena.",
       "Cuando tu naturaleza o habilidad no es la mejor, te dice cuánta fuerza ganas al cambiarla.",

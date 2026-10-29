@@ -1400,7 +1400,10 @@
   function desenharGolpes(ns, ctx, pl, L) {
     const { S, GAP, n, totalW, sx, sy } = L.golpes;
     const agora = performance.now();
-    const cdOf = (m) => (m.kind === 'orbit' ? 0 : lim(m.t / (m.cd * pl.cdMul), 0, 1));
+    // 0.7.1: golpe pronto esperando alvo (ninguém no alcance) — o jogo põe m.t = 0,05 a cada quadro até achar alguém
+    // (systems/combat.js tickMove). Isso contava como recarga e a varredura piscava entre cheia e quase cheia.
+    const ESPERA = 0.06;
+    const cdOf = (m) => (m.kind === 'orbit' || !(m.t > ESPERA) ? 0 : lim(m.t / (m.cd * pl.cdMul), 0, 1));
     // objeto equipado, à esquerda
     {
       const ix = sx - S - 18, iy = sy;
