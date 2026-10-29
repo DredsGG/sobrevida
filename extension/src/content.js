@@ -46,7 +46,13 @@
   // ───────────────────────── o teste (roda sozinho) ─────────────────────────
   let run = null; // { dex, fase, i, total, cancel }
   let ultimoFim = 0;
-  const pausado = () => urgente();
+  // 0.4.1: a versão urgente pausa o farm só fora da partida (pausar no meio deixava o Pokémon parado e ele morria);
+  // a partida em andamento termina e a pausa vale a partir do menu
+  const pausado = () => urgente() && foraDaPartida();
+  // quadros (tutorial, novidades, versão nova) só aparecem fora da partida: no meio dela atrapalham e podem custar a run
+  // (estado do jogo vem do piloto: 'ui' = telas fora da partida, 'over' = fim; o resto é partida, inclusive cartas e pausa)
+  const foraDaPartida = () => !(pst && pst.ok && Date.now() - pstAt < 5000 && pst.st && pst.st !== 'ui' && pst.st !== 'over');
+  let quadroPendente = null;   // 'tutorial' | 'news' escondido porque uma partida começou; volta no menu
   function contador() { const m = (byId('test-count') || {}).textContent; const n = String(m || '').match(/(\d+)\D+(\d+)/); return n ? [+n[1], +n[2]] : [0, 0]; }
 
   async function responderTeste() {
@@ -764,7 +770,7 @@
     const bk = c.querySelector('.back'); if (bk) bk.addEventListener('click', () => { step--; renderTutorial(); });
     c.querySelector('.go').addEventListener('click', () => { if (last) closeCard(false); else { step++; renderTutorial(); } });
   }
-  function tutorial() { if (urgente()) return; fecharPicker(); open = 'tutorial'; step = 0; renderTutorial(); paint(card()); }
+  function tutorial() { if (urgente()) return; if (!foraDaPartida()) { quadroPendente = 'tutorial'; return; } fecharPicker(); open = 'tutorial'; step = 0; renderTutorial(); paint(card()); }
   const baseVer = (v) => String(v || '').split('.').slice(0, 3).join('.');
   const BASE = baseVer(VERSION);
   const versaoAnterior = (v) => Object.keys(NOV.en || NOV.pt || {}).filter((x) => cmpVer(x, v) < 0).sort((a, b) => cmpVer(b, a))[0] || '';
@@ -776,6 +782,7 @@
   function news() {
     const items = itensDe(newsFrom, VERSION);
     if (!items.length || urgente()) return;
+    if (!foraDaPartida()) { quadroPendente = 'news'; return; }
     open = 'news';
     const T = L(), c = card();
     c.setAttribute('aria-label', T.newsTitle(BASE));
@@ -817,6 +824,7 @@
     if (!ready || dead) return;
     const tem = upd.disponivel && upd.ultima && cmpVer(upd.ultima, VERSION) > 0;
     if (!tem) { if (open === 'update') { open = null; hideEl(card()); } return; }
+    if (!foraDaPartida()) return;                    // na partida, espera o menu (vale também para a urgente)
     if (urgente()) { mandarCfg(); if (open !== 'update') { if (run) pararTeste(); updateCard(); } return; }
     if (open || adiadoAqui()) return;
     updateCard();
@@ -858,7 +866,15 @@
     const fora = !!t;
     if (fab.hidden === fora) { fab.hidden = !fora; if (fora) placeFab(); }
     root.querySelector('.fab .dot').hidden = !(upd.disponivel && upd.ultima && cmpVer(upd.ultima, VERSION) > 0);
-    if (!fora) { if (!run) fecharPicker(); }       // o menu pode ficar aberto na partida (pela pílula), com o farm ligado ou não
+    if (!fora) { if (!run) fecharPicker(); }
+    // 0.4.1: começou partida com um quadro aberto → esconde (tutorial e novidades voltam no menu; versão nova reaparece sozinha)
+    if (open && !foraDaPartida()) {
+      if (open === 'tutorial' || open === 'news') quadroPendente = open;
+      open = null; hideEl(card());
+    } else if (!open && quadroPendente && foraDaPartida()) {
+      const q = quadroPendente; quadroPendente = null;
+      if (q === 'tutorial') tutorial(); else news();
+    }       // o menu pode ficar aberto na partida (pela pílula), com o farm ligado ou não
     pill();
     const naRun = !!(pst && pst.ok && pst.run);
     if (naRun && !tick.naRun && farm.on && menuOpen) fecharMenu();
@@ -945,6 +961,8 @@
     await sleep(1200); // deixa o jogo desenhar primeiro
     if (dead) return;
     await visivel();
+    if (dead) return;
+    await esperar(foraDaPartida, 1e10);              // página aberta no meio da partida: os quadros esperam o menu
     if (dead) return;
     try { ob = (await ext.storage.local.get('sv.onboard'))['sv.onboard'] || ob; } catch (_) {}
     if (urgente()) { ready = true; return maybeUpdate(); }

@@ -88,6 +88,11 @@ const CT = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
     if (s.run && s.run.t > 25 && !pillShot) {
       pillShot = true;
       ok(await shadow('.pill').isVisible(), 'pílula do farm aparece durante a partida');
+      // 0.4.1: versão nova chegando no meio da partida: o quadro NÃO aparece (só no menu)
+      await sw.evaluate(() => chrome.storage.local.set({ 'sv.update': { disponivel: true, ultima: '9.9.9', notas: '- teste', at: Date.now() } }));
+      await sleep(1500);
+      ok(await shadow('.card.on').count() === 0, 'versão nova no meio da partida: quadro não aparece (espera o menu)');
+      await sw.evaluate(() => chrome.storage.local.set({ 'sv.update': {} }));
       await page.screenshot({ path: path.join(SHOTS, '12-farm-pilula.png') });
       ok(await shadow('.menu.on').count() === 0, 'menu da Sobrevida fecha sozinho quando o farm começa a partida (não cobre o jogo)');
       await shadow('.pill span').click(); await sleep(800);

@@ -2,6 +2,10 @@
 // Frases curtas, do ponto de vista de quem usa. Aparece uma vez, na primeira abertura depois da atualização.
 globalThis.SV_NOVIDADES = {
   pt: {
+    '0.4.1': [
+      "Tutorial, novidades e aviso de versão nova agora só aparecem fora da partida (no menu). Se uma partida começa com um deles aberto, ele some e volta no menu.",
+      "Versão urgente: a partida em andamento termina normalmente; o farm pausa só no menu.",
+    ],
     '0.4.0': [
       "Base de cálculo: a Sobrevida lê do próprio jogo os dados de todos os Pokémon, golpes e inimigos e calcula, para cada Pokémon, o valor de cada golpe (dano por segundo, lado físico/especial, monotipo, clima e eficácia contra os inimigos que vão aparecer na partida).",
       "Com isso o farm monta a build de cada Pokémon (2 ataques principais, buffs e o parceiro de troca) e escolhe cartas, melhorias e fusões por ela. A build aparece no painel do farm.",
@@ -54,6 +58,10 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   en: {
+    '0.4.1': [
+      "The tutorial, What's new and new-version notices now only show outside a run (in the menu). If a run starts with one open, it hides and comes back in the menu.",
+      "Urgent version: the current run finishes normally; the farm only pauses in the menu.",
+    ],
     '0.4.0': [
       "Calculation base: Sobrevida reads the data of every Pokémon, move and enemy from the game itself and works out, for each Pokémon, the value of each move (damage per second, physical/special side, mono-type, weather and effectiveness against the enemies coming up in the run).",
       "The farm builds each Pokémon's loadout from it (2 main attacks, buffs and the switching partner) and picks cards, upgrades and fusions accordingly. The build shows in the farm panel.",
@@ -106,6 +114,10 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   es: {
+    '0.4.1': [
+      "El tutorial, las novedades y el aviso de versión nueva ahora solo aparecen fuera de la partida (en el menú). Si empieza una partida con uno abierto, se oculta y vuelve en el menú.",
+      "Versión urgente: la partida en curso termina normalmente; el farm solo se pausa en el menú.",
+    ],
     '0.4.0': [
       "Base de cálculo: Sobrevida lee del propio juego los datos de todos los Pokémon, golpes y enemigos y calcula, para cada Pokémon, el valor de cada golpe (daño por segundo, lado físico/especial, monotipo, clima y eficacia contra los enemigos que van a salir en la partida).",
       "Con eso el farm arma la build de cada Pokémon (2 ataques principales, potenciadores y el compañero de cambio) y elige cartas, mejoras y fusiones según ella. La build aparece en el panel del farm.",

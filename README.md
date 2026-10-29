@@ -9,7 +9,7 @@ Choose your partner Pokémon before the 8-question personality quiz and get exac
 
 ![Manifest V3](https://img.shields.io/badge/Manifest-V3-4285F4?logo=googlechrome&logoColor=white)
 ![Firefox](https://img.shields.io/badge/Firefox-140%2B-FF7139?logo=firefoxbrowser&logoColor=white)
-![Version](https://img.shields.io/badge/version-0.4.0-f4b400)
+![Version](https://img.shields.io/badge/version-0.4.1-f4b400)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 **Works on:** Chrome · Edge · Brave · Opera GX · Firefox 140+
@@ -81,11 +81,11 @@ No `.xpi` in the release yet? Use `about:debugging` → **This Firefox** → **L
 
 ### Updating
 
-Sobrevida checks this repository's releases by itself: when the game opens, every 30 minutes, and whenever you come back to the game tab (at most once every 10 minutes). When there's a new version, a notice appears in the middle of the game with what changed and an **Update** button.
+Sobrevida checks this repository's releases by itself: when the game opens, every 30 minutes, and whenever you come back to the game tab (at most once every 10 minutes). When there's a new version, a notice appears in the middle of the screen with what changed and an **Update** button, but never during a run: notices, What's new and the tutorial wait for the menu so they can't cost you a run.
 
 - **Chrome, Edge, Brave, Opera GX:** *Update* downloads the new zip. Unzip it **over the same folder**; the extension notices within a minute and reloads itself. Then reload the game tab (the panel shows a **Reload now** button), because the part that plays the game only starts with the page.
 - **Firefox:** *Update* opens the signed `.xpi`. Firefox also updates it on its own.
-- The **✕** only postpones the notice for an hour. A release marked **URGENTE** (a fix for a serious problem) shows the notice without ✕, and the farm stops until you update.
+- The **✕** only postpones the notice for an hour. A release marked **URGENTE** (a fix for a serious problem) shows the notice without ✕, and the farm stops until you update (a run already in progress finishes first).
 
 ## Languages
 
