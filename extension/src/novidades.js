@@ -2,6 +2,12 @@
 // Frases curtas, do ponto de vista de quem usa. Aparece uma vez, na primeira abertura depois da atualização.
 globalThis.SV_NOVIDADES = {
   pt: {
+    '0.6.0': [
+      "Visual novo da partida, no estilo do jogo: card do seu Pokémon com o sprite animado, nível, vida (verde, amarela e vermelha, com o rastro do dano) e experiência embaixo.",
+      "Buffs com timer: cada um mostra os acúmulos, os segundos que faltam e uma barrinha, e pisca nos 2 últimos segundos.",
+      "Relógio com derrotados e moedas, painel do chefe com o retrato e a porcentagem, e barra de golpes com a recarga em forma de relógio e os segundos do golpe ativo.",
+      "Dá para voltar ao visual do jogo no menu da Sobrevida (\"Visual novo da partida\"). Funciona também com o farm desligado.",
+    ],
     '0.5.0': [
       "Loja Kecleon automática: entre as partidas, o farm calcula quanto cada natureza, cada habilidade e cada MT do dia deixam o parceiro mais forte. Quando vale a pena, compra a Menta, a Cápsula ou a MT e usa na ficha do Pokémon, pelos botões do jogo.",
       "Só compra quando o ganho passa do mínimo e rende mais por moeda que a próxima melhoria de Força. Usa também o que já estiver na Mochila. Dá para desligar nas Opções do farm.",
@@ -63,6 +69,12 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   en: {
+    '0.6.0': [
+      "New in-run look, in the game's style: your Pokémon's card with its animated sprite, level, HP (green, yellow and red, with a damage trail) and EXP underneath.",
+      "Buffs with timers: each one shows its stacks, seconds left and a small bar, and blinks in the last 2 seconds.",
+      "Clock with defeated count and coins, a boss panel with portrait and percentage, and a moves bar with a clock-style cooldown and the active move's seconds.",
+      "You can switch back to the game's look in the Sobrevida menu (\"New in-run look\"). It works with the farm off too.",
+    ],
     '0.5.0': [
       "Automatic Kecleon Shop: between runs, the farm works out how much stronger each nature, each ability and each of today's TMs would make your partner. When it's worth it, it buys the Mint, Capsule or TM and uses it on the Pokémon's page, through the game's own buttons.",
       "It only buys when the gain clears the minimum and pays off better per coin than the next Strength upgrade. It also uses what's already in the Bag. You can turn it off in the farm Options.",
@@ -124,6 +136,12 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   es: {
+    '0.6.0': [
+      "Visual nuevo de la partida, al estilo del juego: tarjeta de tu Pokémon con el sprite animado, nivel, vida (verde, amarilla y roja, con el rastro del daño) y experiencia debajo.",
+      "Buffs con temporizador: cada uno muestra las cargas, los segundos que quedan y una barrita, y parpadea en los 2 últimos segundos.",
+      "Reloj con derrotados y monedas, panel del jefe con retrato y porcentaje, y barra de golpes con la recarga en forma de reloj y los segundos del golpe activo.",
+      "Puedes volver al visual del juego en el menú de Sobrevida (\"Visual nuevo de la partida\"). También funciona con el farm apagado.",
+    ],
     '0.5.0': [
       "Tienda Kecleon automática: entre partidas, el farm calcula cuánto más fuerte dejan al compañero cada naturaleza, cada habilidad y cada MT del día. Cuando compensa, compra la Menta, la Cápsula o la MT y la usa en la ficha del Pokémon, con los botones del juego.",
       "Solo compra cuando la ganancia supera el mínimo y rinde más por moneda que la siguiente mejora de Fuerza. También usa lo que ya está en la Mochila. Se puede desactivar en las Opciones del farm.",

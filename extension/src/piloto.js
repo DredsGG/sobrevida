@@ -47,6 +47,7 @@
     gacha: true,        // tirar gacha com os tickets
     partner: true,      // trocar de parceiro sozinho: o melhor que ainda não está 100%
     skins: true,        // Halloween: comprar as skins de bruja com os doces
+    hud: true,          // 0.6.0: visual novo da partida (card do Pokémon, relógio, chefe, golpes); vale com o farm desligado
     shop: true,         // 0.5.0: Loja Kecleon — Menta, Cápsula e MT para o parceiro quando a conta mostra ganho
     missions: true,     // recolher prêmios de missões
     reserve: 1500,      // moedas que sempre ficam (o preço de uma Menta/Cápsula)
@@ -61,7 +62,7 @@
     try {
       const c = JSON.parse(e.detail || '{}');
       const was = cfg.on;
-      for (const k of ['on', 'upgrades', 'gacha', 'partner', 'skins', 'missions', 'shop']) if (typeof c[k] === 'boolean') cfg[k] = c[k];
+      for (const k of ['on', 'upgrades', 'gacha', 'partner', 'skins', 'missions', 'shop', 'hud']) if (typeof c[k] === 'boolean') cfg[k] = c[k];
       if (typeof c.reserve === 'number' && c.reserve >= 0) cfg.reserve = c.reserve;
       if (c.modo === 'solo' || c.modo === 'grupo') cfg.modo = c.modo;
       if (c.learn && typeof c.learn === 'object') try {
@@ -155,6 +156,7 @@
       };
     }
     trackHazards(ns);
+    try { instalarVisual(ns); } catch (e) { log('visual', e); }
     // 0.3.0: rotação de ataques roda a cada quadro, logo antes do jogo disparar os golpes
     if (ns.Combat && typeof ns.Combat.tick === 'function') {
       const origCT = ns.Combat.tick;
@@ -1040,6 +1042,369 @@
   }
   // Esqueça o que foi calculado deste Pokémon (mudou natureza, habilidade ou MT)
   function esquecer(dex) { KB.plans = {}; KB.fx = {}; KB.abOut = {}; }
+
+  // ======================= visual novo da partida (0.6.0) =======================
+  // O jogo desenha o HUD inteiro no canvas, numa função só (G.HUD.draw, ui/hud.js). Aqui ela é envolvida:
+  //   1. recorta (clip) as áreas que a Sobrevida redesenha;
+  //   2. chama o desenho original (continua registrando os toques nos golpes e esferas, fenda, eventos, clima…);
+  //   3. desenha por cima, no mesmo quadro: card do Pokémon, relógio, barra do chefe e barra de golpes.
+  // Visual tirado do próprio jogo (css/style.css: caixa azul com borda branca, contorno escuro, dourado, Pixelify).
+  // Qualquer erro → volta para o HUD do jogo sozinho (cfg.hud desliga pelo painel).
+  const VIS = { falhas: 0, t: 0, dur: {}, hp: null, boss: new Map(), retrato: null, retratoKey: '', mini: new Map() };
+  const COR = { box1: '#2c519f', box2: '#1a3170', edge: '#f4f8ff', edgeIn: '#5b83d6', edgeOut: '#0b1838', gold: '#ffd23f', gold2: '#f0a31e', muted: '#b9cbf0', shadow: '#0a1430', bond: '#ff8ad8' };
+  const FNT = (w, s) => `${w} ${s}px Pixelify,"Segoe UI",system-ui,sans-serif`;
+  const BUFF_COR = { atk: '#ff6b4d', patk: '#ff6b4d', satk: '#c47bff', spd: '#7fe0ff', def: '#b0b8c8', regen: '#5fe08a' };
+  const BUFF_TXT = { atk: 'ATK', patk: 'ATK', satk: 'AT.E', spd: 'VEL', def: 'DEF', regen: 'REG' };
+  const lim = (v, a, b) => Math.max(a, Math.min(b, v));
+
+  function rr(ctx, x, y, w, h, r) {
+    r = Math.max(0, Math.min(r, w / 2, h / 2));
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+  // Caixa do jogo: contorno escuro, borda branca, gradiente azul e linha interna
+  function caixa(ctx, x, y, w, h, r, a = 0.93) {
+    rr(ctx, x - 2, y - 2, w + 4, h + 4, r + 2); ctx.fillStyle = COR.edgeOut; ctx.fill();
+    rr(ctx, x, y, w, h, r); ctx.fillStyle = COR.edge; ctx.fill();
+    const g = ctx.createLinearGradient(0, y, 0, y + h);
+    g.addColorStop(0, COR.box1); g.addColorStop(1, COR.box2);
+    ctx.globalAlpha = a; rr(ctx, x + 2, y + 2, w - 4, h - 4, Math.max(2, r - 2)); ctx.fillStyle = g; ctx.fill(); ctx.globalAlpha = 1;
+    rr(ctx, x + 3.5, y + 3.5, w - 7, h - 7, Math.max(2, r - 3)); ctx.lineWidth = 1.2; ctx.strokeStyle = COR.edgeIn; ctx.stroke();
+  }
+  function txt(ctx, s, x, y, cor, font, align = 'left') {
+    ctx.font = font; ctx.textAlign = align;
+    ctx.fillStyle = COR.shadow; ctx.fillText(s, x + 1.5, y + 1.5);
+    ctx.fillStyle = cor; ctx.fillText(s, x, y);
+  }
+  // Barra com rastro do dano (o pedaço perdido some devagar, como nos jogos), brilho em cima e marcas
+  function barra(ctx, x, y, w, h, frac, rastro, cores, marcas = 0) {
+    frac = lim(frac, 0, 1); rastro = lim(rastro == null ? frac : rastro, frac, 1);
+    rr(ctx, x - 1.5, y - 1.5, w + 3, h + 3, (h + 3) / 2); ctx.fillStyle = COR.edgeOut; ctx.fill();
+    rr(ctx, x, y, w, h, h / 2); ctx.fillStyle = '#16203f'; ctx.fill();
+    ctx.save(); rr(ctx, x, y, w, h, h / 2); ctx.clip();
+    if (rastro > frac) { ctx.fillStyle = 'rgba(255,236,190,.85)'; ctx.fillRect(x, y, w * rastro, h); }
+    const g = ctx.createLinearGradient(0, y, 0, y + h);
+    g.addColorStop(0, cores[0]); g.addColorStop(1, cores[1]);
+    ctx.fillStyle = g; ctx.fillRect(x, y, w * frac, h);
+    ctx.fillStyle = 'rgba(255,255,255,.32)'; ctx.fillRect(x, y + 1, w * frac, Math.max(1, h * 0.28));
+    if (marcas) { ctx.fillStyle = 'rgba(11,24,56,.55)'; for (let i = 1; i < marcas; i++) ctx.fillRect(Math.round(x + w * i / marcas), y, 1, h); }
+    ctx.restore();
+  }
+  const corVida = (f) => (f > 0.5 ? ['#8dfc9a', '#2fb854'] : f > 0.2 ? ['#ffe27a', '#e0a020'] : ['#ff9a9a', '#e0303f']);
+  const corChefe = (f) => (f > 0.5 ? ['#ffe27a', '#f0a31e'] : f > 0.25 ? ['#ffb46b', '#e0601e'] : ['#ff9a9a', '#d42a3c']);
+  // rastro: segue o valor na hora quando sobe e desce devagar quando cai
+  function rastro(obj, k, frac, dt) {
+    const v = obj[k];
+    obj[k] = v == null || frac >= v ? frac : Math.max(frac, v - dt * 0.55);
+    return obj[k];
+  }
+  const sigla = (ns) => { const l = (ns.I18n && ns.I18n.lang) || 'es'; return l === 'en' || l.startsWith('zh') ? 'HP' : 'PS'; };
+
+  // ---------- geometria (igual à do jogo, para os toques continuarem batendo) ----------
+  function layout(ns, w, h, pl) {
+    const sa = ns.Touch && ns.Touch.safeArea ? ns.Touch.safeArea() : { left: 0, top: 0, right: 0, bottom: 0 };
+    const touch = !!(ns.Touch && ns.Touch.active);
+    const L = { sa, touch, cortes: [] };
+    // card: fora do cooperativo (lá o jogo põe a vida dos amigos logo embaixo) e se couber ao lado do relógio
+    const cardW = Math.min(276, w / 2 - 128 - sa.left);
+    L.card = !(ns.Coop && ns.Coop.active) && cardW >= 196 ? { x: 12 + sa.left, y: 12 + sa.top, w: cardW, h: 74 } : null;
+    L.relogio = { x: w / 2 - 108, y: 8 + sa.top * 0, w: 216, h: 60 };
+    const boss = ns.EnemyMgr && ns.EnemyMgr.all().find((e) => e.boss && !e.dead);
+    L.boss = boss || null;
+    const bw = Math.min(420, w - 80);
+    // painel do chefe: centrado, ou logo à direita do card quando a tela é estreita
+    const cardDir = L.card ? L.card.x + L.card.w + 10 : 0;
+    const cx0 = Math.max((w - bw) / 2, cardDir), cw0 = Math.min(bw, w - 10 - cx0);
+    L.chefe = boss ? { x: cx0, y: 74, w: cw0, h: 30 } : null;
+    // golpes (ui/hud.js: S 54, GAP 9, centrados embaixo; no celular, onde o jogador pôs)
+    const S = 54, GAP = 9, n = Math.max(1, pl.slots.length), totalW = n * S + (n - 1) * GAP;
+    let sx = (w - totalW) / 2;
+    let sy = h - S - 18 - (touch ? Math.min(28, sa.bottom) : 0);
+    const pb = touch && ns.Touch.spot && ns.Touch.spot('bar');
+    if (pb) {
+      const nAll = Math.max(n, pl.maxMoves), bw2 = S + 18 + nAll * S + (nAll - 1) * GAP;
+      sx = lim(pb[0] * w - bw2 / 2, 6, Math.max(6, w - bw2 - 6)) + S + 18;
+      sy = lim(pb[1] * h - S / 2, 24, h - S - 6);
+    }
+    L.golpes = { S, GAP, n, totalW, sx, sy };
+    // áreas recortadas do desenho original (sem sobreposição: o recorte é evenodd)
+    const meio = w / 2 - 215;
+    let cardCut = 0;
+    if (L.card) L.cortes.push([0, 0, w, 8]);                                          // XP na borda de cima (vai para o card)
+    if (L.card) { cardCut = Math.min(meio, 470); L.cortes.push([0, 8, cardCut, 62 + sa.top]); }   // nome, vida e chips (até y 70)
+    L.cortes.push([Math.max(meio, cardCut), 14, w / 2 + 215 - Math.max(meio, cardCut), 50]);   // relógio + bioma·derrotados·moedas
+    if (boss || (ns.Rift && ns.Rift.inArena)) { const bx = Math.max(cardCut, Math.min((w - bw) / 2, w / 2 - 120) - 4); L.cortes.push([bx, 70 + sa.top, w - 2 * Math.min(bx, w / 2 - 120), 34]); }
+    L.cortes.push([sx - S - 18 - 4, sy - 6 - 22, totalW + S + 18 + 8, S + 6 + 22 + 6]);  // golpes + objeto (com os nomes em cima)
+    return L;
+  }
+
+  // ---------- card do Pokémon ----------
+  function retrato(ns, pl, dt) {
+    const dex = pl.mon.dex, key = dex + ':' + (pl.shiny ? 1 : 0) + ':' + ((pl.anim && pl.anim.skin) || '');
+    if (!VIS.retrato || VIS.retratoKey !== key) {
+      const bh = ns.Sprites.bodyHeight(dex, 1) || 48;
+      VIS.retrato = new ns.Sprites.Animator(dex, lim(50 / bh, 0.35, 1.6), pl.shiny);
+      VIS.retrato.skin = (pl.anim && pl.anim.skin) || null;
+      VIS.retratoKey = key;
+    }
+    const a = VIS.retrato;
+    a.dir = 0;
+    // parado (Idle) olhando para a frente; o dano aparece como o clarão do jogo (as outras animações do PMD têm
+    // outro enquadramento e saíam cortadas no retrato)
+    a.loop('Idle');
+    a.update(dt);
+    return a;
+  }
+  function desenharCard(ns, ctx, pl, L, dt) {
+    const { x, y, w, h } = L.card, P = 58, rx = x + 8, ry = y + 8;
+    caixa(ctx, x, y, w, h, 12);
+    const tc = (ns.U && ns.U.TYPE_COLOR && ns.U.TYPE_COLOR[pl.mon.types[0]]) || '#6b7a94';
+    // retrato: fundo com a cor do tipo, chão e o sprite animado
+    ctx.save();
+    rr(ctx, rx, ry, P, P, 9); ctx.clip();
+    const g = ctx.createRadialGradient(rx + P / 2, ry + P * 0.45, 4, rx + P / 2, ry + P / 2, P * 0.75);
+    g.addColorStop(0, tc); g.addColorStop(1, '#0f1a3a');
+    ctx.globalAlpha = 0.85; ctx.fillStyle = g; ctx.fillRect(rx, ry, P, P); ctx.globalAlpha = 1;
+    ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.beginPath(); ctx.ellipse(rx + P / 2, ry + P - 9, 17, 5, 0, 0, 6.2832); ctx.fill();
+    try { retrato(ns, pl, dt).draw(ctx, rx + P / 2, ry + P - 9, { flash: pl.flash > 0, softFlash: true }); } catch (_) {}
+    ctx.restore();
+    rr(ctx, rx, ry, P, P, 9); ctx.lineWidth = 2; ctx.strokeStyle = tc; ctx.stroke();
+    if (pl.shiny && ns.Icons) ns.Icons.draw(ctx, 'shiny', rx + P - 15, ry + 2, 13);
+    // nome e nível
+    const tx = rx + P + 10, right = x + w - 10;
+    const nv = 'Nv. ' + pl.level;
+    ctx.font = FNT(800, 11);
+    const nw = ctx.measureText(nv).width + 12;
+    rr(ctx, right - nw, y + 8, nw, 17, 8); ctx.fillStyle = 'rgba(10,20,48,.75)'; ctx.fill();
+    ctx.lineWidth = 1.5; ctx.strokeStyle = COR.gold; ctx.stroke();
+    txt(ctx, nv, right - nw / 2, y + 20.5, COR.gold, FNT(800, 11), 'center');
+    let nome = pl.mon.name;
+    ctx.font = FNT(800, 14);
+    while (nome.length > 3 && ctx.measureText(nome).width > right - nw - 6 - tx) nome = nome.slice(0, -2) + '…';
+    txt(ctx, nome, tx, y + 21, '#ffffff', FNT(800, 14));
+    // vida (verde → amarela → vermelha, como nos jogos) com rastro
+    const fv = pl.maxHp > 0 ? pl.hp / pl.maxHp : 0;
+    const bx = tx + 20, bw = right - bx;
+    txt(ctx, sigla(ns), tx, y + 38, COR.gold, FNT(800, 10));
+    let cores = corVida(fv);
+    if (fv < 0.2 && !pl.dead) { const p = 0.5 + Math.sin(performance.now() / 120) * 0.5; ctx.globalAlpha = 0.75 + p * 0.25; }
+    barra(ctx, bx, y + 30, bw, 9, fv, rastro(VIS, 'hp', fv, dt), cores);
+    ctx.globalAlpha = 1;
+    txt(ctx, Math.ceil(Math.max(0, pl.hp)) + ' / ' + Math.round(pl.maxHp), right, y + 52, '#eaf2ff', FNT(700, 10), 'right');
+    // experiência
+    const fx = pl.xpNext > 0 ? pl.xp / pl.xpNext : 0;
+    txt(ctx, 'EXP', tx, y + 66, '#7fd8ff', FNT(800, 9));
+    barra(ctx, tx + 24, y + 60, right - tx - 24, 5, fx, null, ['#8ae8ff', '#3a8cff']);
+  }
+  // chips de buff embaixo do card: acúmulos, segundos e barrinha do tempo (pisca nos 2 últimos segundos)
+  function desenharBuffs(ns, ctx, pl, L) {
+    let bx = L.card.x, by = L.card.y + L.card.h + 8;
+    const chips = [];
+    for (const k in pl.buffs) {
+      const b = pl.buffs[k];
+      if (!(b.n > 0)) { VIS.dur[k] = 0; continue; }
+      if (!(VIS.dur[k] >= b.t)) VIS.dur[k] = b.t;
+      chips.push({ label: (BUFF_TXT[k] || k.toUpperCase()) + ' ×' + b.n, t: b.t, frac: b.t / (VIS.dur[k] || b.t || 1), cor: BUFF_COR[k] || '#ffffff' });
+    }
+    if (pl.power && pl.power.def) chips.push({ label: String(pl.power.def.name || '').toUpperCase(), t: pl.power.t, frac: pl.power.t / (pl.power.dur || pl.power.t || 1), cor: pl.power.def.color || COR.gold });
+    for (const c of chips) {
+      const seg = Math.ceil(c.t) + 's';
+      ctx.font = FNT(800, 10); const w1 = ctx.measureText(c.label).width;
+      ctx.font = FNT(700, 9); const w2 = ctx.measureText(seg).width;
+      const cw = w1 + w2 + 22, ch = 20;
+      if (bx + cw > L.card.x + L.card.w && bx > L.card.x) { bx = L.card.x; by += ch + 6; }
+      const pisca = c.t < 2 ? 0.55 + 0.45 * Math.abs(Math.sin(performance.now() / 110)) : 1;
+      ctx.globalAlpha = pisca;
+      rr(ctx, bx - 1.5, by - 1.5, cw + 3, ch + 3, 8); ctx.fillStyle = COR.edgeOut; ctx.fill();
+      rr(ctx, bx, by, cw, ch, 7); ctx.fillStyle = 'rgba(26,49,112,.94)'; ctx.fill();
+      ctx.lineWidth = 1.5; ctx.strokeStyle = c.cor; ctx.stroke();
+      ctx.fillStyle = c.cor; rr(ctx, bx + 4, by + 5, 3, ch - 10, 1.5); ctx.fill();
+      txt(ctx, c.label, bx + 11, by + 13.5, c.cor, FNT(800, 10));
+      txt(ctx, seg, bx + 14 + w1, by + 13.5, COR.muted, FNT(700, 9));
+      ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.fillRect(bx + 5, by + ch - 4, cw - 10, 2);
+      ctx.fillStyle = c.cor; ctx.fillRect(bx + 5, by + ch - 4, (cw - 10) * lim(c.frac, 0, 1), 2);
+      ctx.globalAlpha = 1;
+      bx += cw + 7;
+    }
+  }
+
+  // ---------- relógio (e fenda), bioma, derrotados e moedas ----------
+  function desenharRelogio(ns, ctx, pl, st, L) {
+    const { x, y, w, h } = L.relogio;
+    caixa(ctx, x, y, w, h, 12);
+    const arena = ns.Rift && ns.Rift.inArena;
+    const tempo = ns.U.mmss(st.time);
+    if (ns.Icons) ns.Icons.draw(ctx, 'clock', x + 14, y + 10, 18);
+    txt(ctx, tempo, x + w / 2 + 6, y + 28, '#ffffff', FNT(800, 24), 'center');
+    let sub = ns.World && ns.World.biomeName ? String(ns.World.biomeName()).toUpperCase() : '';
+    let corSub = COR.muted;
+    if (arena) { sub = 'GRIETA · ' + ns.U.mmss(ns.Rift.timeLeft); corSub = '#d9c2ff'; }
+    txt(ctx, sub, x + w / 2, y + 40, corSub, FNT(700, 9), 'center');
+    // contadores com os ícones do jogo
+    const itens = [['fist', String(pl.kills)], ['coin', String(pl.coins)]];
+    if (ns.Halloween && ns.Halloween.inRun) itens.push(['candy', String(pl.candy || 0)]);
+    ctx.font = FNT(800, 11);
+    const larg = itens.map(([, v]) => 15 + ctx.measureText(v).width);
+    let cx = x + w / 2 - (larg.reduce((a, b) => a + b, 0) + (itens.length - 1) * 14) / 2;
+    itens.forEach(([ic, v], i) => {
+      if (ns.Icons) ns.Icons.draw(ctx, ic, cx, y + 44, 12);
+      txt(ctx, v, cx + 15, y + 54, ic === 'coin' ? COR.gold : '#ffffff', FNT(800, 11));
+      cx += larg[i] + 14;
+    });
+  }
+
+  // ---------- chefe ----------
+  function miniChefe(ns, e, dt) {
+    let a = VIS.mini.get(e);
+    if (!a) {
+      const bh = ns.Sprites.bodyHeight(e.dex, 1) || 48;
+      a = new ns.Sprites.Animator(e.dex, lim(20 / bh, 0.12, 1), !!e.shiny);
+      if (VIS.mini.size > 6) VIS.mini.clear();
+      VIS.mini.set(e, a);
+    }
+    a.dir = 0; a.loop('Idle'); a.update(dt);
+    return a;
+  }
+  function desenharChefe(ns, ctx, L, dt) {
+    const e = L.boss, { x, y, w, h } = L.chefe;
+    caixa(ctx, x, y, w, h, 10);
+    ctx.save(); rr(ctx, x + 5, y + 4, 24, h - 8, 6); ctx.clip();
+    ctx.fillStyle = 'rgba(10,20,48,.8)'; ctx.fillRect(x + 5, y + 4, 24, h - 8);
+    try { miniChefe(ns, e, dt).draw(ctx, x + 17, y + h - 6, {}); } catch (_) {}
+    ctx.restore();
+    const f = e.maxHp > 0 ? e.hp / e.maxHp : 0;
+    const k = 'b' + (e.id || e.dex);
+    if (!VIS.boss.has(e)) { VIS.boss.clear(); VIS.boss.set(e, {}); }
+    const o = VIS.boss.get(e);
+    const pct = Math.max(0, Math.ceil(f * 100)) + '%';
+    ctx.font = FNT(800, 11); const pw = ctx.measureText(pct).width;
+    txt(ctx, String(e.name || '').toUpperCase(), x + 35, y + 13, COR.gold, FNT(800, 10));
+    txt(ctx, pct, x + w - 9, y + 13, '#ffffff', FNT(800, 11), 'right');
+    barra(ctx, x + 35, y + 17, w - 35 - 10, 7, f, rastro(o, k, f, dt), corChefe(f), 10);
+    void pw;
+  }
+
+  // ---------- barra de golpes (mesmo lugar e tamanho do jogo) ----------
+  function desenharGolpes(ns, ctx, pl, L) {
+    const { S, GAP, n, totalW, sx, sy } = L.golpes;
+    const agora = performance.now();
+    const cdOf = (m) => (m.kind === 'orbit' ? 0 : lim(m.t / (m.cd * pl.cdMul), 0, 1));
+    // objeto equipado, à esquerda
+    {
+      const ix = sx - S - 18, iy = sy;
+      if (pl.item) {
+        rr(ctx, ix - 2, iy - 2, S + 4, S + 4, 14); ctx.fillStyle = COR.edgeOut; ctx.fill();
+        const g = ctx.createLinearGradient(0, iy, 0, iy + S); g.addColorStop(0, '#5a4210'); g.addColorStop(1, '#2a1d06');
+        rr(ctx, ix, iy, S, S, 12); ctx.fillStyle = g; ctx.fill();
+        ctx.lineWidth = 2.5; ctx.strokeStyle = COR.gold; ctx.stroke();
+        rr(ctx, ix + 4, iy + 4, S - 8, S - 8, 9); ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(255,210,63,.35)'; ctx.stroke();
+        if (ns.Icons) ns.Icons.draw(ctx, pl.item, ix + (S - 36) / 2, iy + (S - 36) / 2, 36);
+        const nm = ns.Items && ns.Items.BY[pl.item] ? ns.Items.BY[pl.item].name : '';
+        if (nm) faixa(ctx, nm, ix + S / 2, iy - 9, COR.gold);
+      } else {
+        rr(ctx, ix, iy, S, S, 12); ctx.fillStyle = 'rgba(10,16,28,.5)'; ctx.fill();
+        ctx.setLineDash([4, 4]); ctx.lineWidth = 1.2; ctx.strokeStyle = 'rgba(185,203,240,.3)'; ctx.stroke(); ctx.setLineDash([]);
+      }
+    }
+    for (let i = 0; i < n; i++) {
+      const g = pl.slots[i] || [], m = g[0], fused = g.length > 1, on = i === pl.active;
+      const x = sx + i * (S + GAP), y = on ? sy - 6 : sy;
+      const tc = m ? ns.U.TYPE_COLOR[m.type] : '#4a5468';
+      // moldura: contorno escuro + borda (cor do tipo no ativo, rosa no vínculo, dourada evoluído)
+      if (on) { ctx.save(); ctx.shadowColor = tc; ctx.shadowBlur = 14; rr(ctx, x, y, S, S, 12); ctx.fillStyle = tc; ctx.fill(); ctx.restore(); }
+      rr(ctx, x - 2, y - 2, S + 4, S + 4, 14); ctx.fillStyle = COR.edgeOut; ctx.fill();
+      const gr = ctx.createLinearGradient(0, y, 0, y + S);
+      gr.addColorStop(0, on ? '#2c519f' : '#1d2f63'); gr.addColorStop(1, on ? '#1a3170' : '#111d40');
+      rr(ctx, x, y, S, S, 12); ctx.fillStyle = gr; ctx.fill();
+      if (m) { ctx.save(); rr(ctx, x, y, S, S, 12); ctx.clip(); ctx.globalAlpha = on ? 0.32 : 0.16; ctx.fillStyle = tc; ctx.fillRect(x, y + S * 0.45, S, S * 0.55); ctx.restore(); }
+      ctx.lineWidth = on ? 3 : 2;
+      ctx.strokeStyle = fused ? COR.bond : m && m.evolved ? COR.gold : on ? tc : 'rgba(244,248,255,.55)';
+      rr(ctx, x, y, S, S, 12); ctx.stroke();
+      if (!m) continue;
+      if (fused) {
+        const C = 22, P = (S - C * 2) / 3;
+        g.forEach((gm, k) => {
+          const cx = x + P + (k % 2) * (C + P), cy = y + P + Math.floor(k / 2) * (C + P);
+          if (ns.Icons) ns.Icons.draw(ctx, 'move:' + gm.id, cx, cy, C);
+          const f = cdOf(gm);
+          if (f > 0) { ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(cx, cy, C, C * f); }
+          const fl = 1 - (agora - (gm.castAt || 0)) / 180;
+          if (fl > 0) { ctx.fillStyle = 'rgba(255,255,255,' + (fl * 0.55).toFixed(2) + ')'; ctx.fillRect(cx, cy, C, C); }
+        });
+      } else {
+        if (ns.Icons) ns.Icons.draw(ctx, 'move:' + m.id, x + (S - 32) / 2, y + (S - 32) / 2 - 3, 32);
+        // recarga: varredura de relógio por cima (e os segundos no golpe ativo)
+        const f = cdOf(m);
+        if (f > 0.001) {
+          ctx.save(); rr(ctx, x, y, S, S, 12); ctx.clip();
+          ctx.fillStyle = 'rgba(5,10,24,.62)';
+          ctx.beginPath(); ctx.moveTo(x + S / 2, y + S / 2);
+          ctx.arc(x + S / 2, y + S / 2, S, -Math.PI / 2, -Math.PI / 2 + f * 6.2832); ctx.closePath(); ctx.fill();
+          ctx.restore();
+          if (on && m.t > 0.25) txt(ctx, m.t.toFixed(1), x + S / 2, y + S / 2 + 5, '#ffffff', FNT(800, 13), 'center');
+        }
+        const fl = 1 - (agora - (m.castAt || 0)) / 180;
+        if (fl > 0) { rr(ctx, x, y, S, S, 12); ctx.fillStyle = 'rgba(255,255,255,' + (fl * 0.45).toFixed(2) + ')'; ctx.fill(); }
+        // nível do golpe: losangos
+        const dots = (m.def && m.def.maxLvl) || 5, dw = 5, dg = 2.5, tw = dots * dw + (dots - 1) * dg;
+        for (let d = 0; d < dots; d++) {
+          const cx = x + (S - tw) / 2 + d * (dw + dg) + dw / 2, cy = y + S - 6;
+          ctx.beginPath(); ctx.moveTo(cx, cy - 3); ctx.lineTo(cx + 2.6, cy); ctx.lineTo(cx, cy + 3); ctx.lineTo(cx - 2.6, cy); ctx.closePath();
+          ctx.fillStyle = d < m.lvl ? (m.evolved ? COR.gold : tc) : 'rgba(255,255,255,.2)'; ctx.fill();
+        }
+        if (m.evolved && ns.Icons) ns.Icons.draw(ctx, 'star', x + S - 15, y + 3, 12);
+      }
+      // tecla
+      rr(ctx, x - 4, y - 4, 15, 15, 5); ctx.fillStyle = COR.edgeOut; ctx.fill();
+      rr(ctx, x - 3, y - 3, 13, 13, 4); ctx.fillStyle = on ? tc : '#2c519f'; ctx.fill();
+      txt(ctx, String(i + 1), x + 3.5, y + 7.5, '#ffffff', FNT(800, 9), 'center');
+      if (on) faixa(ctx, fused ? ns.T(m.name, 'move') + ' +' + (g.length - 1) : ns.T(m.name, 'move'), x + S / 2, y - 11, fused ? COR.bond : tc);
+    }
+  }
+  // fita com o nome em cima do golpe ativo / do objeto
+  function faixa(ctx, s, cx, cy, cor) {
+    ctx.font = FNT(800, 10);
+    const w = ctx.measureText(s).width + 14, h = 16, x = cx - w / 2, y = cy - h / 2;
+    rr(ctx, x - 1.5, y - 1.5, w + 3, h + 3, 8); ctx.fillStyle = COR.edgeOut; ctx.fill();
+    rr(ctx, x, y, w, h, 7); ctx.fillStyle = 'rgba(26,49,112,.96)'; ctx.fill();
+    ctx.lineWidth = 1.5; ctx.strokeStyle = cor; ctx.stroke();
+    txt(ctx, s, cx, cy + 3.5, '#ffffff', FNT(800, 10), 'center');
+  }
+
+  function instalarVisual(ns) {
+    const H = ns.HUD;
+    if (!H || typeof H.draw !== 'function' || H.__sv) return;
+    const orig = H.draw;
+    H.__sv = true;
+    H.draw = function (ctx, w, h, pl, st) {
+      if (!cfg.hud || VIS.falhas >= 3 || !pl || !pl.mon || !Array.isArray(pl.slots)) return orig.apply(this, arguments);
+      const agora = performance.now(), dt = Math.min(0.1, Math.max(0, (agora - (VIS.t || agora)) / 1000));
+      VIS.t = agora;
+      let L;
+      try { L = layout(ns, w, h, pl); } catch (e) { VIS.falhas++; log('visual', e); return orig.apply(this, arguments); }
+      ctx.save();
+      ctx.beginPath(); ctx.rect(0, 0, w, h);
+      for (const r of L.cortes) ctx.rect(r[0], r[1], r[2], r[3]);
+      ctx.clip('evenodd');
+      let r;
+      try { r = orig.apply(this, arguments); } finally { ctx.restore(); }
+      ctx.save();
+      try {
+        ctx.textBaseline = 'alphabetic';
+        if (L.card) { desenharCard(ns, ctx, pl, L, dt); desenharBuffs(ns, ctx, pl, L); }
+        desenharRelogio(ns, ctx, pl, st, L);
+        if (L.chefe) desenharChefe(ns, ctx, L, dt);
+        desenharGolpes(ns, ctx, pl, L);
+        VIS.ok = true;
+      } catch (e) {
+        VIS.falhas++; M.err = 'visual: ' + String(e && e.message || e).slice(0, 60); log('visual', e);
+      } finally { ctx.restore(); }
+      return r;
+    };
+  }
 
   // ======================= motor da partida (adaptado do PSBot, MIT) =======================
   const STAT_PRI = { xp: 74, atk: 60, cd: 55, def: 45, hp: 40, rgn: 35, mag: 25, spd: 15, heal: 5 };

@@ -9,7 +9,7 @@ Choose your partner Pokémon before the 8-question personality quiz and get exac
 
 ![Manifest V3](https://img.shields.io/badge/Manifest-V3-4285F4?logo=googlechrome&logoColor=white)
 ![Firefox](https://img.shields.io/badge/Firefox-140%2B-FF7139?logo=firefoxbrowser&logoColor=white)
-![Version](https://img.shields.io/badge/version-0.5.0-f4b400)
+![Version](https://img.shields.io/badge/version-0.6.0-f4b400)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 **Works on:** Chrome · Edge · Brave · Opera GX · Firefox 140+
@@ -55,6 +55,12 @@ Open the heart menu and press **Start farm** (or **Alt+F** anywhere in the game)
 **Co-op.** The farm has a separate **Group** mode (a tab next to **Solo** in the heart menu) for runs with your friends, as the host or as a guest: each player steers their own Pokémon, so it only plays yours. As a guest, turn it on **before** the group run starts (a group run that started with the farm off is left alone); the host can turn it on at any time. In a room it never touches the menu between runs (no gacha, partner switch or solo run) and doesn't leave the results screen by itself. A group run with the farm on never reaches the leaderboard, for anyone in the group: the game only posts a group run with every member's seal, and Sobrevida blocks yours.
 
 **Keep the game tab visible.** Browsers pause a game in a hidden tab and slow it down a lot in a minimized or covered window, so the farm can't play there. The panel tells you when that happens. Only one PokéSurvivor tab farms at a time; a second tab says the farm is running in the first one.
+
+### New in-run look
+
+The run's HUD gets redrawn in the game's own blue *Mystery Dungeon* style: a card for your Pokémon with its animated sprite, level, HP that turns green, yellow and red with a damage trail, and EXP underneath; buffs as chips with stacks, seconds left and a timer bar that blinks near the end; a clock panel with defeated count and coins; a boss panel with portrait and percentage; and a moves bar with a clock-style cooldown and the active move's seconds. It sits exactly where the game's own parts were, so clicks and taps on moves still work. You can switch back to the game's look in the menu ("New in-run look"), with or without the farm.
+
+<img src="docs/sobrevida-hud.png" width="720" alt="A PokéSurvivor run with the Sobrevida HUD: top-left a blue card with Yveltal's sprite, Lv 4, a red HP bar at 27/175 and an EXP bar, buff chips (Sp. Atk x1, Speed x1, Def x2 with seconds and timer bars); top-center a clock panel 3:04 with Shady Forest, defeated and coins; a boss panel for Aurorus at 97%; bottom the item slot with Life Orb and four move slots, the active one labelled Harden">
 
 ### Looks like the game
 

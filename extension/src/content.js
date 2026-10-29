@@ -210,6 +210,7 @@
   .sw { display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 14px; }
   .sw input { appearance: none; width: 40px; height: 22px; border-radius: 11px; background: rgba(0,0,0,.35); border: 2px solid rgba(244,248,255,.35); position: relative; flex: none; cursor: pointer; margin: 0; }
   .sw input::after { content: ''; position: absolute; left: 2px; top: 2px; width: 14px; height: 14px; border-radius: 50%; background: #c9d6f2; transition: left .15s; }
+  .hudsw { margin: 10px 0 2px; font-size: 13px; }
   .sw input:checked { background: linear-gradient(180deg, #ffe37a, #f0a31e); border-color: #fff7d6; }
   .sw input:checked::after { left: 20px; background: #fff; }
   .note { font-size: 13px; color: var(--muted); margin: 0; }
@@ -521,7 +522,7 @@
 
   // ───────────────────────── farm automático (v0.2.0) ─────────────────────────
   // O piloto (src/piloto.js, mundo da página) joga e cuida da rotina; aqui ficam a configuração, a ponte e o painel.
-  const FARM_DEF = { on: false, modo: 'solo', upgrades: true, gacha: true, partner: true, missions: true, skins: true, shop: true };
+  const FARM_DEF = { on: false, modo: 'solo', upgrades: true, gacha: true, partner: true, missions: true, skins: true, shop: true, hud: true };
   let farm = Object.assign({}, FARM_DEF), pst = null, pstAt = 0, farmCanvas = null, farmSig = '';
   const mmss = I.mmss;
   // 0.4.0: o que o farm aprendeu nas partidas (acertos reais por golpe) fica guardado aqui e volta para o piloto
@@ -632,6 +633,7 @@
       ${G ? '' : `<details class="fopts"${farmOptsOpen ? ' open' : ''}><summary>${esc(F.opts)}</summary><div class="opts">
         ${['upgrades', 'shop', 'gacha', 'partner', 'missions', 'skins'].map((k) => `<label class="sw"><input type="checkbox" data-f="${k}"${farm[k] ? ' checked' : ''}> ${esc(F.opt[k])}</label>`).join('')}
       </div></details>`}
+      <label class="sw hudsw"><input type="checkbox" data-f="hud"${farm.hud ? ' checked' : ''}> ${esc(F.hud)}</label>
       <p class="note">${esc(F.rank)}</p>`;
     if (pr) {
       if (!farmCanvas || farmCanvas._dex !== pr.dex) { farmCanvas = spriteCanvas(pr.dex, 64, 64, 2); farmCanvas.style.setProperty('--cc', corTipo((pr.types || [])[0])); }
