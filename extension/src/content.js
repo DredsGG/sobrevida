@@ -556,7 +556,8 @@
     if (!farm.on) return { t: T.off };
     if (!dono) return { t: T.otherTab, w: true };
     if (pausado()) return { t: L().pausedUrg, w: true };
-    if (pst.coop) return { t: T.coop, w: true };
+    if (pst.coop && !pst.coopOk) return { t: T.coopLate, w: true };
+    if (pst.party && !pst.run) return { t: T.party };
     if (pst.hidden) return { t: T.hidden, w: true };
     if (pst.userPaused) return { t: T.userPaused, w: true };
     if (pst.fps != null && pst.fps < 15) return { t: T.slow(pst.fps), w: true };

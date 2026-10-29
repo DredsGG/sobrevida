@@ -94,7 +94,7 @@
     ns.Input.axis = function () {
       const manual = origAxis();
       if (manual && (manual[0] || manual[1])) return manual;
-      if (!cfg.on || !cfg.move || (ns.Coop && ns.Coop.active)) return manual;
+      if (!cfg.on || !cfg.move || bloqueadoGrupo(ns)) return manual;
       try { return steer(ns); } catch (e) { log('steer', e); return manual; }
     };
     // cartas de nível (guarda a última oferta: o "trocar cartas" chama offer de novo)
@@ -156,7 +156,13 @@
   }
 
   function schedule(fn, ms) { setTimeout(() => { try { fn(); } catch (e) { log(e); } }, ms); }
-  const ativo = (ns) => cfg.on && !(ns.Coop && ns.Coop.active);
+  // cooperativo (0.2.4): cada um pilota o próprio Pokémon, então o farm joga em grupo como anfitrião ou convidado.
+  // Só joga partida em grupo que JÁ COMEÇOU com o farm ligado: o selo do ranking de cada membro é pedido no começo;
+  // bloqueado o nosso, o anfitrião não consegue subir a partida do grupo (ranking.js exige o selo de todos).
+  const emGrupo = (ns) => !!(ns.Coop && ns.Coop.active);
+  const naSala = (ns) => !!(ns.Social && ns.Social.room);
+  const bloqueadoGrupo = (ns) => emGrupo(ns) && !M.coopOk;
+  const ativo = (ns) => cfg.on && !bloqueadoGrupo(ns);
   const now = () => performance.now();
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const $ = (s) => document.querySelector(s);
@@ -168,7 +174,7 @@
     const st = ns.Game.state;
     const naRun = st !== 'ui' && st !== 'over';
     // começo de partida (saiu do menu): marca se o farm está nela; se o farm ligar no meio, também conta (ranking bloqueado)
-    if (naRun && (M.lastState === 'ui' || !M.lastState)) M.touched = cfg.on;
+    if (naRun && (M.lastState === 'ui' || !M.lastState)) { M.touched = cfg.on; M.coopRun = emGrupo(ns); M.coopOk = M.coopRun && cfg.on; }
     if (cfg.on && naRun) M.touched = true;
     if (st === 'playing') M.userPausedAt = 0;
     M.lastState = st;
@@ -176,9 +182,11 @@
     if (st === 'playing' || st === 'levelup' || st === 'choice' || st === 'held') { housekeeping(ns); levelWatch(ns); return; }
     if (st === 'paused') return autoResume(ns);
     if (M.busy) return;
+    if (st === 'over' && M.coopRun) return;     // em grupo: o resumo é do time; quem volta para a sala é você
     if (st === 'over') { if (open('scr-over') && now() - M.overAt > 3500) $('#btn-again') && $('#btn-again').click(); return; }
     if (st === 'ui') {
       if (closePopups()) return;
+      if (naSala(ns)) return;                  // numa sala com amigos: nada de menu (parceiro, gacha, partida solo)
       if (!open('scr-menu')) return;            // outra tela aberta (a pessoa mexendo ou o jogo trocando): espera
       if (document.visibilityState !== 'visible') return;
       M.busy = true;
@@ -473,7 +481,7 @@
     const scr = document.querySelector('#app > .scr:not(.hidden), body > .scr:not(.hidden), .scr:not(.hidden)');
     emit({
       ok: true, on: cfg.on, st, fps: FPS.v, scr: scr ? scr.id : null, mode: inRun ? (S.mode || '') : '', task: M.task, err: M.err,
-      coop: !!(ns.Coop && ns.Coop.active), hidden: document.visibilityState !== 'visible', userPaused: M.userPausedAt > 0 && st === 'paused',
+      coop: emGrupo(ns), coopOk: !!M.coopOk, coopHost: !!(ns.Coop && ns.Coop.active && ns.Coop.isHost), party: naSala(ns), hidden: document.visibilityState !== 'visible', userPaused: M.userPausedAt > 0 && st === 'paused',
       run: inRun ? { hp: Math.round(p.hp), max: Math.round(p.maxHp), lv: p.level, t: Math.round((ns.Game.st && ns.Game.st.time) || 0), k: p.kills, dex: p.dex } : null,
       coins: s ? s.coins : null, t1: s && s.tickets ? s.tickets.t1 : null, t10: s && s.tickets ? s.tickets.t10 : null,
       candy: s && s.bag ? s.bag.candy || 0 : 0, hw: !!(ns.Halloween && ns.Halloween.on), guest: !!(ns.DB && ns.DB.guest),

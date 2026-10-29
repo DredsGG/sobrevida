@@ -2,6 +2,11 @@
 // Frases curtas, do ponto de vista de quem usa. Aparece uma vez, na primeira abertura depois da atualização.
 globalThis.SV_NOVIDADES = {
   pt: {
+    '0.2.4': [
+      "Modo cooperativo: o farm agora joga em grupo com os amigos, sendo você o anfitrião ou convidado. Ligue o farm antes de a partida em grupo começar.",
+      "Em grupo, entre as partidas o farm não mexe no menu (nada de gacha, troca de parceiro ou partida sozinho) e não volta da tela final sozinho.",
+      "A partida em grupo com o farm não entra no ranking, nem para os amigos.",
+    ],
     '0.2.3': [
       "Na partida, a barrinha do farm agora fica no canto superior direito, onde não cobre nada do jogo.",
     ],
@@ -28,6 +33,11 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   en: {
+    '0.2.4': [
+      "Co-op: the farm now plays in a group with your friends, whether you're the host or a guest. Turn the farm on before the group run starts.",
+      "In a group, the farm doesn't touch the menu between runs (no gacha, partner switch or solo run) and doesn't leave the results screen by itself.",
+      "A group run with the farm doesn't go to the leaderboard, not even for your friends.",
+    ],
     '0.2.3': [
       "During a run, the farm bar now sits in the top-right corner, where it doesn't cover anything in the game.",
     ],
@@ -54,6 +64,11 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   es: {
+    '0.2.4': [
+      "Cooperativo: el farm ahora juega en grupo con tus amigos, seas el anfitrión o un invitado. Activa el farm antes de que empiece la partida en grupo.",
+      "En grupo, entre partidas el farm no toca el menú (ni gacha, ni cambio de compañero, ni partida en solitario) y no sale solo de la pantalla final.",
+      "La partida en grupo con el farm no entra en el ranking, ni para tus amigos.",
+    ],
     '0.2.3': [
       "En la partida, la barrita del farm ahora va en la esquina superior derecha, donde no tapa nada del juego.",
     ],
