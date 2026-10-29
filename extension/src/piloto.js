@@ -2068,10 +2068,33 @@
     return { x: wp[0], y: wp[1], offPath: nd };
   }
 
+  // ----- 0.11.0: cooperativo — reviver, coleira e não disputar alvo com o companheiro -----
+  // Pelo código do jogo: caído só levanta com um companheiro vivo a até 56 px por 3 s (game.js reviveTick) e a partida só
+  // acaba se todos caírem; XP é do time; cada inimigo persegue o jogador mais perto.
+  const GRUPO = { REVIVE_R: 40, PERTO: 120, LONGE: 360 };
+  function companheiros(ns) {
+    try { return ns.Coop && ns.Coop.active ? (ns.Coop.mates || []).filter((m) => m && m.connected && m.pl) : []; } catch (_) { return []; }
+  }
+  // algum companheiro vivo está bem mais perto desse alvo do que eu? (o alvo fica para ele)
+  function deOutro(ns, p, x, y) {
+    const eu = Math.hypot(x - p.x, y - p.y);
+    for (const m of companheiros(ns)) {
+      const o = m.pl;
+      if (o.dead) continue;
+      if (Math.hypot(x - o.x, y - o.y) < eu * 0.75 - 30) return true;
+    }
+    return false;
+  }
   function candidates(ns, p, hpPct) {
     const out = [], now = ns.Game.st.time, W = ns.World;
+    // reviver o companheiro caído vem antes de tudo (com vida para chegar lá)
+    if (hpPct > 0.15 && !p.dead) for (const m of companheiros(ns)) {
+      const o = m.pl;
+      if (!o.dead) continue;
+      out.push({ key: 'revive' + m.uid, tier: 6, x: o.x, y: o.y, value: 30, left: Infinity, mode: 'revive', goalTol: 0, chase: true, hold: GRUPO.REVIVE_R, until: () => !o.dead });
+    }
     if (hpPct > 0.2) for (const e of ns.EnemyMgr.all()) {
-      if (e.dead || e.behavior !== 'thief') continue;
+      if (e.dead || e.behavior !== 'thief' || deOutro(ns, p, e.x, e.y)) continue;
       S.seen[e.id] = S.seen[e.id] ?? now;
       const gold = (e.def && e.def.loot === 'ticket10') || e.dex === 1000;
       out.push({ key: 'thief' + e.id, x: e.x, y: e.y, tier: gold ? 5 : 3, value: gold ? 14 : 3, left: 15 - (now - S.seen[e.id]), mode: gold ? 'thiefGold' : 'thief', goalTol: 2, chase: true, flee: e.spd || 92 });
@@ -2098,6 +2121,7 @@
       for (const sp of spots.slice(0, 2)) out.push({ key: 'los' + Math.round(sp.x / 64) + ',' + Math.round(sp.y / 64), tier: 1, x: sp.x, y: sp.y, value: 6, left: Infinity, mode: 'los', goalTol: 0, chase: true });
     }
     if (!ns.Rift.inArena && W && W.specialsNear) for (const o of W.specialsNear(p.x, p.y, 700)) {
+      if (deOutro(ns, p, o.x, o.y)) continue;
       if (o.type === 'altar' && !o.used) out.push({ key: 'altar' + o.id, tier: 2, x: o.x, y: o.y, value: 5, left: Infinity, mode: 'altar', goalTol: 1, chase: true });
       else if (o.type === 'spring' && hpPct < 0.6 && (o.charge ?? 1) > 0.2) out.push({ key: 'spring' + o.id, tier: 2, x: o.x, y: o.y - 8, value: 7, left: Infinity, mode: 'spring', goalTol: 0, hold: 20, until: () => p.hp >= p.maxHp * 0.95 });
       else if (o.type === 'bigchest' && hpPct > 0.5) {
@@ -2111,12 +2135,20 @@
     }
     return out;
   }
+  // em grupo: alvo que leva para longe de todos os companheiros vivos (baú, altar, ladrão…) fica de fora;
+  // reviver e fenda continuam
+  function longeDoGrupo(ns, c) {
+    if (c.mode === 'revive' || c.mode === 'rift') return false;
+    const vivos = companheiros(ns).filter((m) => !m.pl.dead);
+    if (!vivos.length) return false;
+    return vivos.every((m) => Math.hypot(c.x - m.pl.x, c.y - m.pl.y) > GRUPO.LONGE);
+  }
   function plan(ns, p, hpPct) {
     const now = performance.now();
     const pSpd = (p.baseSpd || 100) * (p.spdMul || 1);
     const cur = S.plan;
     const gt = ns.Game.st.time;
-    const cands = candidates(ns, p, hpPct).filter(c => !(S.ban[c.key] > gt));
+    const cands = candidates(ns, p, hpPct).filter(c => !(S.ban[c.key] > gt) && !longeDoGrupo(ns, c));
     const live = cur && cands.find(c => c.key === cur.key);
     const higher = cur && cands.some(c => c.tier > cur.c.tier && !(S.noGo[c.key] > now));
     const stale = !live || higher || now - cur.at > 600 || Math.hypot(live.x - cur.c.x, live.y - cur.c.y) > 48 || (cur.path && cur.path.pts.length < 2);
@@ -2168,18 +2200,29 @@
       for (const k of items) if (Math.abs(k.x - g.x) < clR && Math.abs(k.y - g.y) < clR) left += wOf(k);
       if (left > 0 && d > mag * 0.85) return { x: g.x, y: g.y, w: 2, mode: 'orbs', orb: true };
     }
+    // coleira: longe demais do companheiro vivo mais perto → volta para perto dele (reviver em segundos se alguém cair)
+    const vivos = companheiros(ns).filter((m) => !m.pl.dead);
+    if (vivos.length && !(ns.Rift && ns.Rift.inArena)) {
+      let mp = null, md = Infinity;
+      for (const m of vivos) { const d = Math.hypot(m.pl.x - p.x, m.pl.y - p.y); if (d < md) { md = d; mp = m.pl; } }
+      if (mp && md > GRUPO.LONGE) { S.orbGoal = null; return { x: mp.x, y: mp.y, w: 2.5, mode: 'grupo' }; }
+    }
     let best = null, bestS = 0;
+    const perto = vivos.map((m) => m.pl).find((o) => Math.hypot(o.x - p.x, o.y - p.y) < GRUPO.PERTO) || null;
     const [ox, oy] = S.out || [0, 0];
     const seeds = items.length > 120 ? items.map(k => [Math.hypot(k.x - p.x, k.y - p.y), k]).sort((a, b) => a[0] - b[0]).slice(0, 120).map(x => x[1]) : items;
     for (const k of seeds) {
       const dx = k.x - p.x, dy = k.y - p.y, d = Math.hypot(dx, dy);
       if (d < mag * 0.9) continue;  
+      if (vivos.length && deOutro(ns, p, k.x, k.y)) continue;   // gema mais perto do companheiro: fica para ele (XP é do time)
       let cluster = 0;
       for (const o of items) if (Math.abs(o.x - k.x) < clR && Math.abs(o.y - k.y) < clR) cluster += wOf(o);
       let crowd = 0;
       for (const e of enemies) if (!e.dead && Math.abs(e.x - k.x) < 70 && Math.abs(e.y - k.y) < 70) crowd += e.boss ? 5 : 1;
       const ahead = (ox * dx + oy * dy) / (d || 1);
-      const s = cluster / (d + 120) / (1 + crowd * 0.35 * fear) * (1 + 0.3 * ahead);
+      let s = cluster / (d + 120) / (1 + crowd * 0.35 * fear) * (1 + 0.3 * ahead);
+      // grudado no companheiro: prefere as gemas do lado oposto ao dele (cada um puxa a sua parte da horda)
+      if (perto) { const lado = ((perto.x - p.x) * dx + (perto.y - p.y) * dy) / ((Math.hypot(perto.x - p.x, perto.y - p.y) || 1) * (d || 1)); if (lado > 0.3) s *= 0.5; }
       if (s > bestS) { bestS = s; best = k; }
     }
     if (best) {
@@ -2195,7 +2238,7 @@
         const d = Math.hypot(e.x - p.x, e.y - p.y);
         if (d < hd) { hd = d; hunt = e; }
       }
-      if (hunt && hd > 600) return { x: hunt.x, y: hunt.y, w: 0.8, mode: 'hunt' };
+      if (hunt && hd > 600 && !vivos.length) return { x: hunt.x, y: hunt.y, w: 0.8, mode: 'hunt' };
     }
     return null;
   }
