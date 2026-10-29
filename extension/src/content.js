@@ -619,15 +619,23 @@
   function pill() {
     if (!root) return;
     const el = root.querySelector('.pill'), fab = root.querySelector('.fab');
-    const show = farm.on && fab.hidden;
+    // 0.2.5: na partida a pílula aparece sempre (o coração some): com o farm desligado ela é o jeito de abrir o menu
+    // e de ligar o farm no meio da partida
+    const show = fab.hidden;
     if (!show) { if (!el.hidden) el.hidden = true; return; }
-    const st = farmStatus();
+    const st = farm.on ? farmStatus() : { t: L().f.offShort };
     // monta uma vez (por idioma) e depois só troca o texto: o clique não pode cair num elemento que acabou de ser trocado
     if (el._lang !== lang) {
-      el._lang = lang;
-      el.innerHTML = `${ICO.heart}<span></span><button class="btn sm ghost" type="button">■ ${esc(L().f.stop)}</button>`;
-      el.querySelector('button').addEventListener('click', (e) => { e.stopPropagation(); setFarm({ on: false }); });
+      el._lang = lang; el._on = null;
+      el.innerHTML = `${ICO.heart}<span></span><button class="btn sm ghost" type="button"></button>`;
+      el.querySelector('button').addEventListener('click', (e) => { e.stopPropagation(); setFarm({ on: !farm.on }); });
       el.addEventListener('click', (e) => { if (e.target.closest('button')) return; if (menuOpen) fecharMenu(); else abrirMenu(); });
+    }
+    if (el._on !== farm.on) {
+      el._on = farm.on;
+      const bt = el.querySelector('button');
+      bt.textContent = farm.on ? `■ ${L().f.stop}` : `▶ ${L().f.startShort}`;
+      bt.className = `btn sm ${farm.on ? 'ghost' : 'gold'}`;
     }
     const txt = `${L().f.short} · ${st.t}`;
     if (el._txt !== txt) { el._txt = txt; el.querySelector('span').textContent = txt; }
@@ -826,7 +834,7 @@
     const fora = !!t;
     if (fab.hidden === fora) { fab.hidden = !fora; if (fora) placeFab(); }
     root.querySelector('.fab .dot').hidden = !(upd.disponivel && upd.ultima && cmpVer(upd.ultima, VERSION) > 0);
-    if (!fora) { if (!farm.on) fecharMenu(); if (!run) fecharPicker(); }
+    if (!fora) { if (!run) fecharPicker(); }       // o menu pode ficar aberto na partida (pela pílula), com o farm ligado ou não
     pill();
     const naRun = !!(pst && pst.ok && pst.run);
     if (naRun && !tick.naRun && farm.on && menuOpen) fecharMenu();

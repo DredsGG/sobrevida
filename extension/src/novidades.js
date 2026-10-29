@@ -2,6 +2,10 @@
 // Frases curtas, do ponto de vista de quem usa. Aparece uma vez, na primeira abertura depois da atualização.
 globalThis.SV_NOVIDADES = {
   pt: {
+    '0.2.5': [
+      "Na partida, a barrinha da Sobrevida aparece sempre no canto superior direito, mesmo com o farm desligado: clique nela para abrir o menu, ou em \"Ligar\" para o farm assumir na hora.",
+      "Cooperativo: se você criou a sala, pode ligar o farm no meio da partida em grupo. Como convidado, ligue antes de a partida começar.",
+    ],
     '0.2.4': [
       "Modo cooperativo: o farm agora joga em grupo com os amigos, sendo você o anfitrião ou convidado. Ligue o farm antes de a partida em grupo começar.",
       "Em grupo, entre as partidas o farm não mexe no menu (nada de gacha, troca de parceiro ou partida sozinho) e não volta da tela final sozinho.",
@@ -33,6 +37,10 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   en: {
+    '0.2.5': [
+      "During a run, the Sobrevida bar always shows in the top-right corner, even with the farm off: click it to open the menu, or \"Start\" to let the farm take over right away.",
+      "Co-op: if you created the room, you can turn the farm on in the middle of a group run. As a guest, turn it on before the run starts.",
+    ],
     '0.2.4': [
       "Co-op: the farm now plays in a group with your friends, whether you're the host or a guest. Turn the farm on before the group run starts.",
       "In a group, the farm doesn't touch the menu between runs (no gacha, partner switch or solo run) and doesn't leave the results screen by itself.",
@@ -64,6 +72,10 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   es: {
+    '0.2.5': [
+      "En la partida, la barrita de Sobrevida aparece siempre en la esquina superior derecha, aunque el farm esté apagado: haz clic para abrir el menú, o en \"Activar\" para que el farm tome el control al momento.",
+      "Cooperativo: si creaste la sala, puedes activar el farm en medio de la partida en grupo. Como invitado, actívalo antes de que empiece.",
+    ],
     '0.2.4': [
       "Cooperativo: el farm ahora juega en grupo con tus amigos, seas el anfitrión o un invitado. Activa el farm antes de que empiece la partida en grupo.",
       "En grupo, entre partidas el farm no toca el menú (ni gacha, ni cambio de compañero, ni partida en solitario) y no sale solo de la pantalla final.",

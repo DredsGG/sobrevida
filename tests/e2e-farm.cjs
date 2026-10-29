@@ -104,6 +104,17 @@ const CT = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
   ok((await sw.evaluate(() => chrome.storage.local.get('sv.farm')))['sv.farm'].on === false, 'Alt+F desliga o farm');
   const regras2 = await sw.evaluate(() => chrome.declarativeNetRequest.getDynamicRules());
   ok(!regras2.length, 'farm desligado: selo liberado de novo');
+  // 0.2.5: na partida, com o farm desligado, a pílula continua no canto (abre o menu e liga o farm no meio)
+  const naPartida = await page.evaluate(() => !['ui', 'over'].includes(window.__NS.Game.state));
+  if (naPartida) {
+    ok(await shadow('.pill').isVisible() && /Ligar/.test(await shadow('.pill button').innerText()), 'farm desligado na partida: a pílula fica no canto com "Ligar"');
+    await shadow('.pill span').click(); await sleep(700);
+    ok(await shadow('.menu.on').count() === 1, 'clique na pílula abre o menu no meio da partida (farm desligado)');
+    await page.screenshot({ path: path.join(SHOTS, '14-pilula-desligado.png') });
+    await page.keyboard.press('Escape'); await sleep(400);
+    await shadow('.pill button').click(); await sleep(1200);
+    ok((await sw.evaluate(() => chrome.storage.local.get('sv.farm')))['sv.farm'].on === true, '"Ligar" da pílula liga o farm no meio da partida');
+  } else console.log('  (a partida tinha acabado: pulei o teste da pílula com o farm desligado)');
   await ctx.close();
   console.log(falhas ? `\n${falhas} FALHA(S)` : '\nTUDO PASSOU');
   process.exit(falhas ? 1 : 0);

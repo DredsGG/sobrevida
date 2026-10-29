@@ -161,7 +161,10 @@
   // bloqueado o nosso, o anfitrião não consegue subir a partida do grupo (ranking.js exige o selo de todos).
   const emGrupo = (ns) => !!(ns.Coop && ns.Coop.active);
   const naSala = (ns) => !!(ns.Social && ns.Social.room);
-  const bloqueadoGrupo = (ns) => emGrupo(ns) && !M.coopOk;
+  // Anfitrião pode ligar no meio: quem sobe a partida do grupo é ele, e o envio fica bloqueado aqui (M.touched).
+  // Convidado não: o selo dele já foi para o anfitrião no começo e lá não dá para bloquear.
+  const anfitriao = (ns) => !!(ns.Coop && ns.Coop.isHost);
+  const bloqueadoGrupo = (ns) => emGrupo(ns) && !M.coopOk && !anfitriao(ns);
   const ativo = (ns) => cfg.on && !bloqueadoGrupo(ns);
   const now = () => performance.now();
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -481,7 +484,7 @@
     const scr = document.querySelector('#app > .scr:not(.hidden), body > .scr:not(.hidden), .scr:not(.hidden)');
     emit({
       ok: true, on: cfg.on, st, fps: FPS.v, scr: scr ? scr.id : null, mode: inRun ? (S.mode || '') : '', task: M.task, err: M.err,
-      coop: emGrupo(ns), coopOk: !!M.coopOk, coopHost: !!(ns.Coop && ns.Coop.active && ns.Coop.isHost), party: naSala(ns), hidden: document.visibilityState !== 'visible', userPaused: M.userPausedAt > 0 && st === 'paused',
+      coop: emGrupo(ns), coopOk: !!M.coopOk || anfitriao(ns), coopHost: !!(ns.Coop && ns.Coop.active && ns.Coop.isHost), party: naSala(ns), hidden: document.visibilityState !== 'visible', userPaused: M.userPausedAt > 0 && st === 'paused',
       run: inRun ? { hp: Math.round(p.hp), max: Math.round(p.maxHp), lv: p.level, t: Math.round((ns.Game.st && ns.Game.st.time) || 0), k: p.kills, dex: p.dex } : null,
       coins: s ? s.coins : null, t1: s && s.tickets ? s.tickets.t1 : null, t10: s && s.tickets ? s.tickets.t10 : null,
       candy: s && s.bag ? s.bag.candy || 0 : 0, hw: !!(ns.Halloween && ns.Halloween.on), guest: !!(ns.DB && ns.DB.guest),
