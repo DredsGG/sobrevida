@@ -2,6 +2,9 @@
 // Frases curtas, do ponto de vista de quem usa. Aparece uma vez, na primeira abertura depois da atualização.
 globalThis.SV_NOVIDADES = {
   pt: {
+    '0.10.0': [
+      "Visual novo da partida também no cooperativo: seu nick aparece em cima do card e, embaixo, um card para cada amigo com o Pokémon, o nick na cor do jogo, a vida e a distância. Caído, o card pisca e mostra quanto falta para ele levantar.",
+    ],
     '0.9.0': [
       "Gacha automático com opção nova: priorizar a região onde você tem menos Pokémon. O farm tira no banner com mais chance de Pokémon novo por tiro (conta a raridade: lendário é raro). Desmarcada, continua como antes: fecha primeiro a região mais perto de completar, que dá o Amuleto Íris.",
     ],
@@ -85,6 +88,9 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   en: {
+    '0.10.0': [
+      "New in-run look in co-op too: your nickname sits on top of the card and, below it, each friend gets a card with their Pokémon, nickname in their game color, HP and distance. When someone is down, the card blinks and shows how close they are to getting back up.",
+    ],
     '0.9.0': [
       "Auto gacha has a new option: prioritize the region where you have the fewest Pokémon. The farm pulls on the banner with the best chance of a new Pokémon per pull (rarity counts: legendaries are rare). Unchecked, it works as before: it first finishes the region closest to complete, which gives the Iris Charm.",
     ],
@@ -168,6 +174,9 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   es: {
+    '0.10.0': [
+      "Visual nuevo de la partida también en cooperativo: tu nick aparece encima de la tarjeta y, debajo, una tarjeta para cada amigo con su Pokémon, el nick en su color del juego, la vida y la distancia. Si cae, la tarjeta parpadea y muestra cuánto le falta para levantarse.",
+    ],
     '0.9.0': [
       "Gacha automático con opción nueva: priorizar la región donde tienes menos Pokémon. El farm tira en el banner con más probabilidad de Pokémon nuevo por tirada (cuenta la rareza: los legendarios son raros). Sin marcar, sigue como antes: completa primero la región más cerca del final, que da el Amuleto Iris.",
     ],

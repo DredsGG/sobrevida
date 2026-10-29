@@ -1261,7 +1261,9 @@
     const L = { sa, touch, cortes: [] };
     // card: fora do cooperativo (lá o jogo põe a vida dos amigos logo embaixo) e se couber ao lado do relógio
     const cardW = Math.min(276, w / 2 - 128 - sa.left);
-    L.card = !(ns.Coop && ns.Coop.active) && cardW >= 196 ? { x: 12 + sa.left, y: 12 + sa.top, w: cardW, h: 74 } : null;
+    // 0.10.0: também no cooperativo (a lista de companheiros do jogo é redesenhada embaixo, com nick, vida e distância)
+    L.card = cardW >= 196 ? { x: 12 + sa.left, y: 12 + sa.top, w: cardW, h: 74 } : null;
+    L.grupo = !!(ns.Coop && ns.Coop.active) && L.card ? (ns.Coop.mates || []).filter((m) => m && m.connected && m.pl) : [];
     L.relogio = { x: w / 2 - 108, y: 8 + sa.top * 0, w: 216, h: 60 };
     const boss = ns.EnemyMgr && ns.EnemyMgr.all().find((e) => e.boss && !e.dead);
     L.boss = boss || null;
@@ -1287,7 +1289,10 @@
     if (L.card) L.cortes.push([0, 0, w, 8]);                                          // XP na borda de cima (vai para o card)
     if (L.card) { cardCut = Math.min(meio, 470); L.cortes.push([0, 8, cardCut, 62 + sa.top]); }   // nome, vida e chips (até y 70)
     L.cortes.push([Math.max(meio, cardCut), 14, w / 2 + 215 - Math.max(meio, cardCut), 50]);   // relógio + bioma·derrotados·moedas
-    if (boss || (ns.Rift && ns.Rift.inArena)) { const bx = Math.max(cardCut, Math.min((w - bw) / 2, w / 2 - 120) - 4); L.cortes.push([bx, 70 + sa.top, w - 2 * Math.min(bx, w / 2 - 120), 34]); }
+    let chefeX = 0;
+    if (boss || (ns.Rift && ns.Rift.inArena)) { const bx = Math.max(cardCut, Math.min((w - bw) / 2, w / 2 - 120) - 4); chefeX = bx; L.cortes.push([bx, 70 + sa.top, w - 2 * Math.min(bx, w / 2 - 120), 34]); }
+    // lista de companheiros do jogo (hud.js drawCoop: 15 px por linha logo embaixo da vida, até y ~130)
+    if (L.grupo.length) L.cortes.push([0, 70 + sa.top, chefeX ? Math.min(300, chefeX) : 300, 15 * L.grupo.length + 24]);
     L.cortes.push([sx - S - 18 - 4, sy - 6 - 22, totalW + S + 18 + 8, S + 6 + 22 + 6]);  // golpes + objeto (com os nomes em cima)
     return L;
   }
@@ -1380,6 +1385,7 @@
       ctx.globalAlpha = 1;
       bx += cw + 7;
     }
+    return chips.length ? by + 20 + 8 : by;
   }
 
   // ---------- relógio (e fenda), bioma, derrotados e moedas ----------
@@ -1548,7 +1554,7 @@
       ctx.save();
       try {
         ctx.textBaseline = 'alphabetic';
-        if (L.card) { desenharCard(ns, ctx, pl, L, dt); L.desvio = cfg.cola ? desenharFaixaCola(ns, ctx, pl, L) : 0; desenharBuffs(ns, ctx, pl, L); }
+        if (L.card) { desenharCard(ns, ctx, pl, L, dt); L.desvio = cfg.cola ? desenharFaixaCola(ns, ctx, pl, L) : 0; const yb = desenharBuffs(ns, ctx, pl, L); if (L.grupo.length) desenharGrupo(ns, ctx, pl, L, yb, dt); }
         desenharRelogio(ns, ctx, pl, st, L);
         if (L.chefe) desenharChefe(ns, ctx, L, dt);
         desenharGolpes(ns, ctx, pl, L);
@@ -1635,6 +1641,73 @@
     cx += 6; ctx.fillStyle = 'rgba(244,248,255,.35)'; ctx.fillRect(cx - 5, y + 5, 1, 14);
     buffs.forEach(icone);
     return 32;
+  }
+
+
+  // ======================= cooperativo no visual novo (0.10.0) =======================
+  // Seu nick (na cor do jogo) em cima do card e, embaixo, um card pequeno por companheiro: retrato, nick, Pokémon,
+  // vida, distância; caído: pisca e mostra quanto falta para levantar (fique a até ~1,7 m dele por 3 s).
+  const GRUPO_TXT = { pt: { caido: 'CAÍDO', m: 'm' }, en: { caido: 'DOWN', m: 'm' }, es: { caido: 'CAÍDO', m: 'm' } };
+  const gt = () => GRUPO_TXT[cfg.lang] || GRUPO_TXT.pt;
+  // nomes de jogador: sem passar pelo tradutor do jogo (fillText é traduzido por ele)
+  function txtCru(ns, ctx, s, x, y, cor, font, align = 'left', sombra = true) {
+    const f = (ns.I18n && ns.I18n.rawCanvas) ? (t, a, b) => ns.I18n.rawCanvas(ctx, 'fillText', t, a, b) : (t, a, b) => ctx.fillText(t, a, b);
+    ctx.font = font; ctx.textAlign = align;
+    if (sombra) { ctx.fillStyle = COR.shadow; f(s, x + 1.5, y + 1.5); }
+    ctx.fillStyle = cor; f(s, x, y);
+  }
+  function retratoMate(ns, m, dt) {
+    VIS.mates = VIS.mates || new Map();
+    const o = m.pl, key = m.uid + ':' + o.dex;
+    let a = VIS.mates.get(key);
+    if (!a) {
+      const bh = ns.Sprites.bodyHeight(o.dex || (o.mon && o.mon.dex), 1) || 48;
+      a = new ns.Sprites.Animator(o.dex || o.mon.dex, lim(24 / bh, 0.15, 1), !!o.shiny);
+      if (VIS.mates.size > 12) VIS.mates.clear();
+      VIS.mates.set(key, a);
+    }
+    a.dir = 0; a.loop('Idle'); a.update(dt);
+    return a;
+  }
+  function desenharGrupo(ns, ctx, pl, L, y0, dt) {
+    const x = L.card.x, w = L.card.w, H = 36, t = performance.now() / 1000;
+    // seu nick, numa etiqueta na borda de cima do card
+    const eu = ns.Social && ns.Social.me && ns.Social.me.name;
+    if (eu) {
+      ctx.font = FNT(800, 10);
+      const ew = ctx.measureText(eu).width + 14, ex = L.card.x + 72, ey = L.card.y - 9;
+      rr(ctx, ex - 1.5, ey - 1.5, ew + 3, 18, 8); ctx.fillStyle = COR.edgeOut; ctx.fill();
+      rr(ctx, ex, ey, ew, 15, 7); ctx.fillStyle = pl.tagColor || COR.gold; ctx.fill();
+      txtCru(ns, ctx, eu, ex + ew / 2, ey + 11, '#1a3170', FNT(800, 10), 'center', false);
+    }
+    let y = y0;
+    for (const m of L.grupo) {
+      const o = m.pl, cor = m.color || '#ffffff', dead = !!o.dead;
+      const f = dead ? 0 : (o.maxHp > 0 ? o.hp / o.maxHp : 0);
+      caixa(ctx, x, y, w, H, 10, 0.9);
+      ctx.save(); rr(ctx, x + 6, y + 6, 24, 24, 6); ctx.clip();
+      ctx.fillStyle = 'rgba(10,20,48,.85)'; ctx.fillRect(x + 6, y + 6, 24, 24);
+      try { retratoMate(ns, m, dt).draw(ctx, x + 18, y + 28, { alpha: dead ? 0.45 : 1 }); } catch (_) {}
+      ctx.restore();
+      rr(ctx, x + 6, y + 6, 24, 24, 6); ctx.lineWidth = 2; ctx.strokeStyle = cor; ctx.stroke();
+      const tx = x + 38, right = x + w - 9;
+      const metros = Math.round(Math.hypot(o.x - pl.x, o.y - pl.y) / 32);
+      txtCru(ns, ctx, String(m.name || '?'), tx, y + 15, cor, FNT(800, 11));
+      ctx.font = FNT(800, 11);
+      const nw = ns.I18n && ns.I18n.rawCanvas ? ns.I18n.rawCanvas(ctx, 'measureText', String(m.name || '?')).width : ctx.measureText(String(m.name || '?')).width;
+      const pk = o.mon && o.mon.name;
+      if (pk) txt(ctx, pk, tx + nw + 6, y + 15, COR.muted, FNT(700, 9));
+      txtCru(ns, ctx, metros + ' ' + gt().m, right, y + 15, COR.muted, FNT(700, 9), 'right');
+      if (dead) {
+        const pisca = Math.sin(t * 8) > 0;
+        const fr = lim((o.reviveT || 0) / ((ns.Player && ns.Player.REVIVE_TIME) || 3), 0, 1);
+        barra(ctx, tx, y + 21, right - tx - 56, 7, fr, null, ['#8dfc9a', '#2fb854']);
+        txtCru(ns, ctx, gt().caido, right, y + 29, pisca ? '#ff8a96' : '#ffd0d5', FNT(800, 9), 'right');
+      } else {
+        barra(ctx, tx, y + 21, right - tx, 7, f, rastro(VIS, 'mate:' + m.uid, f, dt), corVida(f));
+      }
+      y += H + 6;
+    }
   }
 
   // ======================= motor da partida (adaptado do PSBot, MIT) =======================

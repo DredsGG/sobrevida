@@ -9,7 +9,7 @@ Choose your partner Pokémon before the 8-question personality quiz and get exac
 
 ![Manifest V3](https://img.shields.io/badge/Manifest-V3-4285F4?logo=googlechrome&logoColor=white)
 ![Firefox](https://img.shields.io/badge/Firefox-140%2B-FF7139?logo=firefoxbrowser&logoColor=white)
-![Version](https://img.shields.io/badge/version-0.9.0-f4b400)
+![Version](https://img.shields.io/badge/version-0.10.0-f4b400)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 **Works on:** Chrome · Edge · Brave · Opera GX · Firefox 140+
@@ -64,7 +64,7 @@ For anyone who plays by hand: open one of your Pokémon in the game's collection
 
 ### New in-run look
 
-The run's HUD gets redrawn in the game's own blue *Mystery Dungeon* style: a card for your Pokémon with its animated sprite, level, HP that turns green, yellow and red with a damage trail, and EXP underneath; buffs as chips with stacks, seconds left and a timer bar that blinks near the end; a clock panel with defeated count and coins; a boss panel with portrait and percentage; and a moves bar with a clock-style cooldown and the active move's seconds. It sits exactly where the game's own parts were, so clicks and taps on moves still work. You can switch back to the game's look in the menu ("New in-run look"), with or without the farm.
+The run's HUD gets redrawn in the game's own blue *Mystery Dungeon* style: a card for your Pokémon with its animated sprite, level, HP that turns green, yellow and red with a damage trail, and EXP underneath; buffs as chips with stacks, seconds left and a timer bar that blinks near the end; a clock panel with defeated count and coins; a boss panel with portrait and percentage; and a moves bar with a clock-style cooldown and the active move's seconds. In co-op, your nickname sits on top of the card and each friend gets a small card underneath (Pokémon, nickname in their game color, HP, distance; when they're down it blinks and shows the revive progress). It sits exactly where the game's own parts were, so clicks and taps on moves still work. You can switch back to the game's look in the menu ("New in-run look"), with or without the farm.
 
 <img src="docs/sobrevida-hud.png" width="720" alt="A PokéSurvivor run with the Sobrevida HUD: top-left a blue card with Yveltal's sprite, Lv 4, a red HP bar at 27/175 and an EXP bar, buff chips (Sp. Atk x1, Speed x1, Def x2 with seconds and timer bars); top-center a clock panel 3:04 with Shady Forest, defeated and coins; a boss panel for Aurorus at 97%; bottom the item slot with Life Orb and four move slots, the active one labelled Harden">
 
