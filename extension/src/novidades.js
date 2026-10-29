@@ -2,6 +2,15 @@
 // Frases curtas, do ponto de vista de quem usa. Aparece uma vez, na primeira abertura depois da atualização.
 globalThis.SV_NOVIDADES = {
   pt: {
+    '0.2.3': [
+      "Na partida, a barrinha do farm agora fica no canto superior direito, onde não cobre nada do jogo.",
+    ],
+    '0.2.2': [
+      "O farm agora luta com o chefe da fenda e com os chefes do mapa: chega na distância do ataque que você está usando (encosta se for de perto) em vez de só fugir. Com pouca vida, volta a desviar.",
+      "Na luta com chefe, o farm prefere o ataque que alcança de longe, quando ele é tão bom quanto o outro.",
+      "Parceiro: o farm termina as melhorias do Pokémon atual até 100% e só depois troca para o mais forte que você tem. Se você escolher outro no jogo, ele respeita.",
+      "Pokémon grandes (como o Yveltal) aparecem inteiros no painel.",
+    ],
     '0.2.1': [
       'Se a Sobrevida for atualizada com o jogo aberto, o painel avisa e mostra o botão "Recarregar agora" (antes o farm ficava parado esperando).',
       'Só uma aba joga por vez: com duas abas do PokéSurvivor abertas, a outra mostra que o farm está na primeira.',
@@ -19,6 +28,15 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   en: {
+    '0.2.3': [
+      "During a run, the farm bar now sits in the top-right corner, where it doesn't cover anything in the game.",
+    ],
+    '0.2.2': [
+      "The farm now fights the rift boss and map bosses: it moves to the range of the attack you're using (up close for short attacks) instead of only running. Low on HP, it goes back to dodging.",
+      "In boss fights the farm prefers the long-range attack when it's as good as the other one.",
+      "Partner: the farm finishes the current Pokémon's upgrades to 100% and only then switches to the strongest one you own. If you pick another one in the game, it keeps it.",
+      "Big Pokémon (like Yveltal) show up whole in the panel.",
+    ],
     '0.2.1': [
       'If Sobrevida is updated with the game open, the panel tells you and shows a "Reload now" button (before, the farm just sat waiting).',
       'Only one tab plays at a time: with two PokéSurvivor tabs open, the other one shows the farm is running in the first.',
@@ -36,6 +54,15 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   es: {
+    '0.2.3': [
+      "En la partida, la barrita del farm ahora va en la esquina superior derecha, donde no tapa nada del juego.",
+    ],
+    '0.2.2': [
+      "El farm ahora pelea con el jefe de la grieta y los jefes del mapa: se pone a la distancia del ataque que usas (pegado si es de cerca) en vez de solo huir. Con poca vida, vuelve a esquivar.",
+      "En la pelea con jefes, el farm prefiere el ataque de largo alcance cuando es tan bueno como el otro.",
+      "Compañero: el farm termina las mejoras del Pokémon actual hasta el 100% y solo después cambia al más fuerte que tengas. Si eliges otro en el juego, lo respeta.",
+      "Los Pokémon grandes (como Yveltal) se ven enteros en el panel.",
+    ],
     '0.2.1': [
       'Si Sobrevida se actualiza con el juego abierto, el panel avisa y muestra el botón "Recargar ahora" (antes el farm se quedaba esperando).',
       'Solo una pestaña juega a la vez: con dos pestañas de PokéSurvivor abiertas, la otra muestra que el farm está en la primera.',

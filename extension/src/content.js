@@ -122,7 +122,7 @@
   :host { all: initial; }
   * { box-sizing: border-box; }
   .w { position: fixed; inset: 0; pointer-events: none; z-index: 2147483000; font: 16px/1.35 'Pixelify', 'Segoe UI', system-ui, sans-serif;
-    color: #fff; -webkit-font-smoothing: none; --box1: #2c519f; --box2: #1a3170; --edge: #f4f8ff; --edge-in: #5b83d6; --edge-out: #0b1838;
+    color: #fff; -webkit-font-smoothing: none; font-variant-ligatures: none; font-feature-settings: 'liga' 0, 'clig' 0; --box1: #2c519f; --box2: #1a3170; --edge: #f4f8ff; --edge-in: #5b83d6; --edge-out: #0b1838;
     --gold: #ffd23f; --gold2: #f0a31e; --muted: #b9cbf0; --shadow: #0a1430; --red: #ff5f6d; --green: #5fe08a; }
   .w > * { pointer-events: auto; }
   [hidden] { display: none !important; }
@@ -166,7 +166,8 @@
   .farm .acts { font-size: 12px; color: #dbe6ff; display: flex; flex-direction: column; gap: 2px; text-align: left; }
   .farm details summary { cursor: pointer; font-size: 13px; color: var(--muted); }
   .farm details .opts { display: flex; flex-direction: column; gap: 6px; padding-top: 6px; }
-  .pill { position: fixed; left: 14px; bottom: 14px; display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 10px; max-width: calc(100vw - 28px); font-size: 13px; cursor: pointer; }
+  /* canto superior direito, abaixo do quadro de clima do jogo (y 14–40): ali não fica nada da partida */
+  .pill { position: fixed; right: 14px; top: 48px; display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 10px; max-width: calc(100vw - 28px); font-size: 13px; cursor: pointer; }
   .pill svg { width: 22px; height: 22px; flex: none; }
   .pill span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .pill .btn { padding: 2px 8px; font-size: 13px; }
@@ -298,6 +299,22 @@
   const canvases = new Set();
   const metaExtra = {}; // folha Idle de Pokémon fora dos 29 iniciais (o piloto manda a do parceiro)
   const metaDe = (dex) => { const s = byDex(dex); return s ? s.idle : metaExtra[dex] || null; };
+  // área com pixels de verdade na folha (união de todos os quadros da linha de baixo): os quadros dos Pokémon
+  // grandes têm muita borda vazia; recortando, o desenho cabe no quadro sem ficar minúsculo
+  const caixas = {};
+  function caixa(dex, im, fw, fh, n) {
+    if (caixas[dex]) return caixas[dex];
+    let b = { x: 0, y: 0, w: fw, h: fh };
+    try {
+      const k = document.createElement('canvas'); k.width = fw * n; k.height = fh;
+      const g = k.getContext('2d'); g.drawImage(im, 0, 0, fw * n, fh, 0, 0, fw * n, fh);
+      const d = g.getImageData(0, 0, fw * n, fh).data;
+      let x0 = fw, y0 = fh, x1 = -1, y1 = -1;
+      for (let y = 0; y < fh; y++) for (let x = 0; x < fw * n; x++) if (d[(y * fw * n + x) * 4 + 3] > 8) { const lx = x % fw; if (lx < x0) x0 = lx; if (lx > x1) x1 = lx; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+      if (x1 >= x0 && y1 >= y0) b = { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+    } catch (_) {}
+    return (caixas[dex] = b);
+  }
   function spriteCanvas(dex, w, h, scale) {
     const c = document.createElement('canvas');
     c.width = w; c.height = h; c._dex = dex; c._scale = scale; c._t0 = performance.now() + Math.random() * 400;
@@ -321,8 +338,11 @@
       const ctx = c.getContext('2d');
       ctx.imageSmoothingEnabled = false;
       ctx.clearRect(0, 0, c.width, c.height);
-      const sc = c._scale, dw = fw * sc, dh = fh * sc;
-      ctx.drawImage(im, f * fw, 0, fw, fh, Math.round((c.width - dw) / 2), Math.round((c.height - dh) / 2 + 2), dw, dh);
+      // cabe no quadro: Pokémon grandes (Yveltal 80×96) encolhem; escala inteira quando dá, para o pixel art não borrar
+      const b = caixa(c._dex, im, fw, fh, n);
+      const fit = Math.min((c.width - 4) / b.w, (c.height - 4) / b.h);
+      const sc = c._scale <= fit ? c._scale : fit >= 1 ? Math.floor(fit) : fit, dw = Math.round(b.w * sc), dh = Math.round(b.h * sc);
+      ctx.drawImage(im, f * fw + b.x, b.y, b.w, b.h, Math.round((c.width - dw) / 2), Math.round((c.height - dh) / 2), dw, dh);
     }
     if (any) raf = requestAnimationFrame(desenhar);
   }

@@ -9,7 +9,7 @@ Choose your partner Pokémon before the 8-question personality quiz and get exac
 
 ![Manifest V3](https://img.shields.io/badge/Manifest-V3-4285F4?logo=googlechrome&logoColor=white)
 ![Firefox](https://img.shields.io/badge/Firefox-140%2B-FF7139?logo=firefoxbrowser&logoColor=white)
-![Version](https://img.shields.io/badge/version-0.2.1-f4b400)
+![Version](https://img.shields.io/badge/version-0.2.3-f4b400)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 **Works on:** Chrome · Edge · Brave · Opera GX · Firefox 140+
@@ -44,9 +44,9 @@ Open the heart menu and press **Start farm** (or **Alt+F** anywhere in the game)
   4. buys that partner's upgrades, best value first, keeping a reserve of 10% of your coins (at most 1,500);
   5. saves to the cloud and starts the next run.
 - **Never on the leaderboard.** Farm runs are blocked from the game's leaderboard twice: the game's submit is skipped, and the request that seals a run on PokéSurvivor's server is blocked by the browser before it leaves.
-- **A panel that says what it's doing:** the current task or move, level and HP, your partner's upgrade progress, coins and tickets per hour, and the last things it did. During a run a small pill in the corner shows the same with a **Stop** button. Every step can be turned off under *Options*.
+- **A panel that says what it's doing:** the current task or move, level and HP, your partner's upgrade progress, coins and tickets per hour, and the last things it did. During a run a small bar in the top-right corner (out of the way of the game) shows the same with a **Stop** button. Every step can be turned off under *Options*.
 
-<img src="docs/sobrevida-farm-run.png" width="420" alt="A run in progress with Slurpuff in a forest and the Sobrevida pill in the bottom-left corner: Farm, Picking up XP, 0:46, Lv 5, 147/147 HP and a Stop button">&nbsp;&nbsp;<img src="docs/sobrevida-farm-panel.png" width="420" alt="The Sobrevida panel open during a run: Stop, Picking up XP at 0:47 level 5, partner Slurpuff with Upgrades 35/92, collection 27 Pokémon, and the log: bought 35 upgrades, partner Psyduck to Slurpuff, Gacha Kalos x30 with 26 new">
+<img src="docs/sobrevida-farm-run.png" width="420" alt="A run in progress in a forest with the Sobrevida bar in the top-right corner: Farm, Picking up XP, 0:46, Lv 5, 147/147 HP and a Stop button">&nbsp;&nbsp;<img src="docs/sobrevida-farm-panel.png" width="420" alt="The Sobrevida panel open under the bar during a run: Stop, Picking up XP at 0:47 level 5, partner Slurpuff with Upgrades 35/92, collection 27 Pokémon, and the log: bought 35 upgrades, partner Psyduck to Slurpuff, Gacha Kalos x30 with 26 new">
 
 **Keep the game tab visible.** Browsers pause a game in a hidden tab and slow it down a lot in a minimized or covered window, so the farm can't play there. The panel tells you when that happens. Only one PokéSurvivor tab farms at a time; a second tab says the farm is running in the first one.
 

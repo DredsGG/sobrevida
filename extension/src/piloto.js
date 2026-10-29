@@ -353,6 +353,9 @@
   function alvo(ns) {
     const s = ns.DB.save;
     const own = Object.keys(s.owned || {}).map(Number).filter((d) => ns.DEX_BY[d]);
+    // 0.2.2 (pedido do André): termina um Pokémon antes de ir para outro. O parceiro atual (escolhido pelo
+    // farm ou por você no jogo) fica até chegar a 100%; só então vai para o mais forte que ainda não está 100%.
+    if (s.partner && s.owned && s.owned[s.partner] && !progresso(ns, s.partner).maxed) return s.partner;
     own.sort((a, b) => power(ns, b) - power(ns, a));
     return own.find((d) => !progresso(ns, d).maxed) || own[0] || s.partner;
   }
@@ -591,6 +594,32 @@
     return i < 0 ? 99 : i;
   }
 
+  // Sobrevida 0.2.2: alcance de cada golpe, igual ao reach() de systems/combat.js do jogo; os que não miram
+  // (nova, aura, órbita, rastro, mina) pela área que cobrem. Só o grupo ATIVO ataca.
+  function moveReach(m) {
+    if (!m || m.kind === 'buff') return 0;
+    const r = m.radius || 0, fly = (m.speed || 0) * (m.life || 0);
+    switch (m.kind) {
+      case 'melee': return r + 30;
+      case 'beam': return r + 20;
+      case 'boomerang': return r + 40;
+      case 'chain': return 280;
+      case 'meteor': return 340;
+      case 'dash': return r + 60;
+      case 'cone': return fly + 30;
+      case 'spin': case 'shove': case 'charge': return r + 20;
+      case 'quake': return (m.count | 0) * 34 + r;
+      case 'vortex': case 'stun': case 'turret': return 300;
+      case 'projectile': case 'homing': case 'bounce': return Math.min(520, fly || 520);
+      case 'nova': return fly || 200;
+      case 'aura': return r || 60;
+      case 'orbit': return r + (m.size || 8);
+      case 'mine': case 'trail': return 40;
+      default: return 200;
+    }
+  }
+  function groupReach(g) { let r = 0; for (const m of g || []) r = Math.max(r, moveReach(m)); return r; }
+
   function groupScore(g, prof) {
     let dmg = 0, buff = 0, rank = 0;
     for (const m of g) {
@@ -608,8 +637,10 @@
     if (now - S.lastSlotCheck > 600 && p.slots.length > 1 && !p.hasItem?.('choiceband')) {
       S.lastSlotCheck = now;
       const prof = profileOf(ns);
-      let best = p.active, bs = groupScore(p.slots[p.active] || [], prof);
-      p.slots.forEach((g, i) => { const s = groupScore(g, prof); if (s > bs + 0.5) { bs = s; best = i; } });
+      const bossFight = !!((ns.Rift && ns.Rift.inArena) || (ns.EnemyMgr.bossAlive && ns.EnemyMgr.bossAlive()));
+      const sc = g => { const s0 = groupScore(g, prof); return s0 && bossFight ? s0 * (groupReach(g) >= 200 ? 1.25 : 1) : s0; };
+      let best = p.active, bs = sc(p.slots[p.active] || []);
+      p.slots.forEach((g, i) => { const s = sc(g); if (s > bs + 0.5) { bs = s; best = i; } });
       if (best !== p.active) p.setActive(best);
     }
     if (cfg.orbs && ns.Orbs && p.orbs && now - S.lastOrb > 1500) {
@@ -898,6 +929,22 @@
     const hitFrac = (dmg, pure) => Math.min(1, (dmg || 0) * (pure ? 1 : red) / p.maxHp);
     const hazFrac = h => Math.min(1, (h.pct ? Math.max(h.dmg || 0, p.maxHp * h.pct) : (h.dmg || 0)) * (h.pure ? 1 : red) / p.maxHp);
     const DMG_W = hpPct < 0.6 ? 160 : 90, TOUCH_W = hpPct < 0.35 ? 160 : hpPct < 0.6 ? 100 : 30;
+    // 0.2.2: lutar com o chefe em vez de só fugir. O alcance do golpe ativo decide a distância: de perto
+    // (mordida, investida, aura) encosta enquanto a vida aguenta; de longe fica a ~70% do alcance (até 280 px,
+    // dentro dos 330 px em que o jogo prioriza o chefe). Vida baixa: volta a desviar.
+    const myReach = groupReach(p.slots && p.slots[p.active]);
+    const short = myReach < 150;
+    let engaged = null, engageF = 1;
+    if (!judging) {
+      const riftBoss = ns.Rift && ns.Rift.inArena && ns.Rift.arena && ns.Rift.arena.bossId && ns.EnemyMgr.get && ns.EnemyMgr.get(ns.Rift.arena.bossId);
+      const cand = (riftBoss && !riftBoss.dead) ? riftBoss : near.find(e => e.boss && !e.dead && Math.hypot(e.x - p.x, e.y - p.y) < 450);
+      const keep = S.engaged === (cand && cand.id) ? 0.05 : 0;   // histerese: não fica liga/desliga
+      // perder na fenda não acaba a partida (volta ao mapa sem prêmio): lá dá para arriscar mais que com chefe do mapa
+      const lim = riftBoss && cand === riftBoss ? (short ? 0.25 : 0.2) : (short ? 0.45 : 0.3);
+      if (cand && myReach > 0 && hpPct > lim - keep) { engaged = cand; engageF = short ? 0.3 : 0.6; }
+    }
+    S.engaged = engaged ? engaged.id : null;
+    S.engageD = engaged ? (short ? Math.max(28, myReach * 0.6) : Math.min(280, myReach * 0.7)) : 0;
     const danger = (x, y, tAhead) => {
       let c = 0, big = 0, worst = 0, haz = 0;
       for (const e of near) {
@@ -905,10 +952,11 @@
         const d = Math.hypot(x - e.x, y - e.y) - (e.r || 10) - p.r - spd * tAhead * 0.8;
         const reach = (e.arceus ? 140 : e.boss ? 90 : 35) + 45 * fast;
         const w = e.arceus ? 8 : (e.boss ? 4 : 1) * Math.min(3, Math.max(0.5, (e.dmg || 10) / (p.maxHp * 0.12)));
-        const v = w * Math.exp(-Math.max(d, -20) / reach);
+        const bf = e === engaged ? engageF : 1;          // 0.2.2: chefe que estamos enfrentando assusta menos
+        const v = w * bf * Math.exp(-Math.max(d, -20) / reach);
         if (e.boss || e.arceus) big += v; else c += v;
         const touch = Math.exp(-Math.max(0, d) / 18);
-        worst = Math.max(worst, touch * (e.arceus ? 0.4 : hitFrac(e.dmg, false)));
+        worst = Math.max(worst, touch * bf * (e.arceus ? 0.4 : hitFrac(e.dmg, false)));
       }
       for (const s of shots) {
         const sx = s.x + (s.vx || 0) * tAhead, sy = s.y + (s.vy || 0) * tAhead;
@@ -972,7 +1020,15 @@
       let px0 = p.x - ar.x, py0 = p.y - ar.y; const pr = Math.hypot(px0, py0) || 1;
       const pa = Math.atan2(py0, px0);
       let kx = 0, ky = 0, w = 1.8;
-      if (boss && !boss.dead) {
+      if (boss && !boss.dead && engaged === boss) {
+        const ang = Math.atan2(p.y - boss.y, p.x - boss.x) + S.spin * (short ? 0.25 : 0.4);
+        const R0 = S.engageD;
+        let tx = boss.x + Math.cos(ang) * R0, ty = boss.y + Math.sin(ang) * R0;
+        const tr = Math.hypot(tx - ar.x, ty - ar.y), lim = edge * 0.95;   // não encostar na parede da arena
+        if (tr > lim) { tx = ar.x + (tx - ar.x) * lim / tr; ty = ar.y + (ty - ar.y) * lim / tr; S.spin *= -1; }
+        kx = tx - p.x; ky = ty - p.y;
+        w = Math.hypot(kx, ky) > 50 ? 4 : 2.2;
+      } else if (boss && !boss.dead) {
         const ba = Math.atan2(boss.y - ar.y, boss.x - ar.x);
         let delta = pa - ba; while (delta > Math.PI) delta -= 2 * Math.PI; while (delta < -Math.PI) delta += 2 * Math.PI;
         if (Math.abs(delta) < Math.PI * 0.85) S.spin = delta >= 0 ? 1 : -1;
@@ -991,6 +1047,12 @@
       }                                                    
       const kl = Math.hypot(kx, ky);
       if (kl > 0.01) kite = { x: kx / kl, y: ky / kl, w };
+    } else if (engaged && !(target && (target.hold || target.chase || target.escort))) {
+      const ang = Math.atan2(p.y - engaged.y, p.x - engaged.x) + S.spin * (short ? 0.25 : 0.4);
+      let kx = engaged.x + Math.cos(ang) * S.engageD - p.x, ky = engaged.y + Math.sin(ang) * S.engageD - p.y;
+      const kl = Math.hypot(kx, ky) || 1;
+      kite = { x: kx / kl, y: ky / kl, w: kl > 50 ? 3.5 : 2 };
+      if (pathLen(kx / kl, ky / kl, 90) < 40) { S.spinBlockT += dt; if (S.spinBlockT > 0.6) { S.spin *= -1; S.spinBlockT = 0; } } else S.spinBlockT = 0;
     } else if ((!target || here > 2) && !(target && target.hold) && !(target && target.chase && here < 4)) {
       if (hadTarget) S.loopC = null;  
       let R = 380, c = S.loopC;
@@ -1044,7 +1106,7 @@
     let bi = -1;
     for (let i = 0; i < 16; i++) if (sm[i] < Infinity && (bi < 0 || sm[i] < sm[bi])) bi = i;
     if (!target) S.wanderA += dt * 0.35;
-    S.mode = judging ? (here > 2 ? 'judgeDodge' : 'judgeLoop') : arena ? (here > 2 ? 'arenaDodge' : 'arenaBoss') : here > 2 ? 'dodge' : target && (target.chase || target.hold) ? target.mode : kite ? 'kite' : target ? target.mode : 'idle';
+    S.mode = judging ? (here > 2 ? 'judgeDodge' : 'judgeLoop') : engaged ? (here > 2 + (short ? 4 : 1) ? 'arenaDodge' : 'bossFight') : arena ? (here > 2 ? 'arenaDodge' : 'arenaBoss') : here > 2 ? 'dodge' : target && (target.chase || target.hold) ? target.mode : kite ? 'kite' : target ? target.mode : 'idle';
     const escape = () => {
       let bd = null, bs = -Infinity;
       for (const [dx, dy] of DIRS) {
