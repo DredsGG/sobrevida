@@ -758,9 +758,10 @@
   // partida (G.Enemies.cast, por tramo de tempo, peso pela duração do tramo) e contra os chefes (G.Enemies.BOSSES).
   function cobertura(ns) {
     const E = ns.Enemies, cast = E && E.cast;
+    if (KB.fixa) return KB.cov;                                // colinha: cobertura geral travada durante a conta
     const key = cast ? cast.map((c) => c.from + ':' + c.list.map((d) => d.dex).join(',')).join('|') : 'none';
     if (KB.castKey === key && KB.cov) return KB.cov;
-    KB.castKey = key; KB.cov = {}; KB.covBoss = {};
+    KB.castKey = key; KB.cov = {}; KB.covBoss = {}; KB.tag = (KB.tag | 0) + 1;
     const tiposDe = (dex) => ((ns.DEX_BY && ns.DEX_BY[dex]) || {}).types || null;
     const alvos = [];
     if (cast && cast.length) cast.forEach((c, i) => {
@@ -808,7 +809,7 @@
   // × no dano do golpe pela habilidade: 75% do tempo com vida alta, 25% com pouca, contra os inimigos desta partida
   function abilOut(ns, mon, fx, m) {
     if (!fx || !fx.out || !m) return 1;
-    const key = (mon && mon.dex) + ':' + (fx.d || '') + ':' + m.id + ':' + (m.lvl || 1) + ':' + (m.dmg || 0) + ':' + KB.castKey.length;
+    const key = (mon && mon.dex) + ':' + (fx.d || '') + ':' + m.id + ':' + (m.lvl || 1) + ':' + (m.dmg || 0) + ':' + (KB.fixa ? 'g' : KB.tag | 0);
     if (KB.abOut[key] != null) return KB.abOut[key];
     const alvos = inimigos();
     const v = semSorte(() => {
@@ -976,9 +977,9 @@
   // Golpe inicial = o golpe de maior valor que o jogo deixa escolher para começar; segundo = o próximo; Veto = os que
   // menos servem para este Pokémon (primeiro os buffs fora da build, porque a partida aceita só 2 buffs; depois os
   // ataques de menor valor). Nunca veta golpe da build.
-  function escolhasDe(ns, dex) {
-    const mon = monDe(ns, dex);
-    const pl = mon && planoDe(ns, dex);
+  function escolhasDe(ns, dex, planoDado, monDado) {
+    const mon = monDado || monDe(ns, dex);
+    const pl = planoDado || (mon && planoDe(ns, dex));
     if (!pl) return null;
     let choices = [];
     try { choices = ns.startChoices(dex) || []; } catch (_) {}
@@ -1041,7 +1042,115 @@
     return out.sort((a, b) => b.ganho - a.ganho);
   }
   // Esqueça o que foi calculado deste Pokémon (mudou natureza, habilidade ou MT)
-  function esquecer(dex) { KB.plans = {}; KB.fx = {}; KB.abOut = {}; }
+  function esquecer(dex) { KB.plans = {}; KB.plansG = {}; KB.fx = {}; KB.abOut = {}; }
+
+
+  // ----- 0.7.0: colinha (natureza, habilidade, build e MT de cada Pokémon) -----
+  // Para quem joga na mão: mesma base de cálculo, mas contra TODOS os inimigos que podem aparecer (G.Enemies.TIERS +
+  // candidates(), sem o sorteio desta partida) e todos os chefes possíveis (BOSS_SLOTS por BST). Assim a colinha não
+  // muda de uma partida para outra.
+  function coberturaGeral(ns) {
+    if (KB.geral) return KB.geral;
+    const E = ns.Enemies, tipos = Object.keys((ns.Types && ns.Types.CHART) || {});
+    const alvos = [], chefes = [];
+    try {
+      const T = E.TIERS || [];
+      T.forEach((t, i) => {
+        const dur = Math.max(60, ((T[i + 1] && T[i + 1].from) || t.from + 300) - t.from);
+        const c = E.candidates(t) || [];
+        for (const p of c) if (p.types) alvos.push([p.types, dur / c.length]);
+      });
+      for (const sl of (E.BOSS_SLOTS || [])) {
+        const pool = (ns.DEX || []).filter((p) => !p.leg && p.bst >= sl.bst[0] && p.bst <= sl.bst[1]);
+        for (const p of pool) chefes.push([p.types, 1 / pool.length]);
+      }
+    } catch (_) {}
+    const cov = {}, covBoss = {};
+    for (const ty of tipos) {
+      let s = 0, w = 0, sb = 0, wb = 0;
+      for (const [t, peso] of alvos) { s += ns.Types.mult(ty, t) * peso; w += peso; }
+      for (const [t, peso] of chefes) { sb += ns.Types.mult(ty, t) * peso; wb += peso; }
+      cov[ty] = w ? s / w : 1; covBoss[ty] = wb ? sb / wb : 1;
+    }
+    // amostra dos inimigos para os ganchos das habilidades (no máximo ~60, espalhados)
+    const passo = Math.max(1, Math.floor(alvos.length / 60));
+    return (KB.geral = { cov, covBoss, alvos: alvos.filter((_, i) => i % passo === 0) });
+  }
+  function comGeral(ns, fn) {
+    const g = coberturaGeral(ns), salvo = { cov: KB.cov, covBoss: KB.covBoss, alvos: KB.alvos, fixa: KB.fixa, plans: KB.plans };
+    KB.cov = g.cov; KB.covBoss = g.covBoss; KB.alvos = g.alvos; KB.fixa = true; KB.plans = KB.plansG || (KB.plansG = {});
+    try { return fn(); } finally { KB.cov = salvo.cov; KB.covBoss = salvo.covBoss; KB.alvos = salvo.alvos; KB.fixa = salvo.fixa; KB.plans = salvo.plans; }
+  }
+  const COLA = new Map();
+  function colinha(ns, dex) {
+    const base = ns.DEX_BY && ns.DEX_BY[dex], s = ns.DB && ns.DB.save;
+    if (!base || !ns.Mons || !ns.NATURES) return null;
+    const dono = !!(s && s.owned && s.owned[dex]);
+    const nat0 = dono ? ns.Mons.natureOf(dex) : null, ab0 = dono ? ns.Mons.abilityOf(dex) : null;
+    const ensinadas = dono ? ns.Mons.taught(dex) : [];
+    const chave = [dex, nat0 && nat0.id, ab0 && ab0.slot, ensinadas.join(','), Object.keys(KB.learn).length].join('|');
+    if (COLA.has(chave)) return COLA.get(chave);
+    const nm = (id) => { const d = id && ns.Moves.BY_ID[id]; return d ? (ns.T ? ns.T(d.name, 'move') : d.name) : null; };
+    const r = comGeral(ns, () => {
+      const comNat = (n) => { const m = Object.assign({}, base); if (n && n.up) { m[n.up] = base[n.up] * 1.1; m[n.down] = base[n.down] * 0.9; } m.atk = Math.max(m.pa, m.sa); m.nature = n ? n.id : ''; return m; };
+      const slots = ns.Mons.slots(dex);
+      const abAtual = ab0 ? ab0.id : slots[0];
+      const pool0 = poolDe(ns, dono ? ns.Mons.monFor(dex) : base);
+      const forca = (mon, ab, pool) => { const fx = fxDe(ns, mon, ab); const p = planoCalc(ns, mon, fx, pool); return [p ? forcaPlano(mon, fx, p) : 0, p]; };
+      // 1) melhor natureza com a habilidade atual (ou a 1ª, se não tem o Pokémon)
+      let bestN = null, fN = -1;
+      for (const n of ns.NATURES) { const [f] = forca(comNat(n), abAtual, pool0); if (f > fN * 1.0001) { fN = f; bestN = n; } }
+      // 2) melhor habilidade com essa natureza (normais e oculta à parte)
+      const monN = comNat(bestN);
+      const habs = [0, 1, 2].filter((i) => slots[i] && !(i === 1 && slots[1] === slots[0])).map((i) => ({ i, id: slots[i], f: forca(monN, slots[i], pool0)[0] }));
+      const normal = habs.filter((h) => h.i < 2).sort((a, b) => b.f - a.f)[0] || null;
+      const oculta = habs.find((h) => h.i === 2) || null;
+      const melhorAb = oculta && normal && oculta.f > normal.f * 1.03 ? oculta : normal || oculta;
+      // 3) natureza de novo com a melhor habilidade (uma muda a outra) e a build final
+      let bestN2 = bestN, fN2 = -1;
+      for (const n of ns.NATURES) { const [f] = forca(comNat(n), melhorAb.id, pool0); if (f > fN2 * 1.0001) { fN2 = f; bestN2 = n; } }
+      const monF = comNat(bestN2);
+      const [fFinal, plano] = forca(monF, melhorAb.id, pool0);
+      // 4) MT que melhoram (todas as que ele aprende, não só as do dia)
+      let mts = [];
+      try {
+        const lista = ns.Mons.learnable ? (dono ? ns.Mons.learnable(dex) : (ns.TM_OF(dex) || []).filter((id) => ns.Moves.BY_ID[id] && !ns.Mons.natural(dex, id))) : [];
+        mts = lista.map((id) => ({ id, nome: nm(id), ganho: forca(monF, melhorAb.id, pool0.concat([id]))[0] / fFinal - 1, preco: ns.Shop ? ns.Shop.tmPrice(id) : 0 }))
+          .filter((x) => x.ganho >= 0.02).sort((a, b) => b.ganho - a.ganho).slice(0, 3)
+          .map((x) => ({ nome: x.nome, ganho: Math.round(x.ganho * 100), preco: x.preco }));
+      } catch (_) {}
+      // ganhos em relação ao que o Pokémon tem hoje
+      let fHoje = 0;
+      if (dono) fHoje = forca(ns.Mons.monFor(dex), abAtual, pool0)[0];
+      const fSoNat = dono ? forca(comNat(bestN2), abAtual, pool0)[0] : 0;
+      const nomeNat = (n) => (n ? ns.Mons.name(n.n) : '');
+      const escolhas = (() => { try { return plano ? escolhasDe(ns, dex, plano, monF) : null; } catch (_) { return null; } })();
+      return {
+        dex, nome: base.name, dono,
+        nat: { id: bestN2.id, nome: nomeNat(bestN2), up: bestN2.up, down: bestN2.down, atual: nat0 ? nomeNat(nat0) : null, ok: !!(nat0 && nat0.id === bestN2.id),
+               ganho: dono && fHoje > 0 ? Math.round((fSoNat / fHoje - 1) * 100) : null },
+        ab: { nome: ns.Mons.abilityName(melhorAb.id), oculta: melhorAb.i === 2, atual: ab0 ? ns.Mons.abilityName(ab0.id) : null, ok: !!(ab0 && ab0.id === melhorAb.id),
+              ganho: dono && fSoNat > 0 ? Math.round((fFinal / fSoNat - 1) * 100) : null,
+              desc: (() => { try { const fx = ns.AbilityFX.of(melhorAb.id, monF), t = (x) => (x && ns.T ? ns.T(x) : x); return [t(fx.d), t(fx.d2)].filter(Boolean).join(' '); } catch (_) { return ''; } })() },
+        build: plano ? { a: nm(plano.a), b: nm(plano.b), buffs: plano.buffs.map(nm).filter(Boolean), parceiro: nm(plano.parceiro),
+                         lado: (ns.Moves.BY_ID[plano.a] || {}).cat || '' } : null,
+        inicio: escolhas ? { a: nm(escolhas.start), b: nm(escolhas.start2), vetos: escolhas.bans.slice(0, 3).map(nm).filter(Boolean) } : null,
+        mts, total: dono && fHoje > 0 ? Math.round((fFinal / fHoje - 1) * 100) : null,
+      };
+    });
+    if (COLA.size > 200) COLA.clear();
+    COLA.set(chave, r);
+    return r;
+  }
+  // pedido da extensão (mundo isolado): a colinha do Pokémon aberto na coleção
+  document.addEventListener('sobrevida:pedir', (e) => {
+    let q = null;
+    try { q = JSON.parse(e.detail || '{}'); } catch (_) { return; }
+    if (!q || q.tipo !== 'colinha' || !NS) return;
+    let r = null;
+    try { r = colinha(NS, +q.dex); } catch (er) { log('colinha', er); }
+    try { document.dispatchEvent(new CustomEvent('sobrevida:colinha', { detail: JSON.stringify({ dex: +q.dex, r }) })); } catch (_) {}
+  });
 
   // ======================= visual novo da partida (0.6.0) =======================
   // O jogo desenha o HUD inteiro no canvas, numa função só (G.HUD.draw, ui/hud.js). Aqui ela é envolvida:

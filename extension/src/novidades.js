@@ -2,6 +2,11 @@
 // Frases curtas, do ponto de vista de quem usa. Aparece uma vez, na primeira abertura depois da atualização.
 globalThis.SV_NOVIDADES = {
   pt: {
+    '0.7.0': [
+      "Colinha na coleção: abra qualquer Pokémon seu na coleção do jogo e, embaixo de natureza e habilidade, aparece a melhor natureza, a melhor habilidade (e se é a oculta), a build (2 ataques, buffs e o de troca), com que golpe começar, o que vetar e as MT que valem a pena.",
+      "Quando a sua natureza ou habilidade não é a melhor, a colinha diz quanto de força você ganha trocando.",
+      "A conta é feita contra todos os inimigos e chefes que podem aparecer, então não muda de uma partida para outra. Dá para desligar no menu da Sobrevida.",
+    ],
     '0.6.0': [
       "Visual novo da partida, no estilo do jogo: card do seu Pokémon com o sprite animado, nível, vida (verde, amarela e vermelha, com o rastro do dano) e experiência embaixo.",
       "Buffs com timer: cada um mostra os acúmulos, os segundos que faltam e uma barrinha, e pisca nos 2 últimos segundos.",
@@ -69,6 +74,11 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   en: {
+    '0.7.0': [
+      "Cheat sheet in the collection: open any of your Pokémon in the game's collection and, under nature and ability, you'll see the best nature, the best ability (and whether it's the hidden one), the build (2 attacks, buffs and the switch move), which move to start with, what to ban and the TMs worth buying.",
+      "When your nature or ability isn't the best, it tells you how much strength you'd gain by changing it.",
+      "It's worked out against every enemy and boss that can show up, so it doesn't change from run to run. You can turn it off in the Sobrevida menu.",
+    ],
     '0.6.0': [
       "New in-run look, in the game's style: your Pokémon's card with its animated sprite, level, HP (green, yellow and red, with a damage trail) and EXP underneath.",
       "Buffs with timers: each one shows its stacks, seconds left and a small bar, and blinks in the last 2 seconds.",
@@ -136,6 +146,11 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   es: {
+    '0.7.0': [
+      "Chuleta en la colección: abre cualquiera de tus Pokémon en la colección del juego y, debajo de naturaleza y habilidad, verás la mejor naturaleza, la mejor habilidad (y si es la oculta), la build (2 ataques, buffs y el de cambio), con qué golpe empezar, qué vetar y las MT que valen la pena.",
+      "Cuando tu naturaleza o habilidad no es la mejor, te dice cuánta fuerza ganas al cambiarla.",
+      "Se calcula contra todos los enemigos y jefes que pueden salir, así que no cambia de una partida a otra. Se puede desactivar en el menú de Sobrevida.",
+    ],
     '0.6.0': [
       "Visual nuevo de la partida, al estilo del juego: tarjeta de tu Pokémon con el sprite animado, nivel, vida (verde, amarilla y roja, con el rastro del daño) y experiencia debajo.",
       "Buffs con temporizador: cada uno muestra las cargas, los segundos que quedan y una barrita, y parpadea en los 2 últimos segundos.",

@@ -522,7 +522,7 @@
 
   // ───────────────────────── farm automático (v0.2.0) ─────────────────────────
   // O piloto (src/piloto.js, mundo da página) joga e cuida da rotina; aqui ficam a configuração, a ponte e o painel.
-  const FARM_DEF = { on: false, modo: 'solo', upgrades: true, gacha: true, partner: true, missions: true, skins: true, shop: true, hud: true };
+  const FARM_DEF = { on: false, modo: 'solo', upgrades: true, gacha: true, partner: true, missions: true, skins: true, shop: true, hud: true, cola: true };
   let farm = Object.assign({}, FARM_DEF), pst = null, pstAt = 0, farmCanvas = null, farmSig = '';
   const mmss = I.mmss;
   // 0.4.0: o que o farm aprendeu nas partidas (acertos reais por golpe) fica guardado aqui e volta para o piloto
@@ -560,6 +560,66 @@
     try { pst = JSON.parse(e.detail); pstAt = Date.now(); if (pst && pst.partner && pst.partner.meta) metaExtra[pst.partner.dex] = pst.partner.meta; } catch (_) {}
   };
   document.addEventListener('sobrevida:st', onSt);
+  // ---------- 0.7.0: colinha na ficha do Pokémon (coleção do jogo) ----------
+  // O piloto calcula (melhor natureza, habilidade, build, MT) e a extensão desenha um painel no visual do jogo, logo
+  // abaixo de natureza/habilidade/MT da ficha. translate="no": o tradutor do jogo não mexe nos nossos textos.
+  const COLA = { chave: '', dados: {}, pedidoEm: 0 };
+  const dexDaFicha = () => {
+    const d = document.getElementById('dex-detail');
+    const linha = d && d.querySelector('.center > div');
+    const m = linha && /(\d{1,4})/.exec(linha.textContent || '');
+    return m ? +m[1] : 0;
+  };
+  const onCola = (e) => {
+    try { const o = JSON.parse(e.detail); if (o && o.dex && COLA.chave && COLA.chave.startsWith(o.dex + '|')) { COLA.dados[COLA.chave] = o.r || null; desenharCola(); } } catch (_) {}
+  };
+  document.addEventListener('sobrevida:colinha', onCola);
+  function htmlCola(r) {
+    const C = L().f.cola, sinal = (v) => (v > 0 ? '+' : '') + v + '%';
+    const natTxt = r.nat.up ? `+${C.stat[r.nat.up]} −${C.stat[r.nat.down]}` : C.neutra;
+    // a sua já é a melhor (ou rende igual, menos de 1% de diferença) → ✓
+    const sua = (o) => (!r.dono ? '' : o.ok ? `<span class="ok">✓ ${esc(C.sua)}</span>` : !(o.ganho >= 1) ? `<span class="ok">✓ ${esc(C.igual(o.atual))}</span>` : `<span>${esc(C.aSua(o.atual, o.ganho))}</span>`);
+    const suaNat = sua(r.nat), suaAb = sua(r.ab);
+    const b = r.build;
+    return `<div class="sv-cola-t">${esc(C.titulo)}</div>
+      <div class="sv-cola-r"><span class="k">${esc(C.nat)}</span><div><b>${esc(r.nat.nome)}</b> <small>${esc(natTxt)}</small><br><small class="m">${suaNat}</small></div></div>
+      <div class="sv-cola-r"><span class="k">${esc(C.hab)}</span><div><b>${esc(r.ab.nome)}</b>${r.ab.oculta ? ` <small class="gold">${esc(C.oculta)}</small>` : ''}<br><small class="m">${esc(r.ab.desc || '')}</small>${suaAb ? `<br><small class="m">${suaAb}</small>` : ''}</div></div>
+      ${b ? `<div class="sv-cola-r"><span class="k">${esc(C.build)}</span><div><b>${esc([b.a, b.b].filter(Boolean).join(' + '))}</b>${b.lado ? ` <small>(${esc(C.lado[b.lado] || '')})</small>` : ''}<br><small class="m">${esc(C.buffs)}: ${esc(b.buffs.join(', ') || '—')} · ${esc(C.troca)}: ${esc(b.parceiro || '—')}</small></div></div>` : ''}
+      ${r.inicio && r.inicio.a ? `<div class="sv-cola-r"><span class="k">${esc(C.inicio)}</span><div><b>${esc(r.inicio.a)}</b>${r.inicio.b ? ` <small>· ${esc(C.seg)}: ${esc(r.inicio.b)}</small>` : ''}${r.inicio.vetos.length ? `<br><small class="m">${esc(C.veto)}: ${esc(r.inicio.vetos.join(', '))}</small>` : ''}</div></div>` : ''}
+      <div class="sv-cola-r"><span class="k">${esc(C.mt)}</span><div>${r.mts.length ? r.mts.map((m) => `<b>${esc(m.nome)}</b> <small>${esc(sinal(m.ganho))}</small>`).join('<br>') : `<small class="m">${esc(C.nada)}</small>`}</div></div>
+      ${r.total > 0 ? `<p class="sv-cola-tot">${esc(C.total(r.total))}</p>` : ''}
+      <p class="sv-cola-p">${esc(C.rod)}</p>`;
+  }
+  const COLA_CSS = `.sv-cola{margin:10px 0 6px;padding:10px 12px;border:2px solid rgba(255,210,63,.55);border-radius:10px;background:rgba(10,20,48,.45);text-align:left;font-size:13px;line-height:1.35}
+    .sv-cola-t{color:#ffd23f;font-weight:700;margin-bottom:6px}
+    .sv-cola-r{display:grid;grid-template-columns:84px 1fr;gap:8px;margin:5px 0}
+    .sv-cola-r .k{color:#b9cbf0}.sv-cola small{font-size:12px}.sv-cola .m{color:#b9cbf0}.sv-cola .ok{color:#7fe8a0}
+    .sv-cola-tot{margin:8px 0 2px;color:#7fe8a0}.sv-cola-p{margin:6px 0 0;color:#8fa3c4;font-size:11px}`;
+  function desenharCola() {
+    const d = document.getElementById('dex-detail'), ext = d && d.querySelector('.mon-extra');
+    let box = d && d.querySelector('.sv-cola');
+    if (!farm.cola || !ext || dead) { if (box) box.remove(); return; }
+    if (!document.getElementById('sv-cola-css')) { const st = document.createElement('style'); st.id = 'sv-cola-css'; st.textContent = COLA_CSS; document.head.appendChild(st); }
+    const dex = dexDaFicha();
+    if (!dex) return;
+    // a chave inclui o que a ficha mostra (natureza, habilidade, MT): depois de uma Menta/Cápsula/MT, recalcula
+    const chave = dex + '|' + (ext.textContent || '').replace(/\s+/g, ' ').trim();
+    if (!box) { box = document.createElement('div'); box.className = 'sv-cola'; box.setAttribute('translate', 'no'); ext.insertAdjacentElement('afterend', box); }
+    const r = COLA.dados[chave];
+    if (r === undefined) {
+      if (COLA.chave !== chave || Date.now() - COLA.pedidoEm > 4000) {
+        COLA.chave = chave; COLA.pedidoEm = Date.now();
+        try { document.dispatchEvent(new CustomEvent('sobrevida:pedir', { detail: JSON.stringify({ tipo: 'colinha', dex }) })); } catch (_) {}
+      }
+      if (box.dataset.sig !== 'calc') { box.innerHTML = `<div class="sv-cola-t">${esc(L().f.cola.titulo)}</div><small class="m">${esc(L().f.cola.calc)}</small>`; box.dataset.sig = 'calc'; }
+      return;
+    }
+    if (!r) { box.remove(); return; }
+    const sig = chave + '|' + lang;
+    if (box.dataset.sig === sig) return;
+    box.innerHTML = htmlCola(r); box.dataset.sig = sig;
+  }
+
   async function setFarm(patch) {
     Object.assign(farm, patch);
     try { await ext.storage.local.set({ 'sv.farm': farm }); } catch (_) {}
@@ -634,6 +694,7 @@
         ${['upgrades', 'shop', 'gacha', 'partner', 'missions', 'skins'].map((k) => `<label class="sw"><input type="checkbox" data-f="${k}"${farm[k] ? ' checked' : ''}> ${esc(F.opt[k])}</label>`).join('')}
       </div></details>`}
       <label class="sw hudsw"><input type="checkbox" data-f="hud"${farm.hud ? ' checked' : ''}> ${esc(F.hud)}</label>
+      <label class="sw hudsw"><input type="checkbox" data-f="cola"${farm.cola ? ' checked' : ''}> ${esc(F.colaOpt)}</label>
       <p class="note">${esc(F.rank)}</p>`;
     if (pr) {
       if (!farmCanvas || farmCanvas._dex !== pr.dex) { farmCanvas = spriteCanvas(pr.dex, 64, 64, 2); farmCanvas.style.setProperty('--cc', corTipo((pr.types || [])[0])); }
@@ -863,6 +924,7 @@
     tick.n = tick.n || 0;
     if (dead || !alive()) return;
     ui();
+    try { desenharCola(); } catch (_) {}
     const t = tela();
     const fab = root.querySelector('.fab');
     // o botão só aparece fora da partida (nas telas de entrar, teste, escolha e menu); durante a run fica escondido
@@ -1001,6 +1063,8 @@
     removeEventListener('resize', onResize);
     try { ext.storage.onChanged.removeListener(onStore); ext.runtime.onMessage.removeListener(onMsg); } catch (_) {}
     document.removeEventListener('sobrevida:st', onSt);
+    document.removeEventListener('sobrevida:colinha', onCola);
+    document.querySelectorAll('.sv-cola, #sv-cola-css').forEach((el) => el.remove());
     if (host) host.remove();
   }
 

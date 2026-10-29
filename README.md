@@ -9,7 +9,7 @@ Choose your partner Pokémon before the 8-question personality quiz and get exac
 
 ![Manifest V3](https://img.shields.io/badge/Manifest-V3-4285F4?logo=googlechrome&logoColor=white)
 ![Firefox](https://img.shields.io/badge/Firefox-140%2B-FF7139?logo=firefoxbrowser&logoColor=white)
-![Version](https://img.shields.io/badge/version-0.6.0-f4b400)
+![Version](https://img.shields.io/badge/version-0.7.0-f4b400)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 **Works on:** Chrome · Edge · Brave · Opera GX · Firefox 140+
@@ -55,6 +55,12 @@ Open the heart menu and press **Start farm** (or **Alt+F** anywhere in the game)
 **Co-op.** The farm has a separate **Group** mode (a tab next to **Solo** in the heart menu) for runs with your friends, as the host or as a guest: each player steers their own Pokémon, so it only plays yours. As a guest, turn it on **before** the group run starts (a group run that started with the farm off is left alone); the host can turn it on at any time. In a room it never touches the menu between runs (no gacha, partner switch or solo run) and doesn't leave the results screen by itself. A group run with the farm on never reaches the leaderboard, for anyone in the group: the game only posts a group run with every member's seal, and Sobrevida blocks yours.
 
 **Keep the game tab visible.** Browsers pause a game in a hidden tab and slow it down a lot in a minimized or covered window, so the farm can't play there. The panel tells you when that happens. Only one PokéSurvivor tab farms at a time; a second tab says the farm is running in the first one.
+
+### Cheat sheet in the collection
+
+For anyone who plays by hand: open one of your Pokémon in the game's collection and, right under its nature and ability, Sobrevida shows the best nature, the best ability (and whether it's the hidden one), the build (two main attacks, buffs and the switch move), which move to start with, what to ban and the TMs worth buying. When yours isn't the best, it says how much strength you'd gain by changing it. It uses the same calculations as the farm, but against every enemy and boss that can show up, so it doesn't change from run to run. It's an estimate from the game's own data (and the real damage from your runs), not a guarantee. You can turn it off in the menu.
+
+<img src="docs/sobrevida-cheat-sheet.png" width="270" alt="Sobrevida cheat sheet panel for Marill in the collection: Nature Lonely (+Attack −Defense), yours Naughty does just as well; Ability Huge Power, +50% damage with physical moves, yours Thick Fat, +23% strength by switching; Build Substitute + Water Gun (physical), buffs Harden and Swords Dance, switch Dazzling Gleam; Start with Substitute, 2nd Water Gun, ban Nasty Plot, Agility, Aqua Ring; TMs worth it: none makes a difference; With all of it +23% strength over today">
 
 ### New in-run look
 
