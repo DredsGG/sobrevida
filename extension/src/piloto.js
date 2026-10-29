@@ -63,6 +63,10 @@
       for (const k of ['on', 'upgrades', 'gacha', 'partner', 'skins', 'missions']) if (typeof c[k] === 'boolean') cfg[k] = c[k];
       if (typeof c.reserve === 'number' && c.reserve >= 0) cfg.reserve = c.reserve;
       if (c.modo === 'solo' || c.modo === 'grupo') cfg.modo = c.modo;
+      if (c.learn && typeof c.learn === 'object') try {
+        for (const [k, v] of Object.entries(c.learn)) if (v && v.eff > 0 && v.eff < 60 && v.n > 0 && !(k in KB.learn)) KB.learn[k] = { eff: +v.eff, n: Math.min(5000, v.n | 0) };
+        KB.plans = {}; KB.vals = {};
+      } catch (_) {}
       if (cfg.on && !was) { M.needMaint = true; M.lastPlay = -1e9; sess.start = sess.start || Date.now(); }
       if (cfg.on && NS && NS.Game && NS.Game.state !== 'ui' && NS.Game.state !== 'over') M.touched = true;
     } catch (_) {}
@@ -131,6 +135,7 @@
     const origOver = R.showOver;
     R.showOver = function (d) {
       const r = origOver.apply(this, arguments);
+      try { aprenderFim(); } catch (e) { log('aprenderFim', e); }
       if (M.touched) {
         sess.runs++; sess.coins += d.coins || 0; sess.t1 += d.t1 || 0; sess.t10 += d.t10 || 0; sess.candy += d.candy || 0;
         sess.kills += d.kills || 0; sess.best = Math.max(sess.best, d.time || 0);
@@ -154,7 +159,9 @@
       const origCT = ns.Combat.tick;
       ns.Combat.tick = function (dt, pl) {
         try { if (ativo(ns) && pl === ns.Game.player) weave(ns, pl); } catch (e) { log('weave', e); }
-        return origCT.apply(this, arguments);
+        const r = origCT.apply(this, arguments);
+        try { if (pl === ns.Game.player && !pl.dead) aprenderTick(ns, pl); } catch (e) { log('aprender', e); }
+        return r;
       };
     }
     if (ns.Audio && typeof ns.Audio.sfx === 'function') {
@@ -264,6 +271,7 @@
       if (cfg.gacha) { M.task = 'gacha'; await gacha(ns); }
       if (cfg.partner) { M.task = 'partner'; await parceiro(ns); }
       if (cfg.upgrades) { M.task = 'upgrades'; await melhorias(ns); }
+      if (cfg.upgrades) { M.task = 'moves'; await golpes(ns); }
       if (cfg.skins && ns.Halloween && ns.Halloween.on) { M.task = 'skins'; await skins(ns); }
       M.task = 'save'; await guardar(ns);
       if (!cfg.on) return;
@@ -358,6 +366,8 @@
   const powerCache = {};
   function power(ns, dex) {
     if (powerCache[dex] != null) return powerCache[dex];
+    // 0.4.0: força pela base de cálculo (build planejada × sobrevivência); a fórmula antiga fica de reserva
+    try { const f = forcaDe(ns, dex); if (f > 0) return (powerCache[dex] = f); } catch (e) { log('forca', e); }
     const mon = ns.DEX_BY[dex];
     if (!mon) return 0;
     let pool = [];
@@ -407,7 +417,8 @@
   }
 
   // ---------- 8. rotina: melhorias do parceiro (valor ÷ preço, até 100%) ----------
-  const UPG_VALUE = { def: 1.2, xp: 1.15, atk: 1.1, cd: 1.1, coins: 1.1, reroll: 1.0, moves: 1.0, hp: 0.9, magnet: 0.9, crit: 0.8, regen: 0.8, spd: 0.5, start: 0.3, start2: 0.3, ban: 0.3 };
+  // 0.4.0: Golpe inicial, Segundo golpe inicial e Veto agora são configurados pela base de cálculo → valem mais
+  const UPG_VALUE = { def: 1.2, xp: 1.15, atk: 1.1, cd: 1.1, coins: 1.1, reroll: 1.0, moves: 1.0, hp: 0.9, magnet: 0.9, crit: 0.8, regen: 0.8, spd: 0.5, start: 1.2, start2: 0.9, ban: 0.8 };
   // reserva calculada sozinha: 10% das moedas, no máximo o preço de uma Menta (1.500). Conta nova não fica travada.
   const reserva = (ns) => Math.min(cfg.reserve, Math.floor(((ns.DB.save && ns.DB.save.coins) || 0) * 0.1));
   async function melhorias(ns) {
@@ -447,6 +458,59 @@
       comprados.push(U.LIST[i].id);
     }
     if (comprados.length) act('upgrades', { dex, nome: nome(ns, dex), n: comprados.length, ids: [...new Set(comprados)].slice(0, 6) });
+    await voltar('upgrades');
+  }
+
+  // ---------- 8b. rotina (0.4.0): Golpe inicial, Segundo golpe inicial e Veto ----------
+  // Pelos MESMOS botões da tela de Melhorias ("Escolher: …" e os golpes da lista), só quando algo está diferente
+  // do que a base de cálculo recomenda.
+  function golpesPendentes(ns, dex) {
+    const lv = ns.DB.upgradesOf(dex) || {}, s = ns.DB.save, want = escolhasDe(ns, dex);
+    if (!want) return null;
+    const out = {};
+    if (lv.start && want.start && ns.startMoveOf(dex) !== want.start) out.start = want.start;
+    if (lv.start2 && lv.moves && want.start2 && ns.startMove2Of(dex) !== want.start2) out.start2 = want.start2;
+    const nb = lv.ban | 0;
+    if (nb) {
+      const quero = want.bans.filter((id) => id !== (out.start || ns.startMoveOf(dex)) && id !== (out.start2 || ns.startMove2Of(dex))).slice(0, nb);
+      const tem = ((s.pban || {})[dex] || []).slice();
+      if (quero.length && (tem.length !== quero.length || quero.some((id) => !tem.includes(id)))) out.bans = { quero, tem };
+    }
+    return Object.keys(out).length ? out : null;
+  }
+  async function golpes(ns) {
+    const s = ns.DB.save, dex = s && s.partner;
+    if (!dex) return;
+    const pend = golpesPendentes(ns, dex);
+    if (!pend) return;
+    if (!await ir('upgrades')) return;
+    const sel = document.getElementById('upg-mon');
+    if (sel && +sel.value !== dex) { sel.value = String(dex); sel.dispatchEvent(new Event('change')); await sleep(300); }
+    const feito = {};
+    // cada lista abre logo abaixo do seu item; a tela lembra o que ficou aberto, então fecha tudo antes e abre uma por vez
+    const aberta = (attr) => { const b = $(`#upg-list [${attr}]`), it = b && b.closest('.upg-item'); return !!(it && it.nextElementSibling && it.nextElementSibling.classList.contains('ban-picker')); };
+    const alternar = async (attr) => { const b = $(`#upg-list [${attr}]`); if (!b) return false; b.click(); await sleep(250); return true; };
+    const abrir = async (attr) => { if (!aberta(attr)) await alternar(attr); return aberta(attr); };
+    const fechar = async (attr) => { if (aberta(attr)) await alternar(attr); };
+    for (const at of ['data-ban', 'data-start', 'data-start2']) await fechar(at);
+    const chip = (id) => $(`#upg-list .ban-picker [data-id="${id}"]`);
+    if (pend.start && await abrir('data-start')) {
+      const c = chip(pend.start); if (c) { c.click(); await sleep(250); feito.start = pend.start; }
+      await fechar('data-start');
+    }
+    if (pend.start2 && await abrir('data-start2')) {
+      const c = chip(pend.start2); if (c) { c.click(); await sleep(250); feito.start2 = pend.start2; }
+      await fechar('data-start2');
+    }
+    if (pend.bans && await abrir('data-ban')) {
+      const { quero, tem } = pend.bans;
+      for (const id of tem) if (!quero.includes(id)) { const c = chip(id); if (c) { c.click(); await sleep(200); } }
+      for (const id of quero) if (!((s.pban || {})[dex] || []).includes(id)) { const c = chip(id); if (c) { c.click(); await sleep(200); } }
+      feito.bans = ((s.pban || {})[dex] || []).slice();
+      await fechar('data-ban');
+    }
+    const nm = (id) => { const d = id && ns.Moves.BY_ID[id]; return d ? (ns.T ? ns.T(d.name, 'move') : d.name) : id; };
+    if (Object.keys(feito).length) act('moves', { dex, nome: nome(ns, dex), start: nm(feito.start), start2: nm(feito.start2), bans: (feito.bans || []).map(nm) });
     await voltar('upgrades');
   }
 
@@ -500,6 +564,11 @@
         const pr = s.partner && progresso(ns, s.partner);
         const sm = ns.SPRITE_META && ns.SPRITE_META[s.partner], id = sm && sm.a && sm.a.Idle;
         tgt = s.partner ? { dex: s.partner, name: nome(ns, s.partner), have: pr.have, total: pr.total, meta: id ? [id.w, id.h, id.n, id.d] : null, types: (ns.DEX_BY[s.partner] || {}).types || [] } : null;
+        // 0.4.0: build planejada pela base de cálculo, para o painel (nomes no idioma do jogo)
+        if (tgt) try {
+          const pl = planoDe(ns, s.partner), nm = (id) => { const d = id && ns.Moves.BY_ID[id]; return d ? (ns.T ? ns.T(d.name, 'move') : d.name) : null; };
+          if (pl) tgt.build = { a: nm(pl.a), b: nm(pl.b), buffs: pl.buffs.map(nm).filter(Boolean), parceiro: nm(pl.parceiro) };
+        } catch (e) { log('build', e); }
       }
     } catch (_) {}
     const scr = document.querySelector('#app > .scr:not(.hidden), body > .scr:not(.hidden), .scr:not(.hidden)');
@@ -511,6 +580,224 @@
       candy: s && s.bag ? s.bag.candy || 0 : 0, hw: !!(ns.Halloween && ns.Halloween.on), guest: !!(ns.DB && ns.DB.guest),
       partner: tgt, owned, maxed, sess, acts, touched: M.touched,
     });
+  }
+
+  // ======================= cérebro: base de cálculo (0.4.0) =======================
+  // Tudo é lido do próprio jogo na hora (G.Moves, G.DEX_BY, G.Enemies, G.Types, G.Stats, G.Weather): quando o jogo
+  // muda um número, os cálculos mudam junto, sem precisar reescrever nada aqui. Os cálculos alimentam:
+  //   - as cartas (golpes novos, melhorias, evoluções) → seguem a build planejada do Pokémon;
+  //   - a escolha do parceiro entre partidas (força calculada da build);
+  //   - o desvio (ameaça de cada comportamento de inimigo);
+  //   - o painel (build planejada e o porquê).
+  const KB = { castKey: '', cov: null, covBoss: null, plans: {}, vals: {}, learn: {}, run: new Map() };
+  const CROWD_R = 46;                                         // ~1 inimigo a cada 46 px de raio numa horda
+  const crowd = (r) => Math.max(1, Math.min(10, ((r || 0) / CROWD_R) ** 2));
+
+  // Quantos inimigos um disparo acerta: alvo único grande (chefe) e horda. Geometria tirada de systems/combat.js.
+  function hitsOf(m) {
+    const n = Math.max(1, m.count | 0), pierce = m.pierce | 0, r = m.radius || 0;
+    switch (m.kind) {
+      case 'projectile': case 'homing': {
+        const single = m.homing ? n : 1 + (n - 1) * 0.35;
+        return [single, n * (1 + pierce * 0.7) * 0.9];
+      }
+      case 'bounce': return [1 + (n - 1) * 0.35, n * (1 + (m.bounce | 0) * 0.8)];
+      case 'nova': { const k = Math.max(3, n); return [Math.max(1, k * 0.15), k * (1 + pierce * 0.6) * 0.45]; }
+      case 'cone': return [n * 0.45, n * (1 + pierce * 0.6) * 0.55];
+      case 'melee': return [1, Math.max(1, crowd(r) * Math.min(1, (m.arc || 1.7) / 6.283))];
+      case 'beam': return [1, Math.max(1, Math.min(8, r * (m.width || 20) / 1800))];
+      case 'charge': return [0.9, 0.9 * Math.max(1, Math.min(8, r * (m.width || 20) / 1800))];
+      case 'aura': case 'shove': case 'stun': return [1, crowd(r)];
+      case 'orbit': return [n * 0.6 * (m.speed || 2.4) / 2.4, n * 1.8 * (m.speed || 2.4) / 2.4];
+      case 'boomerang': return [n * 1.6, n * Math.max(1, crowd(r * 0.6)) * 1.5];
+      case 'chain': return [1, 1 + n];
+      case 'mine': return [n * 0.35, n * crowd(r) * 0.6];
+      case 'meteor': return [n * 0.6, n * crowd(r) * 0.5];
+      case 'turret': { const shots = (m.dur || 4) / (m.rate || 1) * n; return [shots * 0.6, shots]; }
+      case 'dash': return [1, Math.max(1, crowd(Math.sqrt(r * (m.width || 30))))];
+      case 'trail': return [(m.dur || 3) * 0.5, crowd(r) * (m.dur || 3) * 0.5];
+      case 'spin': return [n, n * crowd(r)];
+      case 'quake': return [Math.max(1, n * 0.35), n * crowd(r) * 0.35];
+      case 'vortex': return [(m.dur || 2.6), crowd(r) * (m.dur || 2.6) * 0.6];
+      default: return [0, 0];
+    }
+  }
+  // Dano por segundo "cru" de uma instância de golpe (sem os atributos do Pokémon): [chefe, horda].
+  function rawDps(m) {
+    if (!m || m.kind === 'buff' || !m.dmg) return [0, 0];
+    let [h1, hN] = hitsOf(m);
+    // aprendido nas partidas: acertos efetivos por disparo medidos de verdade (inclui tipo, crítico e erros de mira)
+    const L = KB.learn[m.id] || KB.learn['k:' + m.kind];
+    if (L && L.n > 20) { const c = Math.min(0.85, L.n / 300), mod = (0.4 * h1 + 0.6 * hN) || 1; const k = (1 - c) + c * (L.eff / mod); h1 *= k; hN *= k; }
+    const per = m.kind === 'orbit' ? 1 : Math.max(0.1, m.cd || 1);
+    const dot = (m.burn || m.poison) ? 1.15 : 1;
+    return [m.dmg * h1 * dot / per, m.dmg * hN * dot / per];
+  }
+  // Instância do golpe no nível pedido (usa as escadas de melhoria do próprio jogo) e, se pedir, evoluído.
+  function inst(ns, id, lvl, evo) {
+    const key = id + ':' + lvl + ':' + (evo ? 1 : 0);
+    if (KB.vals[key]) return KB.vals[key];
+    let m = null;
+    try {
+      m = ns.Moves.instance(id, Math.min(lvl, (ns.Moves.BY_ID[id] || {}).maxLvl || 5));
+      if (evo && ns.Moves.EVO && ns.Moves.EVO[id] && ns.Moves.evolve) ns.Moves.evolve(m);
+    } catch (_) { m = null; }
+    return (KB.vals[key] = m);
+  }
+
+  // Cobertura de tipo: média do multiplicador do jogo (G.Types.mult) contra os inimigos que vão aparecer nesta
+  // partida (G.Enemies.cast, por tramo de tempo, peso pela duração do tramo) e contra os chefes (G.Enemies.BOSSES).
+  function cobertura(ns) {
+    const E = ns.Enemies, cast = E && E.cast;
+    const key = cast ? cast.map((c) => c.from + ':' + c.list.map((d) => d.dex).join(',')).join('|') : 'none';
+    if (KB.castKey === key && KB.cov) return KB.cov;
+    KB.castKey = key; KB.cov = {}; KB.covBoss = {};
+    const tiposDe = (dex) => ((ns.DEX_BY && ns.DEX_BY[dex]) || {}).types || null;
+    const alvos = [];
+    if (cast && cast.length) cast.forEach((c, i) => {
+      const dur = Math.max(60, ((cast[i + 1] && cast[i + 1].from) || c.from + 300) - c.from);
+      for (const d of c.list) { const t = tiposDe(d.dex); if (t) alvos.push([t, dur / c.list.length]); }
+    });
+    const chefes = ((E && E.BOSSES) || []).map((b) => tiposDe(b.dex)).filter(Boolean);
+    const tipos = Object.keys((ns.Types && ns.Types.CHART) || {});
+    for (const ty of tipos) {
+      let s = 0, w = 0;
+      for (const [t, peso] of alvos) { s += ns.Types.mult(ty, t) * peso; w += peso; }
+      KB.cov[ty] = w ? s / w : 1;
+      KB.covBoss[ty] = chefes.length ? chefes.reduce((a, t) => a + ns.Types.mult(ty, t), 0) / chefes.length : 1;
+    }
+    KB.plans = {};
+    return KB.cov;
+  }
+
+  // Valor de um golpe para um Pokémon: dano/s × lado físico/especial × monotipo × clima da habilidade × cobertura,
+  // misturando alvo único (chefes, peso 0,4) e horda (0,6).
+  function valorGolpe(ns, mon, m) {
+    if (!m || m.kind === 'buff') return 0;
+    cobertura(ns);
+    const [s, h] = rawDps(m);
+    let k = m.cat && ns.Stats ? ns.Stats.fit(mon, m.cat) : 1;
+    if (mon.types && mon.types.length === 1 && m.type === mon.types[0]) k *= 1.2;
+    const abil = ((ns.DEX_ABIL && ns.DEX_ABIL[mon.dex]) || []).filter(Boolean);
+    for (const a of abil) if (WEATHER_OF[a] === m.type) k *= WEATHER_MUL[m.type];
+    // o farm luta andando em volta da horda (kite): golpe de alcance curto acerta menos do que a conta pura diz, e
+    // órbita não combina com a troca de ataque (sumiria a cada troca)
+    if (!(KB.learn[m.id] && KB.learn[m.id].n > 20)) k *= Math.max(0.5, Math.min(1, moveReach(m) / 200));
+    if (m.kind === 'orbit') k *= 0.6;
+    const cv = (KB.cov && KB.cov[m.type]) || 1, cb = (KB.covBoss && KB.covBoss[m.type]) || 1;
+    return k * (0.4 * s * cb + 0.6 * h * cv);
+  }
+  // Valor no começo (nível 1) e no fim (nível máximo evoluído): a build olha os dois.
+  function valorBuild(ns, mon, id) {
+    const d = ns.Moves.BY_ID[id];
+    if (!d || d.kind === 'buff') return 0;
+    const v1 = valorGolpe(ns, mon, inst(ns, id, 1, false));
+    const vMax = valorGolpe(ns, mon, inst(ns, id, d.maxLvl || 5, !!(ns.Moves.EVO && ns.Moves.EVO[id])));
+    return 0.35 * v1 * 3 + 0.65 * vMax;               // ×3 no nível 1: compara na mesma escala do fim
+  }
+
+  // Build planejada de um Pokémon: os 2 ataques principais, os buffs e o parceiro de troca.
+  // O 2º ataque ganha bônus se cobre o ponto fraco do 1º (horda × alvo único, ou tipo diferente).
+  function planoDe(ns, dex) {
+    cobertura(ns);
+    if (KB.plans[dex]) return KB.plans[dex];
+    const mon = ns.DEX_BY && ns.DEX_BY[dex];
+    if (!mon) return null;
+    let pool = [];
+    try { pool = ns.Moves.poolFor(mon); } catch (_) {}
+    const ataques = pool.filter((id) => { const d = ns.Moves.BY_ID[id]; return d && d.kind !== 'buff'; })
+      .map((id) => ({ id, v: valorBuild(ns, mon, id), d: ns.Moves.BY_ID[id] }))
+      .filter((x) => x.v > 0).sort((a, b) => b.v - a.v);
+    if (!ataques.length) return null;
+    const a = ataques[0];
+    const [as, ah] = rawDps(inst(ns, a.id, 1, false));
+    const aHorda = ah / Math.max(1e-6, as);
+    let b = null, bs = -1;
+    for (const x of ataques.slice(1)) {
+      const [xs, xh] = rawDps(inst(ns, x.id, 1, false));
+      let bonus = 1;
+      if (x.d.type !== a.d.type) bonus *= 1.08;                                // outro tipo: cobre mais inimigos
+      if ((aHorda > 2.5 && xh / Math.max(1e-6, xs) < 1.6) || (aHorda < 1.6 && xh / Math.max(1e-6, xs) > 2.5)) bonus *= 1.12;
+      if (x.v * bonus > bs) { bs = x.v * bonus; b = x; }
+    }
+    const lado = ns.Stats ? ns.Stats.sideOf(mon) : 'physical';
+    const buffs = ['harden', lado === 'physical' ? 'swords-dance' : 'nasty-plot'].filter((id) => pool.includes(id));
+    // parceiro de troca: golpe de recarga curta e que alcança longe (fica pronto rápido depois de cada troca)
+    const resto = ataques.filter((x) => x !== a && x !== b && x.d.kind !== 'orbit' && x.d.kind !== 'charge');   // órbita/carga não servem de parceiro
+    const parc = resto.slice().sort((x, y) => (x.d.cd || 1) - (y.d.cd || 1) || y.v - x.v)[0] || null;
+    const plano = { dex, a: a.id, b: b && b.id, buffs, parceiro: parc && parc.id, val: Object.fromEntries(ataques.map((x) => [x.id, x.v])), top: a.v };
+    return (KB.plans[dex] = plano);
+  }
+
+  // Força de um Pokémon (para escolher o parceiro): valor da build × sobrevivência (vida, defesas, velocidade).
+  function forcaDe(ns, dex) {
+    const mon = ns.DEX_BY && ns.DEX_BY[dex];
+    const p = mon && planoDe(ns, dex);
+    if (!p) return 0;
+    const off = (mon.atk || 1) * (p.top + 0.6 * ((p.b && p.val[p.b]) || 0));
+    const tough = Math.sqrt((mon.hp || 80) / 100 * (((mon.df || 60) + (mon.sd || 60)) / 180));
+    return off * Math.sqrt(tough) * (0.8 + 0.2 * (mon.spd || 100) / 110);
+  }
+
+  // Ganho de uma carta de melhoria: quanto o golpe sobe de valor no próximo nível (escada real do jogo).
+  function ganhoMelhoria(ns, mon, m) {
+    if (!m || m.kind === 'buff' || !m.def || m.lvl >= (m.def.maxLvl || 5)) return 0;
+    const agora = valorGolpe(ns, mon, m);
+    let prox = null;
+    try { prox = Object.assign({}, m); ns.Moves.levelUp(prox); } catch (_) { prox = null; }
+    return prox ? Math.max(0, valorGolpe(ns, mon, prox) - agora) : 0;
+  }
+
+
+  // ----- aprendizado: mede, em cada partida, o dano real de cada golpe por disparo -----
+  // A cada disparo do golpe (m.castAt muda), soma dano-base × ataque do Pokémon; no fim da partida, o dano que o
+  // próprio jogo contou (m.dealt) dividido por essa soma = acertos efetivos por disparo. Fica guardado (por golpe e
+  // por tipo de ataque) e corrige o modelo nas próximas partidas.
+  function aprenderTick(ns, pl) {
+    for (const m of pl.activeGroup()) {
+      if (m.kind === 'buff' || !m.dmg) continue;
+      let r = KB.run.get(m);
+      if (!r) { r = { last: m.castAt || 0, casts: 0, denom: 0 }; KB.run.set(m, r); }
+      if (m.castAt && m.castAt !== r.last) { r.last = m.castAt; r.casts++; r.denom += m.dmg * pl.atkFor(m) * (m.kind === 'orbit' ? 0 : 1); }
+    }
+  }
+  function aprenderFim() {
+    let mudou = false;
+    for (const [m, r] of KB.run) {
+      if (r.casts < 3 || r.denom <= 0 || !(m.dealt > 0)) continue;
+      const eff = m.dealt / r.denom;
+      if (!(eff > 0 && eff < 60)) continue;
+      for (const key of [m.id, 'k:' + m.kind]) {
+        const L = KB.learn[key] || { eff, n: 0 };
+        const a = Math.min(0.5, r.casts / (L.n + r.casts));
+        L.eff = L.eff * (1 - a) + eff * a; L.n = Math.min(5000, L.n + r.casts);
+        KB.learn[key] = L; mudou = true;
+      }
+    }
+    KB.run = new Map(); KB.plans = {}; KB.vals = {};
+    if (mudou) try { document.dispatchEvent(new CustomEvent('sobrevida:learn', { detail: JSON.stringify(KB.learn) })); } catch (_) {}
+  }
+
+  // ----- 0.4.0: escolhas das Melhorias (Golpe inicial, Segundo golpe inicial, Veto) pela base de cálculo -----
+  // Golpe inicial = o golpe de maior valor que o jogo deixa escolher para começar; segundo = o próximo; Veto = os que
+  // menos servem para este Pokémon (primeiro os buffs fora da build, porque a partida aceita só 2 buffs; depois os
+  // ataques de menor valor). Nunca veta golpe da build.
+  function escolhasDe(ns, dex) {
+    const mon = ns.DEX_BY && ns.DEX_BY[dex];
+    const pl = mon && planoDe(ns, dex);
+    if (!pl) return null;
+    let choices = [];
+    try { choices = ns.startChoices(dex) || []; } catch (_) {}
+    const val = (id) => (pl.val[id] != null ? pl.val[id] : valorBuild(ns, mon, id));
+    const ord = choices.filter((id) => { const d = ns.Moves.BY_ID[id]; return d && d.kind !== 'buff'; }).sort((x, y) => val(y) - val(x));
+    const start = ord[0] || null, start2 = ord.find((id) => id !== start) || null;
+    let pool = [];
+    try { pool = ns.Moves.poolFor(mon); } catch (_) {}
+    const manter = new Set([start, start2, pl.a, pl.b, pl.parceiro, ...pl.buffs].filter(Boolean));
+    const resto = pool.filter((id) => !manter.has(id));
+    const buffsFora = resto.filter((id) => (ns.Moves.BY_ID[id] || {}).kind === 'buff');
+    const ataquesFracos = resto.filter((id) => (ns.Moves.BY_ID[id] || {}).kind !== 'buff').sort((x, y) => val(x) - val(y));
+    return { start, start2, bans: buffsFora.concat(ataquesFracos) };
   }
 
   // ======================= motor da partida (adaptado do PSBot, MIT) =======================
@@ -537,13 +824,19 @@
     if (m.kind === 'buff') return -100;
     const atk = p.moves.filter(x => x.kind !== 'buff').length;
     const need = ['harden', buffId].filter(x => !p.hasMove(x)).length;
-    if (atk === 0) return 860;
+    // 0.4.0: a base de cálculo dá o valor de cada golpe para ESTE Pokémon (dano/s, lado, monotipo, clima, cobertura
+    // contra os inimigos desta partida) e a build planejada (2 principais + parceiro de troca)
+    let rel = null, plano = null;
+    try { plano = planoDe(ns, p.dex); if (plano && plano.top > 0) rel = Math.min(1.2, (plano.val[id] || 0) / plano.top); } catch (e) { log('plano', e); }
+    if (atk === 0) return 860 + (rel != null ? Math.round(30 * rel) : 0);
     if (p.maxMoves - p.slots.length - need < 1) return -100;
     // 0.3.0: um 3º ataque serve de parceiro de troca (rotação): depois de fundir o grupo principal, fica solto e
     // faz o grupo inteiro voltar com 35% da recarga a cada troca. Mais que isso, não.
     if (atk >= 3) return -100;
-    if (atk === 2) return 520 + Math.max(0, aoeScore(ns, p, m)) / 2;
-    return atk === 0 ? 860 : 800 + aoeScore(ns, p, m);
+    if (rel == null) return atk === 2 ? 520 + Math.max(0, aoeScore(ns, p, m)) / 2 : 800 + aoeScore(ns, p, m);
+    if (atk === 2) return 520 + Math.round(30 * rel) + (plano.parceiro === id ? 15 : 0);
+    if (rel < 0.25) return 480;                                   // golpe muito fraco para este Pokémon: só se nada melhor
+    return 800 + Math.round(60 * rel) + (plano.b === id || plano.a === id ? 10 : 0);
   }
 
   function atkBuffOf(ns, p) { return ns.Stats.sideOf(p.mon) === 'physical' ? 'swords-dance' : 'nasty-plot'; }
@@ -572,15 +865,24 @@
       return (cfg.passiveFirst ? 500 : 300) + pri;
     }
     if (type === 'up') {
-      const prof = profileOf(ns);
-      const i = prof ? prof.moves.indexOf(id) : -1;
       const m = p.moves.find(x => x.id === id);
-      const inActive = p.activeGroup().some(x => x.id === id);
-      if (m && !m.evolved && EVO[id] && (i >= 0 || inActive)) {
+      if (!m) return 0;
+      // buffs agora ficam sempre carregados (rotação): +1 carga / +40% de potência valem como uma boa carta de atributo
+      if (m.kind === 'buff') return cfg.passiveFirst ? 565 : 600;
+      // 0.4.0: ordem pela base de cálculo — os 2 golpes de maior valor são o núcleo; o ganho real do próximo
+      // nível (escada do jogo) decide entre eles
+      let core = [], g = 0;
+      try {
+        const vals = p.moves.filter(x => x.kind !== 'buff').map(x => ({ id: x.id, v: valorGolpe(ns, p.mon, x), g: ganhoMelhoria(ns, p.mon, x) }));
+        vals.sort((x, y) => y.v - x.v); core = vals.slice(0, 2).map(x => x.id);
+        const maxG = Math.max(1e-6, ...vals.map(x => x.g)); g = (vals.find(x => x.id === id) || { g: 0 }).g / maxG;
+      } catch (e) { log('ganho', e); }
+      const isCore = core.includes(id);
+      if (!m.evolved && EVO[id] && isCore) {
         const maxLvl = (m.def && m.def.maxLvl) || 5;
-        return 600 + Math.round(40 * (m.lvl || 1) / maxLvl) + (inActive ? 10 : 0);
+        return 600 + Math.round(40 * (m.lvl || 1) / maxLvl) + Math.round(10 * g);
       }
-      return (cfg.passiveFirst ? 400 : 600) + (inActive ? 30 : 0) + (i >= 0 ? 20 - i * 3 : 0);
+      return (cfg.passiveFirst ? 400 : 600) + Math.round(40 * g) + (isCore ? 20 : 0);
     }
     return 0;
   }
@@ -601,11 +903,16 @@
   function bondRank(ns, p, mv) {
     const prof = profileOf(ns);
     if (prof) { const i = prof.moves.indexOf(mv.id); return i >= 0 ? i : 50; }
-    const first = p.moves.find(x => x.kind !== 'buff');
+    // 0.4.0: núcleo da fusão = o golpe de maior valor + Fortaleza + buff do lado + o 2º golpe; o resto fica solto
+    // (um solto é o parceiro de troca da rotação)
+    let ord = null;
+    try { ord = p.moves.filter(x => x.kind !== 'buff').map(x => ({ id: x.id, v: valorGolpe(ns, p.mon, x) })).sort((x, y) => y.v - x.v).map(x => x.id); } catch (_) {}
+    const first = ord ? { id: ord[0] } : p.moves.find(x => x.kind !== 'buff');
     if (first && mv.id === first.id) return 0;
     if (mv.id === 'harden') return 1;
     if (mv.id === atkBuffOf(ns, p)) return 2;
-    return mv.kind === 'buff' ? 10 : 3;
+    if (ord && ord[1] === mv.id) return 3;
+    return mv.kind === 'buff' ? 10 : 5;
   }
   function chooseBond(ns, opt) {
     const p = ns.Game.player;
@@ -1047,6 +1354,14 @@
         if (e.boss || e.arceus) big += v; else c += v;
         const touch = Math.exp(-Math.max(0, d) / 18);
         worst = Math.max(worst, touch * bf * (e.arceus ? 0.4 : hitFrac(e.dmg, false)));
+        // 0.4.0: investida (comportamento "charger", enemy.js): parado 0,55 s mirando em você e depois corre
+        // 0,42 s a 3,4× a velocidade na direção travada → fica fora do corredor da investida
+        if (e.behavior === 'charger' && e.phase === 'aim' && !e.remote) {
+          let ux = p.x - e.x, uy = p.y - e.y; const ul = Math.hypot(ux, uy) || 1; ux /= ul; uy /= ul;
+          const L = (e.spd || 60) * 3.4 * 0.42 + (e.r || 10) + p.r + 12, Wd = (e.r || 10) + p.r + 10;
+          const px = x - e.x, py = y - e.y, along = px * ux + py * uy, side = Math.abs(-px * uy + py * ux);
+          if (along > -Wd && along < L && side < Wd) big += 8 + 20 * hitFrac(e.dmg, false);
+        }
       }
       for (const s of shots) {
         const sx = s.x + (s.vx || 0) * tAhead, sy = s.y + (s.vy || 0) * tAhead;

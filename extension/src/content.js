@@ -518,8 +518,14 @@
   const FARM_DEF = { on: false, modo: 'solo', upgrades: true, gacha: true, partner: true, missions: true, skins: true };
   let farm = Object.assign({}, FARM_DEF), pst = null, pstAt = 0, farmCanvas = null, farmSig = '';
   const mmss = I.mmss;
+  // 0.4.0: o que o farm aprendeu nas partidas (acertos reais por golpe) fica guardado aqui e volta para o piloto
+  let aprendido = {};
+  try { ext.storage.local.get('sv.learn').then((l) => { aprendido = (l && l['sv.learn']) || {}; mandarCfg(); }, () => {}); } catch (_) {}
+  document.addEventListener('sobrevida:learn', (e) => {
+    try { const v = JSON.parse(e.detail); if (v && typeof v === 'object') { aprendido = v; ext.storage.local.set({ 'sv.learn': v }).catch(() => {}); } } catch (_) {}
+  });
   function mandarCfg() {
-    try { document.dispatchEvent(new CustomEvent('sobrevida:cfg', { detail: JSON.stringify(Object.assign({}, farm, { on: !!farm.on && dono && !pausado() })) })); } catch (_) {}
+    try { document.dispatchEvent(new CustomEvent('sobrevida:cfg', { detail: JSON.stringify(Object.assign({}, farm, { on: !!farm.on && dono && !pausado(), learn: aprendido })) })); } catch (_) {}
   }
   // uma aba só joga por vez (duas abas na mesma conta brigariam pelo save): a aba "dona" renova a posse a cada 3 s;
   // se ela fechar, outra assume em até 10 s
@@ -586,6 +592,7 @@
       case 'gacha': return T.aGacha(nGen(x.gen), x.n, x.nn, x.sh, (x.novos || []).join(', '));
       case 'partner': return T.aPartner(x.deN, x.paraN);
       case 'upgrades': return T.aUpgrades(x.n, x.nome);
+      case 'moves': return T.aMoves(x.nome, x.start, x.start2, (x.bans || []).join(', '));
       case 'skins': return T.aSkins(x.n);
       case 'save': return T.aSave;
       default: return a.k;
@@ -612,7 +619,7 @@
       ${st.reload ? `<button class="btn gold sm frl" type="button">${esc(F.reloadBtn)}</button>` : ''}
       ${p && p.guest ? `<p class="warn">${esc(F.guest)}</p>` : ''}
       ${pr ? `<div class="cur"><span class="cvf"></span><div class="nm"><b>${esc(pr.name)}</b>
-        <div class="pbar"><i style="width:${pct}%"></i></div><small>${esc(F.prog(pr.have, pr.total, pct))}</small><br><small>${esc(F.col(p.owned, p.maxed))}</small></div></div>` : ''}
+        <div class="pbar"><i style="width:${pct}%"></i></div><small>${esc(F.prog(pr.have, pr.total, pct))}</small><br><small>${esc(F.col(p.owned, p.maxed))}</small>${pr.build && pr.build.a ? `<br><small class="bld" title="${esc(F.buildWhy)}">${esc(F.build([pr.build.a, pr.build.b].filter(Boolean).join(' + '), (pr.build.buffs || []).join(', '), pr.build.parceiro || '—'))}</small>` : ''}</div></div>` : ''}
       ${ss && ss.start ? `<div class="kv">${esc(F.sess(ss.runs, fmt(ss.coins), fmt(Math.round(ss.coins / horas)), ss.t1 + ss.t10 * 10, ss.best ? mmss(ss.best) : '—'))}${p.hw ? ' · ' + esc(F.candy(ss.candy)) : ''}</div>` : ''}
       ${p && p.acts && p.acts.length ? `<div class="acts">${p.acts.slice(0, 4).map((a) => `<div>· ${esc(actTxt(a))}</div>`).join('')}</div>` : ''}
       ${G ? '' : `<details class="fopts"${farmOptsOpen ? ' open' : ''}><summary>${esc(F.opts)}</summary><div class="opts">

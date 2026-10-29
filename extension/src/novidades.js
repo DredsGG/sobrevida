@@ -2,6 +2,13 @@
 // Frases curtas, do ponto de vista de quem usa. Aparece uma vez, na primeira abertura depois da atualização.
 globalThis.SV_NOVIDADES = {
   pt: {
+    '0.4.0': [
+      "Base de cálculo: a Sobrevida lê do próprio jogo os dados de todos os Pokémon, golpes e inimigos e calcula, para cada Pokémon, o valor de cada golpe (dano por segundo, lado físico/especial, monotipo, clima e eficácia contra os inimigos que vão aparecer na partida).",
+      "Com isso o farm monta a build de cada Pokémon (2 ataques principais, buffs e o parceiro de troca) e escolhe cartas, melhorias e fusões por ela. A build aparece no painel do farm.",
+      "Melhorias: além de comprar, o farm agora configura o Golpe inicial, o Segundo golpe inicial e o Veto pela base de cálculo (veta primeiro os buffs fora da build e os golpes mais fracos).",
+      "Aprende jogando: mede o dano real de cada golpe nas suas partidas e corrige os cálculos nas próximas.",
+      "O parceiro mais forte agora é escolhido pela força calculada da build, e o farm sai do caminho das investidas dos inimigos que miram antes de correr.",
+    ],
     '0.3.0': [
       "Troca de ataque sozinho: logo depois que um golpe sai, o farm troca para o outro espaço, que o jogo deixa quase pronto. Os buffs (Danza Espada, Fortaleza…) agora são usados e ficam carregados. No laboratório, de 3 a 7 vezes mais dano por segundo.",
       "Desvio de tiros pela trajetória inteira: no laboratório, o dano tomado de tiros caiu de 66 para menos de 20 por minuto.",
@@ -47,6 +54,13 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   en: {
+    '0.4.0': [
+      "Calculation base: Sobrevida reads the data of every Pokémon, move and enemy from the game itself and works out, for each Pokémon, the value of each move (damage per second, physical/special side, mono-type, weather and effectiveness against the enemies coming up in the run).",
+      "The farm builds each Pokémon's loadout from it (2 main attacks, buffs and the switching partner) and picks cards, upgrades and fusions accordingly. The build shows in the farm panel.",
+      "Upgrades: besides buying them, the farm now sets the Starting move, the Second starting move and the Bans from the calculation base (it bans buffs outside the build and the weakest moves first).",
+      "Learns as it plays: it measures the real damage of each move in your runs and corrects the calculations in the next ones.",
+      "The strongest partner is now chosen by the build's calculated strength, and the farm gets out of the way of enemies that aim before charging.",
+    ],
     '0.3.0': [
       "Attack switching by itself: right after a move fires, the farm switches to the other slot, which the game leaves almost ready. Buffs (Swords Dance, Harden…) are now used and kept stacked. In the lab, 3 to 7 times more damage per second.",
       "Dodges shots along their whole path: in the lab, damage taken from shots dropped from 66 to under 20 per minute.",
@@ -92,6 +106,13 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   es: {
+    '0.4.0': [
+      "Base de cálculo: Sobrevida lee del propio juego los datos de todos los Pokémon, golpes y enemigos y calcula, para cada Pokémon, el valor de cada golpe (daño por segundo, lado físico/especial, monotipo, clima y eficacia contra los enemigos que van a salir en la partida).",
+      "Con eso el farm arma la build de cada Pokémon (2 ataques principales, potenciadores y el compañero de cambio) y elige cartas, mejoras y fusiones según ella. La build aparece en el panel del farm.",
+      "Mejoras: además de comprarlas, el farm ahora configura el Golpe inicial, el Segundo golpe inicial y el Veto con la base de cálculo (veta primero los potenciadores fuera de la build y los golpes más flojos).",
+      "Aprende jugando: mide el daño real de cada golpe en tus partidas y corrige los cálculos en las siguientes.",
+      "El compañero más fuerte ahora se elige por la fuerza calculada de la build, y el farm se aparta de las embestidas de los enemigos que apuntan antes de correr.",
+    ],
     '0.3.0': [
       "Cambio de ataque solo: justo después de que sale un golpe, el farm cambia al otro hueco, que el juego deja casi listo. Los potenciadores (Danza Espada, Fortaleza…) ahora se usan y se mantienen cargados. En el laboratorio, de 3 a 7 veces más daño por segundo.",
       "Esquiva los disparos por toda su trayectoria: en el laboratorio, el daño recibido de disparos bajó de 66 a menos de 20 por minuto.",
