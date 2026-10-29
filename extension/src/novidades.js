@@ -2,6 +2,11 @@
 // Frases curtas, do ponto de vista de quem usa. Aparece uma vez, na primeira abertura depois da atualização.
 globalThis.SV_NOVIDADES = {
   pt: {
+    '0.5.0': [
+      "Loja Kecleon automática: entre as partidas, o farm calcula quanto cada natureza, cada habilidade e cada MT do dia deixam o parceiro mais forte. Quando vale a pena, compra a Menta, a Cápsula ou a MT e usa na ficha do Pokémon, pelos botões do jogo.",
+      "Só compra quando o ganho passa do mínimo e rende mais por moeda que a próxima melhoria de Força. Usa também o que já estiver na Mochila. Dá para desligar nas Opções do farm.",
+      "Os cálculos agora usam a natureza e a habilidade de verdade de cada Pokémon. O painel mostra as duas embaixo da build.",
+    ],
     '0.4.1': [
       "Tutorial, novidades e aviso de versão nova agora só aparecem fora da partida (no menu). Se uma partida começa com um deles aberto, ele some e volta no menu.",
       "Versão urgente: a partida em andamento termina normalmente; o farm pausa só no menu.",
@@ -58,6 +63,11 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   en: {
+    '0.5.0': [
+      "Automatic Kecleon Shop: between runs, the farm works out how much stronger each nature, each ability and each of today's TMs would make your partner. When it's worth it, it buys the Mint, Capsule or TM and uses it on the Pokémon's page, through the game's own buttons.",
+      "It only buys when the gain clears the minimum and pays off better per coin than the next Strength upgrade. It also uses what's already in the Bag. You can turn it off in the farm Options.",
+      "The math now uses each Pokémon's real nature and ability. The panel shows both under the build.",
+    ],
     '0.4.1': [
       "The tutorial, What's new and new-version notices now only show outside a run (in the menu). If a run starts with one open, it hides and comes back in the menu.",
       "Urgent version: the current run finishes normally; the farm only pauses in the menu.",
@@ -114,6 +124,11 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   es: {
+    '0.5.0': [
+      "Tienda Kecleon automática: entre partidas, el farm calcula cuánto más fuerte dejan al compañero cada naturaleza, cada habilidad y cada MT del día. Cuando compensa, compra la Menta, la Cápsula o la MT y la usa en la ficha del Pokémon, con los botones del juego.",
+      "Solo compra cuando la ganancia supera el mínimo y rinde más por moneda que la siguiente mejora de Fuerza. También usa lo que ya está en la Mochila. Se puede desactivar en las Opciones del farm.",
+      "Los cálculos ahora usan la naturaleza y la habilidad reales de cada Pokémon. El panel las muestra debajo de la build.",
+    ],
     '0.4.1': [
       "El tutorial, las novedades y el aviso de versión nueva ahora solo aparecen fuera de la partida (en el menú). Si empieza una partida con uno abierto, se oculta y vuelve en el menú.",
       "Versión urgente: la partida en curso termina normalmente; el farm solo se pausa en el menú.",

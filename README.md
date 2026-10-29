@@ -9,7 +9,7 @@ Choose your partner Pokémon before the 8-question personality quiz and get exac
 
 ![Manifest V3](https://img.shields.io/badge/Manifest-V3-4285F4?logo=googlechrome&logoColor=white)
 ![Firefox](https://img.shields.io/badge/Firefox-140%2B-FF7139?logo=firefoxbrowser&logoColor=white)
-![Version](https://img.shields.io/badge/version-0.4.1-f4b400)
+![Version](https://img.shields.io/badge/version-0.5.0-f4b400)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 **Works on:** Chrome · Edge · Brave · Opera GX · Firefox 140+
@@ -39,6 +39,7 @@ Open the heart menu and press **Start farm** (or **Alt+F** anywhere in the game)
 - **In a run:** walks and dodges (enemies, ground markers, and projectiles along their whole path), picks up XP, chooses level-up cards, bonds and items, uses orbs, enters rifts, opens chests, chases the coin thief and escorts lost Pokémon.
 - **Calculates the best build for each Pokémon.** Sobrevida reads every Pokémon, move and enemy from the game itself and works out the value of each move for your partner: damage per second at every level and after evolving (using the game's own upgrade ladders), physical/special side, mono-type bonus, weather abilities and effectiveness against the enemies that will show up in this run. From that it plans the build (2 main attacks, buffs and a switching partner) and picks level-up cards, move upgrades, fusions and the strongest partner. It also measures the real damage of each move in your runs and corrects itself. The panel shows the calculated build.
 - **Sets the special upgrades.** Besides buying upgrades, it sets the Starting move, the Second starting move and the Bans (moves that won't show up in cards) from the same calculations, through the game's own Upgrades screen.
+- **Uses the Kecleon Shop.** For your partner it works out how much stronger each nature (Mint), each ability (Ability Capsule / Hidden Ability Capsule) and each of today's TMs would make it. It only buys when the gain clears a minimum and beats the next Strength upgrade per coin, then uses the item on the Pokémon's page in the collection, through the game's own buttons. Items already in your Bag are used too. The math uses each Pokémon's real nature and ability, shown under the build in the panel.
 - **Switches attacks for you.** Only the active move slot attacks in PokéSurvivor, and switching slots leaves the new slot almost ready. Right after a move fires, the farm switches to the slot that will be ready first (preferring super-effective moves), and slips buffs like Swords Dance and Harden in between so they stay stacked. In our lab runs this gave 3 to 7 times more damage per second than staying on one slot. It also fights bosses at the range of the move it's using instead of running away. Touch the arrow keys and you're in control; let go and it takes over again.
 - **Between runs, in this order:**
   1. claims finished missions;

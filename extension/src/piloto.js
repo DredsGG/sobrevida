@@ -47,6 +47,7 @@
     gacha: true,        // tirar gacha com os tickets
     partner: true,      // trocar de parceiro sozinho: o melhor que ainda não está 100%
     skins: true,        // Halloween: comprar as skins de bruja com os doces
+    shop: true,         // 0.5.0: Loja Kecleon — Menta, Cápsula e MT para o parceiro quando a conta mostra ganho
     missions: true,     // recolher prêmios de missões
     reserve: 1500,      // moedas que sempre ficam (o preço de uma Menta/Cápsula)
     // usados pelo motor da partida (PSBot)
@@ -60,7 +61,7 @@
     try {
       const c = JSON.parse(e.detail || '{}');
       const was = cfg.on;
-      for (const k of ['on', 'upgrades', 'gacha', 'partner', 'skins', 'missions']) if (typeof c[k] === 'boolean') cfg[k] = c[k];
+      for (const k of ['on', 'upgrades', 'gacha', 'partner', 'skins', 'missions', 'shop']) if (typeof c[k] === 'boolean') cfg[k] = c[k];
       if (typeof c.reserve === 'number' && c.reserve >= 0) cfg.reserve = c.reserve;
       if (c.modo === 'solo' || c.modo === 'grupo') cfg.modo = c.modo;
       if (c.learn && typeof c.learn === 'object') try {
@@ -270,6 +271,7 @@
       if (cfg.missions) { M.task = 'missions'; await missoes(ns); }
       if (cfg.gacha) { M.task = 'gacha'; await gacha(ns); }
       if (cfg.partner) { M.task = 'partner'; await parceiro(ns); }
+      if (cfg.shop) { M.task = 'shop'; await loja(ns); }
       if (cfg.upgrades) { M.task = 'upgrades'; await melhorias(ns); }
       if (cfg.upgrades) { M.task = 'moves'; await golpes(ns); }
       if (cfg.skins && ns.Halloween && ns.Halloween.on) { M.task = 'skins'; await skins(ns); }
@@ -461,6 +463,110 @@
     await voltar('upgrades');
   }
 
+  // ---------- 8a. rotina (0.5.0): Loja Kecleon — Menta, Cápsula, Cápsula Oculta e MT do parceiro ----------
+  // A base de cálculo diz quanto a força do parceiro sobe com cada natureza, habilidade e MT. Compra só se:
+  //   - o ganho passa do mínimo (Menta e Cápsula 3%, Cápsula Oculta 5%, MT 4%), e
+  //   - rende mais por moeda que o próximo nível de Fuerza (+4% de dano, a melhoria de dano mais direta), e
+  //   - sobra a reserva de moedas.
+  // O que já está na Mochila é usado se passar do mínimo. Compra pelos botões da loja e usa pelos botões da ficha
+  // do Pokémon na coleção, um item por vez (cada troca muda a conta das outras).
+  const LOJA_MIN = { mint: 0.03, cap: 0.03, caph: 0.05, tm: 0.04 };
+  function lojaEscolha(ns, dex) {
+    const s = ns.DB.save, U = ns.Upgrades;
+    const lv = (ns.DB.upgradesOf(dex) || {}).atk | 0;
+    const u = U && U.BY && U.BY.atk;
+    const ref = u && lv < u.max ? (0.04 / (1 + 0.04 * lv)) / U.cost('atk', lv) : 0;
+    const livre = (s.coins || 0) - reserva(ns);
+    let best = null, bs = 0;
+    for (const o of opcoesLoja(ns, dex)) {
+      if (o.ganho < (LOJA_MIN[o.tipo] || 0.05)) continue;
+      const sc = o.tem ? o.ganho * 1e6 : (o.preco <= livre && o.ganho / o.preco >= ref ? o.ganho / o.preco : 0);
+      if (sc > bs) { bs = sc; best = o; }
+    }
+    return best;
+  }
+  async function sairDaColecao() {
+    if (!open('scr-dex')) return;
+    const q = document.getElementById('dex-q');
+    if (M.dexBusca && q && q.value) { q.value = ''; q.dispatchEvent(new Event('input')); await sleep(250); }
+    M.dexBusca = false;
+    await voltar('dex');
+  }
+  async function comprarLoja(ns, key) {
+    await sairDaColecao();
+    if (!open('scr-shop') && !await ir('shop')) return false;
+    const sel = `#shop-body [data-buy="${key}"]`;
+    await waitFor(() => $(sel), 3000);
+    const b = $(sel);
+    if (!b || b.disabled) return false;
+    const antes = ns.DB.save.coins;
+    b.click();
+    await sleep(400);
+    return ns.DB.save.coins < antes;
+  }
+  async function fichaDe(ns, dex) {
+    if (!open('scr-dex') && !await ir('dex')) return false;
+    const achar = () => [...document.querySelectorAll('#dex-grid .cell .no')].find((n) => parseInt(n.textContent, 10) === dex);
+    const naFicha = () => { const c = $('#dex-grid .cell.on .no'); return c && parseInt(c.textContent, 10) === dex && $('#dex-detail .mon-extra'); };
+    if (!naFicha()) {
+      const q = document.getElementById('dex-q');
+      if (!achar() && q) { q.value = String(dex); q.dispatchEvent(new Event('input')); M.dexBusca = true; }
+      await waitFor(achar, 2500);
+      const n = achar();
+      if (!n) return false;
+      n.closest('.cell').click();
+      await sleep(350);
+    }
+    return waitFor(naFicha, 2500);
+  }
+  async function usarNaFicha(ns, dex, o) {
+    const btn = { mint: 'nat', cap: 'cap', caph: 'caph', tm: 'tm' }[o.tipo];
+    const chip = () => $(`#mx-picker [data-v="${o.alvo}"]`);
+    if (!chip()) {
+      const b = $(`#dex-detail [data-extra="${btn}"]`);
+      if (!b) return false;
+      b.click();
+      await waitFor(chip, 1500);
+    }
+    const c = chip();
+    if (!c) return false;
+    c.click();
+    await sleep(450);
+    if (o.tipo === 'mint') return ns.Mons.natureOf(dex).id === o.alvo;
+    if (o.tipo === 'tm') return ns.Mons.taught(dex).includes(o.alvo);
+    return ns.Mons.abilityOf(dex).slot === o.alvo;
+  }
+  function nomeLoja(ns, o) {
+    try {
+      if (o.tipo === 'mint') return ns.Mons.name(ns.NATURE_BY[o.alvo].n);
+      if (o.tipo === 'tm') { const d = ns.Moves.BY_ID[o.alvo]; return ns.T ? ns.T(d.name, 'move') : d.name; }
+      return ns.Mons.abilityName(o.ab);
+    } catch (_) { return String(o.alvo); }
+  }
+  async function loja(ns) {
+    const s = ns.DB.save, dex = s && s.partner;
+    if (!dex || !ns.Shop || !ns.Mons) return;
+    M.dexBusca = false;
+    for (let k = 0; k < 4 && cfg.on; k++) {
+      let o = null;
+      try { o = lojaEscolha(ns, dex); } catch (e) { log('loja', e); }
+      if (!o) break;
+      let comprou = false;
+      if (!o.tem) {
+        comprou = await comprarLoja(ns, o.item);
+        if (!comprou) break;
+      }
+      if (open('scr-shop')) await voltar('shop');
+      if (!await fichaDe(ns, dex)) { log('loja: ficha não abriu'); break; }
+      const ok = await usarNaFicha(ns, dex, o);
+      esquecer(dex); delete powerCache[dex];
+      act('shop', { dex, nome: nome(ns, dex), tipo: o.tipo, alvo: nomeLoja(ns, o), ganho: Math.round(o.ganho * 100), preco: comprou ? o.preco : 0, ok });
+      if (!ok) break;
+    }
+    if (open('scr-shop')) await voltar('shop');
+    await sairDaColecao();
+  }
+
   // ---------- 8b. rotina (0.4.0): Golpe inicial, Segundo golpe inicial e Veto ----------
   // Pelos MESMOS botões da tela de Melhorias ("Escolher: …" e os golpes da lista), só quando algo está diferente
   // do que a base de cálculo recomenda.
@@ -568,6 +674,7 @@
         if (tgt) try {
           const pl = planoDe(ns, s.partner), nm = (id) => { const d = id && ns.Moves.BY_ID[id]; return d ? (ns.T ? ns.T(d.name, 'move') : d.name) : null; };
           if (pl) tgt.build = { a: nm(pl.a), b: nm(pl.b), buffs: pl.buffs.map(nm).filter(Boolean), parceiro: nm(pl.parceiro) };
+          try { tgt.nat = ns.Mons.name(ns.Mons.natureOf(s.partner).n); tgt.abil = ns.Mons.abilityName(ns.Mons.abilityOf(s.partner).id); } catch (_) {}
         } catch (e) { log('build', e); }
       }
     } catch (_) {}
@@ -589,7 +696,7 @@
   //   - a escolha do parceiro entre partidas (força calculada da build);
   //   - o desvio (ameaça de cada comportamento de inimigo);
   //   - o painel (build planejada e o porquê).
-  const KB = { castKey: '', cov: null, covBoss: null, plans: {}, vals: {}, learn: {}, run: new Map() };
+  const KB = { castKey: '', cov: null, covBoss: null, alvos: null, plans: {}, vals: {}, learn: {}, run: new Map(), fx: {}, abOut: {} };
   const CROWD_R = 46;                                         // ~1 inimigo a cada 46 px de raio numa horda
   const crowd = (r) => Math.max(1, Math.min(10, ((r || 0) / CROWD_R) ** 2));
 
@@ -666,20 +773,98 @@
       KB.cov[ty] = w ? s / w : 1;
       KB.covBoss[ty] = chefes.length ? chefes.reduce((a, t) => a + ns.Types.mult(ty, t), 0) / chefes.length : 1;
     }
-    KB.plans = {};
+    KB.alvos = alvos.length ? alvos : null;
+    KB.plans = {}; KB.abOut = {};
     return KB.cov;
   }
 
-  // Valor de um golpe para um Pokémon: dano/s × lado físico/especial × monotipo × clima da habilidade × cobertura,
+  // ----- 0.5.0: natureza e habilidade DE VERDADE do Pokémon (antes: Pokémon sem natureza e clima de qualquer
+  // habilidade possível). A partida usa G.Mons.monFor(dex) (natureza) e G.AbilityFX.of(habilidade, mon).
+  function monDe(ns, dex) {
+    try { const s = ns.DB && ns.DB.save; if (ns.Mons && s && s.owned && s.owned[dex]) return ns.Mons.monFor(dex); } catch (_) {}
+    return ns.DEX_BY && ns.DEX_BY[dex];
+  }
+  function abilDe(ns, dex) { try { return (ns.Mons && ns.Mons.abilityOf(dex).id) || ''; } catch (_) { return ''; } }
+  function fxDe(ns, mon, id) {
+    if (!ns.AbilityFX || !mon) return null;
+    const ab = id != null ? id : abilDe(ns, mon.dex), k = mon.dex + ':' + ab;
+    if (KB.fx[k] !== undefined) return KB.fx[k];
+    let fx = null;
+    try { fx = ns.AbilityFX.of(ab, mon); } catch (_) {}
+    return (KB.fx[k] = fx);
+  }
+  // Clima que a habilidade põe (Weather.KINDS do jogo, systems/weather.js); fica ~75% da partida (volta a cada 3 min)
+  const WX = { sun: { fire: 1.5, water: 0.5 }, rain: { water: 1.5, electric: 1.2, fire: 0.5 }, sand: { rock: 1.3, ground: 1.3, steel: 1.3 }, snow: { ice: 1.5 }, fog: { ghost: 1.3, fairy: 1.3, psychic: 1.3 } };
+  // Chama os ganchos da habilidade com um Math.random fixo (mesma conta toda vez: Afán, Mal Olor... viram a média)
+  function semSorte(fn) {
+    const R = Math.random; let i = 0;
+    Math.random = () => ((i++ * 0.6180339887 + 0.31) % 1);
+    try { return fn(); } finally { Math.random = R; }
+  }
+  const plFalso = (mon, low) => ({ mon, hp: low ? 25 : 80, maxHp: 100, level: 25, moxie: 0.1, angry: low, slowT: 0, x: 0, y: 0, r: 12, bodyH: 20, buffs: {}, critChance: 0.1 });
+  const inimigos = () => (KB.alvos && KB.alvos.length ? KB.alvos : [[['normal'], 1]]);
+  // × no dano do golpe pela habilidade: 75% do tempo com vida alta, 25% com pouca, contra os inimigos desta partida
+  function abilOut(ns, mon, fx, m) {
+    if (!fx || !fx.out || !m) return 1;
+    const key = (mon && mon.dex) + ':' + (fx.d || '') + ':' + m.id + ':' + (m.lvl || 1) + ':' + (m.dmg || 0) + ':' + KB.castKey.length;
+    if (KB.abOut[key] != null) return KB.abOut[key];
+    const alvos = inimigos();
+    const v = semSorte(() => {
+      let s = 0, w = 0;
+      for (const low of [false, true]) {
+        const pl = plFalso(mon, low), wl = low ? 0.25 : 0.75;
+        for (let j = 0; j < alvos.length; j += Math.max(1, Math.floor(alvos.length / 10))) {
+          const [types, peso] = alvos[j];
+          let x = 0;
+          for (let i = 0; i < 6; i++) { let o = 1; try { o = +fx.out(pl, m, { types, x: 40, y: 0, hp: 100, maxHp: 100 }); } catch (_) {} x += o > 0 ? o : 1; }
+          s += (x / 6) * peso * wl; w += peso * wl;
+        }
+      }
+      return w ? s / w : 1;
+    });
+    return (KB.abOut[key] = v);
+  }
+  // Sobrevivência e velocidade que a habilidade dá: [× vida efetiva, × velocidade, × ritmo de disparo]
+  function abilCorpo(mon, fx) {
+    if (!fx) return [1, 1, 1];
+    return semSorte(() => {
+      let inn = 0, dodge = 0, n = 0, spd = 1;
+      const alvos = inimigos();
+      for (let j = 0; j < alvos.length; j += Math.max(1, Math.floor(alvos.length / 10))) {
+        const type = (alvos[j][0] || ['normal'])[0];
+        for (const c of ['p', 's']) {
+          const pl = plFalso(mon, false);
+          let k = 1; try { if (fx.inMul) k = +fx.inMul(pl, type, c) || 1; } catch (_) {}
+          if (fx.absorb === type) k = 0.2;
+          let d = 0; try { if (fx.dodge) d = +fx.dodge(pl, type, c) || 0; } catch (_) {}
+          inn += k; dodge += Math.min(0.6, d); n++;
+        }
+      }
+      try { if (fx.speed) spd = +fx.speed(plFalso(mon, false)) || 1; } catch (_) {}
+      const take = (inn / n) * (1 - dodge / n);
+      return [1 / Math.max(0.3, take), spd, 1 / Math.max(0.5, fx.cdMul || 1)];
+    });
+  }
+  // Defesa como o jogo conta (G.Stats.guard: 75 = normal, tudo entre −22% e +25% de dano recebido)
+  const guarda = (d) => Math.min(1.25, Math.max(0.78, Math.pow(75 / Math.max(5, d || 75), 0.35)));
+
+  // Valor de um golpe para um Pokémon: dano/s × lado físico/especial × monotipo × habilidade × cobertura,
   // misturando alvo único (chefes, peso 0,4) e horda (0,6).
-  function valorGolpe(ns, mon, m) {
+  function valorGolpe(ns, mon, m, fx) {
     if (!m || m.kind === 'buff') return 0;
     cobertura(ns);
     const [s, h] = rawDps(m);
     let k = m.cat && ns.Stats ? ns.Stats.fit(mon, m.cat) : 1;
     if (mon.types && mon.types.length === 1 && m.type === mon.types[0]) k *= 1.2;
-    const abil = ((ns.DEX_ABIL && ns.DEX_ABIL[mon.dex]) || []).filter(Boolean);
-    for (const a of abil) if (WEATHER_OF[a] === m.type) k *= WEATHER_MUL[m.type];
+    if (fx === undefined) fx = fxDe(ns, mon);
+    if (fx) {
+      k *= abilOut(ns, mon, fx, m);
+      const w = fx.summon && WX[fx.summon];
+      if (w && w[m.type]) k *= 1 + (w[m.type] - 1) * 0.75;
+    } else {
+      const abil = ((ns.DEX_ABIL && ns.DEX_ABIL[mon.dex]) || []).filter(Boolean);
+      for (const a of abil) if (WEATHER_OF[a] === m.type) k *= WEATHER_MUL[m.type];
+    }
     // o farm luta andando em volta da horda (kite): golpe de alcance curto acerta menos do que a conta pura diz, e
     // órbita não combina com a troca de ataque (sumiria a cada troca)
     if (!(KB.learn[m.id] && KB.learn[m.id].n > 20)) k *= Math.max(0.5, Math.min(1, moveReach(m) / 200));
@@ -688,25 +873,20 @@
     return k * (0.4 * s * cb + 0.6 * h * cv);
   }
   // Valor no começo (nível 1) e no fim (nível máximo evoluído): a build olha os dois.
-  function valorBuild(ns, mon, id) {
+  function valorBuild(ns, mon, id, fx) {
     const d = ns.Moves.BY_ID[id];
     if (!d || d.kind === 'buff') return 0;
-    const v1 = valorGolpe(ns, mon, inst(ns, id, 1, false));
-    const vMax = valorGolpe(ns, mon, inst(ns, id, d.maxLvl || 5, !!(ns.Moves.EVO && ns.Moves.EVO[id])));
+    const v1 = valorGolpe(ns, mon, inst(ns, id, 1, false), fx);
+    const vMax = valorGolpe(ns, mon, inst(ns, id, d.maxLvl || 5, !!(ns.Moves.EVO && ns.Moves.EVO[id])), fx);
     return 0.35 * v1 * 3 + 0.65 * vMax;               // ×3 no nível 1: compara na mesma escala do fim
   }
 
+  function poolDe(ns, mon) { try { return ns.Moves.poolFor(mon); } catch (_) { return []; } }
   // Build planejada de um Pokémon: os 2 ataques principais, os buffs e o parceiro de troca.
   // O 2º ataque ganha bônus se cobre o ponto fraco do 1º (horda × alvo único, ou tipo diferente).
-  function planoDe(ns, dex) {
-    cobertura(ns);
-    if (KB.plans[dex]) return KB.plans[dex];
-    const mon = ns.DEX_BY && ns.DEX_BY[dex];
-    if (!mon) return null;
-    let pool = [];
-    try { pool = ns.Moves.poolFor(mon); } catch (_) {}
+  function planoCalc(ns, mon, fx, pool) {
     const ataques = pool.filter((id) => { const d = ns.Moves.BY_ID[id]; return d && d.kind !== 'buff'; })
-      .map((id) => ({ id, v: valorBuild(ns, mon, id), d: ns.Moves.BY_ID[id] }))
+      .map((id) => ({ id, v: valorBuild(ns, mon, id, fx), d: ns.Moves.BY_ID[id] }))
       .filter((x) => x.v > 0).sort((a, b) => b.v - a.v);
     if (!ataques.length) return null;
     const a = ataques[0];
@@ -720,23 +900,35 @@
       if ((aHorda > 2.5 && xh / Math.max(1e-6, xs) < 1.6) || (aHorda < 1.6 && xh / Math.max(1e-6, xs) > 2.5)) bonus *= 1.12;
       if (x.v * bonus > bs) { bs = x.v * bonus; b = x; }
     }
-    const lado = ns.Stats ? ns.Stats.sideOf(mon) : 'physical';
+    // buff de ataque do lado dos ataques da build (a natureza pode virar o lado "forte" sem a build mudar)
+    const lado = a.d.cat || (ns.Stats ? ns.Stats.sideOf(mon) : 'physical');
     const buffs = ['harden', lado === 'physical' ? 'swords-dance' : 'nasty-plot'].filter((id) => pool.includes(id));
     // parceiro de troca: golpe de recarga curta e que alcança longe (fica pronto rápido depois de cada troca)
     const resto = ataques.filter((x) => x !== a && x !== b && x.d.kind !== 'orbit' && x.d.kind !== 'charge');   // órbita/carga não servem de parceiro
     const parc = resto.slice().sort((x, y) => (x.d.cd || 1) - (y.d.cd || 1) || y.v - x.v)[0] || null;
-    const plano = { dex, a: a.id, b: b && b.id, buffs, parceiro: parc && parc.id, val: Object.fromEntries(ataques.map((x) => [x.id, x.v])), top: a.v };
-    return (KB.plans[dex] = plano);
+    return { dex: mon.dex, a: a.id, b: b && b.id, buffs, parceiro: parc && parc.id, val: Object.fromEntries(ataques.map((x) => [x.id, x.v])), top: a.v };
+  }
+  function planoDe(ns, dex) {
+    cobertura(ns);
+    if (KB.plans[dex]) return KB.plans[dex];
+    const mon = monDe(ns, dex);
+    if (!mon) return null;
+    const p = planoCalc(ns, mon, fxDe(ns, mon), poolDe(ns, mon));
+    return p ? (KB.plans[dex] = p) : null;
   }
 
-  // Força de um Pokémon (para escolher o parceiro): valor da build × sobrevivência (vida, defesas, velocidade).
-  function forcaDe(ns, dex) {
-    const mon = ns.DEX_BY && ns.DEX_BY[dex];
-    const p = mon && planoDe(ns, dex);
+  // Força de um Pokémon (para escolher o parceiro e para a loja): dano da build × sobrevivência (vida e defesas
+  // como o jogo conta) × velocidade, tudo com a natureza e a habilidade dele.
+  function forcaPlano(mon, fx, p) {
     if (!p) return 0;
-    const off = (mon.atk || 1) * (p.top + 0.6 * ((p.b && p.val[p.b]) || 0));
-    const tough = Math.sqrt((mon.hp || 80) / 100 * (((mon.df || 60) + (mon.sd || 60)) / 180));
-    return off * Math.sqrt(tough) * (0.8 + 0.2 * (mon.spd || 100) / 110);
+    const [vida, vel, ritmo] = abilCorpo(mon, fx);
+    const off = (mon.atk || 1) * (p.top + 0.6 * ((p.b && p.val[p.b]) || 0)) * ritmo;
+    const tough = (mon.hp || 80) / 100 / (0.5 * guarda(mon.df) + 0.5 * guarda(mon.sd)) * vida;
+    return off * Math.sqrt(tough) * (0.8 + 0.2 * (mon.spd || 100) * vel / 110);
+  }
+  function forcaDe(ns, dex) {
+    const mon = monDe(ns, dex), p = mon && planoDe(ns, dex);
+    return p ? forcaPlano(mon, fxDe(ns, mon), p) : 0;
   }
 
   // Ganho de uma carta de melhoria: quanto o golpe sobe de valor no próximo nível (escada real do jogo).
@@ -758,7 +950,7 @@
       if (m.kind === 'buff' || !m.dmg) continue;
       let r = KB.run.get(m);
       if (!r) { r = { last: m.castAt || 0, casts: 0, denom: 0 }; KB.run.set(m, r); }
-      if (m.castAt && m.castAt !== r.last) { r.last = m.castAt; r.casts++; r.denom += m.dmg * pl.atkFor(m) * (m.kind === 'orbit' ? 0 : 1); }
+      if (m.castAt && m.castAt !== r.last) { r.last = m.castAt; r.casts++; r.denom += m.dmg * pl.atkFor(m) * (m.kind === 'orbit' ? 0 : 1) * (pl.abil ? abilOut(ns, pl.mon, pl.abil, m) : 1); }
     }
   }
   function aprenderFim() {
@@ -783,7 +975,7 @@
   // menos servem para este Pokémon (primeiro os buffs fora da build, porque a partida aceita só 2 buffs; depois os
   // ataques de menor valor). Nunca veta golpe da build.
   function escolhasDe(ns, dex) {
-    const mon = ns.DEX_BY && ns.DEX_BY[dex];
+    const mon = monDe(ns, dex);
     const pl = mon && planoDe(ns, dex);
     if (!pl) return null;
     let choices = [];
@@ -799,6 +991,55 @@
     const ataquesFracos = resto.filter((id) => (ns.Moves.BY_ID[id] || {}).kind !== 'buff').sort((x, y) => val(x) - val(y));
     return { start, start2, bans: buffsFora.concat(ataquesFracos) };
   }
+
+  // ----- 0.5.0: Loja Kecleon — o que vale comprar/usar para o Pokémon -----
+  // Para cada natureza (25), cada habilidade que a Cápsula/Cápsula Oculta deixa pôr e cada MT (do dia ou já na
+  // Mochila) que ele aprende, refaz a build e a força com a mesma base de cálculo. Devolve as opções que melhoram,
+  // com o ganho relativo de força e o preço.
+  function opcoesLoja(ns, dex) {
+    const s = ns.DB && ns.DB.save, base = ns.DEX_BY && ns.DEX_BY[dex];
+    if (!s || !base || !ns.Mons || !ns.NATURES || !ns.Shop || !(s.owned && s.owned[dex])) return [];
+    cobertura(ns);
+    const mon0 = monDe(ns, dex), ab0 = abilDe(ns, dex), pool0 = poolDe(ns, mon0);
+    const forca = (mon, ab, pool) => { const fx = fxDe(ns, mon, ab); return forcaPlano(mon, fx, planoCalc(ns, mon, fx, pool)); };
+    const f0 = forca(mon0, ab0, pool0);
+    if (!(f0 > 0)) return [];
+    const out = [], preco = (k) => ((ns.Shop.ITEMS || {})[k] || {}).price || 0;
+    // natureza: +10% num stat, −10% noutro (G.Mons.monFor)
+    let bestN = null, fN = f0;
+    for (const n of ns.NATURES) {
+      const m = Object.assign({}, base);
+      if (n.up) m[n.up] = base[n.up] * 1.1;
+      if (n.down) m[n.down] = base[n.down] * 0.9;
+      m.atk = Math.max(m.pa, m.sa); m.nature = n.id;
+      const f = forca(m, ab0, pool0);
+      if (f > fN * 1.0001) { fN = f; bestN = n; }
+    }
+    if (bestN) out.push({ tipo: 'mint', item: 'mint', alvo: bestN.id, ganho: fN / f0 - 1, preco: preco('mint'), tem: ns.Shop.count('mint') > 0 });
+    // habilidade: Cápsula (as normais) e Cápsula Oculta (inclui a oculta)
+    const slots = ns.Mons.slots(dex);
+    for (const [item, oculta] of [['cap', false], ['caph', true]]) {
+      let best = null, fA = f0;
+      for (const i of ns.Mons.abilityChoices(dex, oculta)) {
+        const f = forca(mon0, slots[i], pool0);
+        if (f > fA * 1.0001) { fA = f; best = i; }
+      }
+      if (best != null) out.push({ tipo: item, item, alvo: best, ab: slots[best], ganho: fA / f0 - 1, preco: preco(item), tem: ns.Shop.count(item) > 0 });
+    }
+    // MT: as 8 do dia e as que já estão na Mochila
+    let hoje = [];
+    try { hoje = ns.Shop.dailyTms() || []; } catch (_) {}
+    for (const id of new Set(hoje.concat(Object.keys(s.tms || {})))) {
+      if (!ns.Mons.canLearn(dex, id)) continue;
+      const tem = ns.Shop.tmCount(id) > 0;
+      if (!tem && !hoje.includes(id)) continue;
+      const f = forca(mon0, ab0, pool0.concat([id]));
+      if (f > f0 * 1.0001) out.push({ tipo: 'tm', item: 'tm:' + id, alvo: id, ganho: f / f0 - 1, preco: ns.Shop.tmPrice(id), tem });
+    }
+    return out.sort((a, b) => b.ganho - a.ganho);
+  }
+  // Esqueça o que foi calculado deste Pokémon (mudou natureza, habilidade ou MT)
+  function esquecer(dex) { KB.plans = {}; KB.fx = {}; KB.abOut = {}; }
 
   // ======================= motor da partida (adaptado do PSBot, MIT) =======================
   const STAT_PRI = { xp: 74, atk: 60, cd: 55, def: 45, hp: 40, rgn: 35, mag: 25, spd: 15, heal: 5 };
@@ -839,7 +1080,12 @@
     return 800 + Math.round(60 * rel) + (plano.b === id || plano.a === id ? 10 : 0);
   }
 
-  function atkBuffOf(ns, p) { return ns.Stats.sideOf(p.mon) === 'physical' ? 'swords-dance' : 'nasty-plot'; }
+  // 0.5.0: o buff de ataque segue a categoria dos ataques da build (com natureza, o lado "forte" pode não ser o da build)
+  function atkBuffOf(ns, p) {
+    let lado = null;
+    try { const pl = planoDe(ns, p.dex != null ? p.dex : p.mon.dex), d = pl && ns.Moves.BY_ID[pl.a]; lado = d && d.cat; } catch (_) {}
+    return (lado || ns.Stats.sideOf(p.mon)) === 'physical' ? 'swords-dance' : 'nasty-plot';
+  }
   const AOE_PRI = { nova: 40, aura: 38, meteor: 36, vortex: 35, orbit: 34, spin: 33, bounce: 31, chain: 30, shove: 29, quake: 27, cone: 26, charge: 24, stun: 22, beam: 22, boomerang: 20, homing: 18, projectile: 12, turret: 12, mine: 8 };
   function aoeScore(ns, p, m) {
     if (!(m.kind in AOE_PRI)) return -350;

@@ -521,7 +521,7 @@
 
   // ───────────────────────── farm automático (v0.2.0) ─────────────────────────
   // O piloto (src/piloto.js, mundo da página) joga e cuida da rotina; aqui ficam a configuração, a ponte e o painel.
-  const FARM_DEF = { on: false, modo: 'solo', upgrades: true, gacha: true, partner: true, missions: true, skins: true };
+  const FARM_DEF = { on: false, modo: 'solo', upgrades: true, gacha: true, partner: true, missions: true, skins: true, shop: true };
   let farm = Object.assign({}, FARM_DEF), pst = null, pstAt = 0, farmCanvas = null, farmSig = '';
   const mmss = I.mmss;
   // 0.4.0: o que o farm aprendeu nas partidas (acertos reais por golpe) fica guardado aqui e volta para o piloto
@@ -599,6 +599,7 @@
       case 'partner': return T.aPartner(x.deN, x.paraN);
       case 'upgrades': return T.aUpgrades(x.n, x.nome);
       case 'moves': return T.aMoves(x.nome, x.start, x.start2, (x.bans || []).join(', '));
+      case 'shop': return T.aShop(x.nome, x.tipo, x.alvo, x.ganho, x.preco);
       case 'skins': return T.aSkins(x.n);
       case 'save': return T.aSave;
       default: return a.k;
@@ -625,11 +626,11 @@
       ${st.reload ? `<button class="btn gold sm frl" type="button">${esc(F.reloadBtn)}</button>` : ''}
       ${p && p.guest ? `<p class="warn">${esc(F.guest)}</p>` : ''}
       ${pr ? `<div class="cur"><span class="cvf"></span><div class="nm"><b>${esc(pr.name)}</b>
-        <div class="pbar"><i style="width:${pct}%"></i></div><small>${esc(F.prog(pr.have, pr.total, pct))}</small><br><small>${esc(F.col(p.owned, p.maxed))}</small>${pr.build && pr.build.a ? `<br><small class="bld" title="${esc(F.buildWhy)}">${esc(F.build([pr.build.a, pr.build.b].filter(Boolean).join(' + '), (pr.build.buffs || []).join(', '), pr.build.parceiro || '—'))}</small>` : ''}</div></div>` : ''}
+        <div class="pbar"><i style="width:${pct}%"></i></div><small>${esc(F.prog(pr.have, pr.total, pct))}</small><br><small>${esc(F.col(p.owned, p.maxed))}</small>${pr.build && pr.build.a ? `<br><small class="bld" title="${esc(F.buildWhy)}">${esc(F.build([pr.build.a, pr.build.b].filter(Boolean).join(' + '), (pr.build.buffs || []).join(', '), pr.build.parceiro || '—'))}</small>` : ''}${pr.nat ? `<br><small class="bld">${esc(F.natAb(pr.nat, pr.abil || '—'))}</small>` : ''}</div></div>` : ''}
       ${ss && ss.start ? `<div class="kv">${esc(F.sess(ss.runs, fmt(ss.coins), fmt(Math.round(ss.coins / horas)), ss.t1 + ss.t10 * 10, ss.best ? mmss(ss.best) : '—'))}${p.hw ? ' · ' + esc(F.candy(ss.candy)) : ''}</div>` : ''}
       ${p && p.acts && p.acts.length ? `<div class="acts">${p.acts.slice(0, 4).map((a) => `<div>· ${esc(actTxt(a))}</div>`).join('')}</div>` : ''}
       ${G ? '' : `<details class="fopts"${farmOptsOpen ? ' open' : ''}><summary>${esc(F.opts)}</summary><div class="opts">
-        ${['upgrades', 'gacha', 'partner', 'missions', 'skins'].map((k) => `<label class="sw"><input type="checkbox" data-f="${k}"${farm[k] ? ' checked' : ''}> ${esc(F.opt[k])}</label>`).join('')}
+        ${['upgrades', 'shop', 'gacha', 'partner', 'missions', 'skins'].map((k) => `<label class="sw"><input type="checkbox" data-f="${k}"${farm[k] ? ' checked' : ''}> ${esc(F.opt[k])}</label>`).join('')}
       </div></details>`}
       <p class="note">${esc(F.rank)}</p>`;
     if (pr) {
