@@ -52,6 +52,7 @@
     // usados pelo motor da partida (PSBot)
     move: true, cards: true, bonds: true, items: true, rift: true, orbs: true, restart: true,
     passiveFirst: true, profiles: {},
+    weave: true,        // 0.3.0: rotação de ataques (troca de espaço quando o outro golpe fica pronto antes; mantém os buffs)
   };
   let NS = null;
   const emit = (o) => { try { document.dispatchEvent(new CustomEvent('sobrevida:st', { detail: JSON.stringify(o) })); } catch (_) {} };
@@ -148,6 +149,18 @@
       };
     }
     trackHazards(ns);
+    // 0.3.0: rotação de ataques roda a cada quadro, logo antes do jogo disparar os golpes
+    if (ns.Combat && typeof ns.Combat.tick === 'function') {
+      const origCT = ns.Combat.tick;
+      ns.Combat.tick = function (dt, pl) {
+        try { if (ativo(ns) && pl === ns.Game.player) weave(ns, pl); } catch (e) { log('weave', e); }
+        return origCT.apply(this, arguments);
+      };
+    }
+    if (ns.Audio && typeof ns.Audio.sfx === 'function') {
+      const origSfx = ns.Audio.sfx;
+      ns.Audio.sfx = function (name) { if (S.muteSelect && name === 'select') return; return origSfx.apply(this, arguments); };
+    }
     // pausa feita pela pessoa (Esc/P) não é desfeita pelo piloto
     // (só conta se o jogo realmente pausou: o Esc que fecha o menu da Sobrevida não pausa o jogo)
     addEventListener('keydown', (e) => {
@@ -526,7 +539,10 @@
     const need = ['harden', buffId].filter(x => !p.hasMove(x)).length;
     if (atk === 0) return 860;
     if (p.maxMoves - p.slots.length - need < 1) return -100;
-    if (atk >= 2) return -100; 
+    // 0.3.0: um 3º ataque serve de parceiro de troca (rotação): depois de fundir o grupo principal, fica solto e
+    // faz o grupo inteiro voltar com 35% da recarga a cada troca. Mais que isso, não.
+    if (atk >= 3) return -100;
+    if (atk === 2) return 520 + Math.max(0, aoeScore(ns, p, m)) / 2;
     return atk === 0 ? 860 : 800 + aoeScore(ns, p, m);
   }
 
@@ -649,11 +665,65 @@
     if (!dmg) return 0;                      
     return prof ? rank + buff * 30 + g.length * 5 : dmg + buff * 6;
   }
+  // ===== 0.3.0: rotação de ataques =====
+  // No jogo só o espaço ATIVO ataca, e os outros espaços ficam parados (a recarga deles não anda). Ao trocar de
+  // espaço, o jogo deixa a recarga dos golpes do espaço novo em no máximo 35% (player.setActive). Então, logo depois
+  // que o golpe ativo dispara, vale trocar para o espaço que fica pronto antes: cada golpe sai a cada ~35% da recarga
+  // e os buffs (Danza Espada, Fortaleza...) entram entre um golpe e outro, mantendo as cargas (duram 7 s).
+  const TARGETED_K = new Set(['melee', 'beam', 'projectile', 'boomerang', 'chain', 'meteor', 'dash', 'cone', 'homing', 'bounce', 'charge', 'spin', 'quake', 'vortex', 'shove', 'stun']);
+  function swapTo(ns, p, i) {
+    // troca silenciosa: sem o som e o anel de "trocar ataque" a cada 0,3 s
+    const fx = ns.FX && ns.FX.ring;
+    S.muteSelect = true;
+    if (fx) ns.FX.ring = function () {};
+    try { p.setActive(i); } finally { S.muteSelect = false; if (fx) ns.FX.ring = fx; }
+    S.swapAt = performance.now(); S.swaps = (S.swaps || 0) + 1;
+  }
+  function weave(ns, p) {
+    if (!cfg.weave || !p || p.dead || !p.slots || p.slots.length < 2 || (p.hasItem && p.hasItem('choiceband'))) return;
+    if (ns.Game.state !== 'playing') return;
+    const now = performance.now();
+    if (now - (S.swapAt || 0) < 90) return;
+    const cur = p.slots[p.active] || [];
+    if (cur.some(m => m.kind === 'orbit')) return;               // órbitas somem ao trocar: fica nelas
+    const isBuff = g => g.length > 0 && g.every(m => m.kind === 'buff');
+    // espaço recém-ativado espera o primeiro disparo (até 1,2 s), senão a troca não rende nada
+    if (S.swapAt && now - S.swapAt < 1200 && cur.length && !cur.some(m => (m.castAt || 0) >= S.swapAt)) {
+      if (isBuff(cur) || cur.some(m => m.kind !== 'buff' && m.t > 0.06)) return;
+    }
+    // 1) buffs: mantém as cargas (vale mais que um golpe solto)
+    for (let i = 0; i < p.slots.length; i++) {
+      const g = p.slots[i];
+      if (i === p.active || !isBuff(g)) continue;
+      const falta = g.some(m => { const b = p.buffs && p.buffs[m.stat]; return b && (b.n < Math.max(1, m.stacks | 0) || b.t < 2.2); });
+      if (falta) return swapTo(ns, p, i);
+    }
+    // 2) golpes: vai para o espaço que fica pronto antes, entre os que alcançam o alvo
+    const tg = p.target && !p.target.dead ? p.target : null;
+    const dist = tg ? Math.hypot(tg.x - p.x, tg.y - p.y) : Infinity;
+    const usable = m => m.kind !== 'buff' && m.kind !== 'orbit' && (!TARGETED_K.has(m.kind) || moveReach(m) >= dist);
+    // eficácia de tipo contra o alvo (×1,6 super eficaz, ×0,6 pouco, ×0,3 imune): golpe fraco só ganha a vez se estiver bem mais pronto
+    const tm = tg && tg.types && ns.Types && ns.Types.mult ? (m) => ns.Types.mult(m.type, tg.types) : () => 1;
+    const ready = (g, active) => {
+      let r = Infinity;
+      for (const m of g) if (usable(m)) r = Math.min(r, ((active ? Math.max(0, m.t) : Math.min(Math.max(0, m.t), 0.35 * m.cd)) + 0.05) / tm(m));
+      return r;
+    };
+    const rCur = ready(cur, true);
+    let best = -1, rBest = rCur;
+    for (let i = 0; i < p.slots.length; i++) {
+      if (i === p.active || p.slots[i].some(m => m.kind === 'orbit')) continue;
+      const r = ready(p.slots[i], false);
+      if (r + 0.04 < rBest) { rBest = r; best = i; }
+    }
+    if (best >= 0) swapTo(ns, p, best);
+  }
+
   function housekeeping(ns) {
     const p = ns.Game.player;
     if (!p || p.dead || ns.Game.state !== 'playing') return;
     const now = performance.now();
-    if (now - S.lastSlotCheck > 600 && p.slots.length > 1 && !p.hasItem?.('choiceband')) {
+    if (!cfg.weave && now - S.lastSlotCheck > 600 && p.slots.length > 1 && !p.hasItem?.('choiceband')) {
       S.lastSlotCheck = now;
       const prof = profileOf(ns);
       const bossFight = !!((ns.Rift && ns.Rift.inArena) || (ns.EnemyMgr.bossAlive && ns.EnemyMgr.bossAlive()));
@@ -786,7 +856,8 @@
     }
     const rift = ns.Rift && ns.Rift.rift;
     const bondDone = p.slots.some(g => g.length >= 4);
-    if (cfg.rift && rift && !ns.Rift.inArena && hpPct > 0.2 && !bondDone)
+    // 0.3.0: com a rotação e a luta de chefe novas, fenda vale sempre (tickets, ×10, moedas, esferas); grupo cheio só com vida boa
+    if (cfg.rift && rift && !ns.Rift.inArena && hpPct > (bondDone ? 0.5 : 0.2))
       out.push({ key: 'rift', tier: 4, x: rift.x, y: rift.y - 10, value: 12, left: rift.ttl ?? 45, mode: 'rift', goalTol: 0, chase: true, direct: true });
     const lost = ns.Events && ns.Events._dbg && ns.Events._dbg();
     if (lost && hpPct > 0.25 && !ns.Rift.inArena) {
@@ -960,7 +1031,7 @@
       const keep = S.engaged === (cand && cand.id) ? 0.05 : 0;   // histerese: não fica liga/desliga
       // perder na fenda não acaba a partida (volta ao mapa sem prêmio): lá dá para arriscar mais que com chefe do mapa
       const lim = riftBoss && cand === riftBoss ? (short ? 0.25 : 0.2) : (short ? 0.45 : 0.3);
-      if (cand && myReach > 0 && hpPct > lim - keep) { engaged = cand; engageF = short ? 0.3 : 0.6; }
+      if (cand && myReach > 0 && hpPct > lim - keep) { engaged = cand; engageF = short ? 0.3 : 1; }   // de longe não precisa encostar: o chefe continua assustando igual (investidas de 330 px)
     }
     S.engaged = engaged ? engaged.id : null;
     S.engageD = engaged ? (short ? Math.max(28, myReach * 0.6) : Math.min(280, myReach * 0.7)) : 0;
@@ -1100,13 +1171,30 @@
       return hit * 30 * bigFear + frac * DMG_W * 1.5;
     };
 
+    // 0.3.0: risco de tiro pela trajetória inteira (colisão contínua): para cada direção, o ponto de maior
+    // aproximação entre o jogador andando e cada projétil, em vez de só olhar onde o jogador termina o passo
+    const shotRisk = (dx, dy, reach) => {
+      if (!shots.length) return 0;
+      const T = reach / pSpd, vx = dx * pSpd, vy = dy * pSpd;
+      let risk = 0;
+      for (const s of shots) {
+        const rx = s.x - p.x, ry = s.y - p.y, rvx = (s.vx || 0) - vx, rvy = (s.vy || 0) - vy, vv = rvx * rvx + rvy * rvy;
+        let t = vv > 1e-6 ? -(rx * rvx + ry * rvy) / vv : 0;
+        t = Math.max(0, Math.min(T + 0.25, t));
+        const d = Math.hypot(rx + rvx * t, ry + rvy * t) - (s.r || 6) - p.r - 4;
+        const hf = hitFrac(s.dmg, false);
+        if (d < 0) risk += (1 + 12 * hf) * 1.5 / (t + 0.3);
+        else if (d < 18) risk += (0.5 + 6 * hf) * (1 - d / 18) / (t + 0.3);
+      }
+      return risk * (hpPct < 0.5 ? 2 : 1);
+    };
     const cost = DIRS.map(([dx, dy]) => {
       let bestStep = Infinity;
       for (const step of [55, 120, 200]) {
         const reach = pathLen(dx, dy, step);
         if (reach < 12) continue;                      
         const x = p.x + dx * reach, y = p.y + dy * reach;
-        let c = danger(x, y, reach / pSpd);
+        let c = danger(x, y, reach / pSpd) + shotRisk(dx, dy, reach);
         c += (reach < step ? 6 + 6 * (1 - reach / step) : 0) + cramped(x, y) * 1.2 + (slowWet && W.isLiquid(x, y) ? 1.2 : 0);  
         if (target) {
           const before = Math.hypot(target.x - p.x, target.y - p.y), after = Math.hypot(target.x - x, target.y - y);

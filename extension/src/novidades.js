@@ -2,6 +2,12 @@
 // Frases curtas, do ponto de vista de quem usa. Aparece uma vez, na primeira abertura depois da atualização.
 globalThis.SV_NOVIDADES = {
   pt: {
+    '0.3.0': [
+      "Troca de ataque sozinho: logo depois que um golpe sai, o farm troca para o outro espaço, que o jogo deixa quase pronto. Os buffs (Danza Espada, Fortaleza…) agora são usados e ficam carregados. No laboratório, de 3 a 7 vezes mais dano por segundo.",
+      "Desvio de tiros pela trajetória inteira: no laboratório, o dano tomado de tiros caiu de 66 para menos de 20 por minuto.",
+      "Prefere o ataque super eficaz contra o inimigo da vez.",
+      "Build: pega um 3º ataque para servir de parceiro de troca e volta a entrar nas fendas depois de juntar os ataques (tickets, ×10, moedas).",
+    ],
     '0.2.6': [
       "Farm com dois modos separados no menu do coração: Sozinho (partidas sozinho em loop, com missões, gacha, parceiro e melhorias) e Em grupo (partidas com amigos: joga só o seu Pokémon e nunca mexe no menu).",
       "Em grupo: se você criou a sala, ligue quando quiser; como convidado, ligue na sala antes de a partida começar. O painel diz se o modo escolhido não serve para a partida em que você está.",
@@ -41,6 +47,12 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   en: {
+    '0.3.0': [
+      "Attack switching by itself: right after a move fires, the farm switches to the other slot, which the game leaves almost ready. Buffs (Swords Dance, Harden…) are now used and kept stacked. In the lab, 3 to 7 times more damage per second.",
+      "Dodges shots along their whole path: in the lab, damage taken from shots dropped from 66 to under 20 per minute.",
+      "Prefers the super-effective move against the current target.",
+      "Build: takes a 3rd attack as a switching partner and goes back into rifts after merging its attacks (tickets, ×10, coins).",
+    ],
     '0.2.6': [
       "The farm has two separate modes in the heart menu: Solo (solo runs in a loop, with missions, gacha, partner and upgrades) and Group (runs with friends: it only plays your Pokémon and never touches the menu).",
       "Group: if you created the room, turn it on any time; as a guest, turn it on in the room before the run starts. The panel tells you when the chosen mode doesn't fit the run you're in.",
@@ -80,6 +92,12 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   es: {
+    '0.3.0': [
+      "Cambio de ataque solo: justo después de que sale un golpe, el farm cambia al otro hueco, que el juego deja casi listo. Los potenciadores (Danza Espada, Fortaleza…) ahora se usan y se mantienen cargados. En el laboratorio, de 3 a 7 veces más daño por segundo.",
+      "Esquiva los disparos por toda su trayectoria: en el laboratorio, el daño recibido de disparos bajó de 66 a menos de 20 por minuto.",
+      "Prefiere el ataque súper eficaz contra el enemigo de turno.",
+      "Build: coge un 3.er ataque como compañero de cambio y vuelve a entrar en las grietas después de fusionar sus ataques (tickets, ×10, monedas).",
+    ],
     '0.2.6': [
       "El farm tiene dos modos separados en el menú del corazón: Solo (partidas en solitario en bucle, con misiones, gacha, compañero y mejoras) y En grupo (partidas con amigos: solo juega tu Pokémon y nunca toca el menú).",
       "En grupo: si creaste la sala, actívalo cuando quieras; como invitado, actívalo en la sala antes de que empiece la partida. El panel avisa si el modo elegido no sirve para la partida en la que estás.",
