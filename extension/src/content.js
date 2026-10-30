@@ -594,7 +594,7 @@
     try { const o = JSON.parse(e.detail); if (o && o.dex && COLA.chave && COLA.chave.startsWith(o.dex + '|')) { COLA.dados[COLA.chave] = o.r || null; desenharCola(); } } catch (_) {}
   };
   document.addEventListener('sobrevida:colinha', onCola);
-  function htmlCola(r) {
+  function htmlCola(r, botoes) {
     const C = L().f.cola, sinal = (v) => (v > 0 ? '+' : '') + v + '%';
     const natTxt = r.nat.up ? `+${C.stat[r.nat.up]} −${C.stat[r.nat.down]}` : C.neutra;
     // a sua já é a melhor (ou rende igual, menos de 1% de diferença) → ✓
@@ -608,13 +608,80 @@
       ${r.inicio && r.inicio.a ? `<div class="sv-cola-r"><span class="k">${esc(C.inicio)}</span><div><b>${esc(r.inicio.a)}</b>${r.inicio.b ? ` <small>· ${esc(C.seg)}: ${esc(r.inicio.b)}</small>` : ''}${r.inicio.vetos.length ? `<br><small class="m">${esc(C.veto)}: ${esc(r.inicio.vetos.join(', '))}</small>` : ''}</div></div>` : ''}
       <div class="sv-cola-r"><span class="k">${esc(C.mt)}</span><div>${r.mts.length ? r.mts.map((m) => `<b>${esc(m.nome)}</b> <small>${esc(sinal(m.ganho))}</small>`).join('<br>') : `<small class="m">${esc(C.nada)}</small>`}</div></div>
       ${r.total > 0 ? `<p class="sv-cola-tot">${esc(C.total(r.total))}</p>` : ''}
-      <p class="sv-cola-p">${esc(C.rod)}</p>`;
+      <p class="sv-cola-p">${esc(C.rod)}</p>${botoes ? botoesCola(r) : ''}`;
+  }
+  // ---------- 0.11.3: botões da colinha (Recalcular / Aplicar tudo) e "Otimizar" na tela de Melhorias ----------
+  // O piloto faz pelos botões do jogo, mesmo com o farm desligado: Menta/Cápsula/MT que a colinha manda, melhorias por
+  // valor e golpe inicial/veto. Só no menu; nada aqui mexe no save direto.
+  const OT = { dex: 0, onde: '', desde: 0 };
+  const otimOcupado = () => OT.dex && Date.now() - OT.desde < 90000;
+  function botoesCola(r) {
+    const C = L().f.cola, ocup = otimOcupado();
+    return `<div class="sv-cola-bt"><button type="button" class="sv-cb" data-sv-cola="recalc"${ocup ? ' disabled' : ''}>${esc(C.recalc)}</button>${r.dono ? `<button type="button" class="sv-cb gold" data-sv-cola="aplicar"${ocup ? ' disabled' : ''}>${esc(ocup && OT.onde === 'dex' ? C.aplicando : C.aplicar)}</button>` : ''}</div>${r.dono ? `<small class="m">${esc(C.dica)}</small>` : ''}`;
+  }
+  function pedirOtim(dex, onde) {
+    if (!dex || otimOcupado()) return;
+    if (semPiloto() || !pronto()) { toast(L().f.cola.erro.menu, false); return; }
+    OT.dex = dex; OT.onde = onde; OT.desde = Date.now();
+    toast(L().f.cola.aplicando, true);
+    try { document.dispatchEvent(new CustomEvent('sobrevida:pedir', { detail: JSON.stringify({ tipo: 'otimizar', dex, volta: onde }) })); } catch (_) {}
+    redesenharBotoes();
+  }
+  function redesenharBotoes() { document.querySelectorAll('.sv-cola').forEach((x) => { x.dataset.sig = ''; }); try { desenharCola(); desenharOtim(); } catch (_) {} }
+  const onOtimizado = (e) => {
+    let o = null;
+    try { o = JSON.parse(e.detail); } catch (_) { return; }
+    if (!o || o.dex !== OT.dex) return;
+    OT.dex = 0;
+    const C = L().f.cola;
+    if (!o.ok) toast(C.erro[o.motivo] || C.erro.menu, false);
+    else {
+      const partes = [o.nat && C.pNat(o.nat), o.ab && C.pAb(o.ab), o.tm > 0 && C.pTm(o.tm), o.upg > 0 && C.pUpg(o.upg)].filter(Boolean);
+      toast(partes.length ? C.feito(o.nome, o.gasto.toLocaleString(lang === 'en' ? 'en-US' : lang === 'es' ? 'es-ES' : 'pt-BR'), partes.join(' · ')) : C.nadaFeito(o.nome), true);
+      registrar({ type: 'otimizar', ok: true });
+    }
+    COLA.dados = {}; COLA.chave = '';
+    redesenharBotoes();
+  };
+  document.addEventListener('sobrevida:otimizado', onOtimizado);
+  const onColaClick = (e) => {
+    const b = e.target && e.target.closest && e.target.closest('[data-sv-cola]');
+    if (!b || b.disabled) return;
+    e.preventDefault(); e.stopPropagation();
+    const dex = dexDaFicha();
+    if (b.dataset.svCola === 'recalc') {
+      if (!dex) return;
+      // o pedido forçado limpa o cache do piloto e refaz a conta na hora (evento síncrono); o desenho pede de novo já fresco
+      COLA.dados = {}; COLA.chave = '';
+      try { document.dispatchEvent(new CustomEvent('sobrevida:pedir', { detail: JSON.stringify({ tipo: 'colinha', dex, forca: true }) })); } catch (_) {}
+      redesenharBotoes(); toast(L().f.cola.recalcOk, true);
+    } else if (b.dataset.svCola === 'aplicar') pedirOtim(dex, 'dex');
+    else if (b.dataset.svCola === 'upg') { const sel = document.getElementById('upg-mon'); pedirOtim(sel ? +sel.value : 0, 'upgrades'); }
+  };
+  document.addEventListener('click', onColaClick, true);
+  // botão na tela de Melhorias do jogo, ao lado do seletor de Pokémon
+  function desenharOtim() {
+    const tela = document.querySelector('#scr-upgrades:not(.hidden)');
+    const velho = document.querySelector('.sv-otim');
+    if (!tela || !farm.cola || dead || semPiloto()) { if (velho) velho.remove(); return; }
+    const sel = tela.querySelector('#upg-mon'), linha = sel && sel.parentElement;
+    if (!linha) return;
+    if (!document.getElementById('sv-cola-css')) { const st = document.createElement('style'); st.id = 'sv-cola-css'; st.textContent = COLA_CSS; document.head.appendChild(st); }
+    const C = L().f.cola, ocup = otimOcupado(), txt = ocup && OT.onde === 'upgrades' ? C.aplicando : C.otim;
+    let b = linha.querySelector('.sv-otim');
+    if (!b) { b = document.createElement('button'); b.type = 'button'; b.className = 'sv-cb gold sv-otim'; b.setAttribute('translate', 'no'); b.dataset.svCola = 'upg'; linha.appendChild(b); linha.style.flexWrap = 'wrap'; linha.style.rowGap = '6px'; }
+    if (b.textContent !== txt) b.textContent = txt;
+    b.disabled = !!ocup; b.title = C.dica;
   }
   const COLA_CSS = `.sv-cola{margin:10px 0 6px;padding:10px 12px;border:2px solid rgba(255,210,63,.55);border-radius:10px;background:rgba(10,20,48,.45);text-align:left;font-size:13px;line-height:1.35}
     .sv-cola-t{color:#ffd23f;font-weight:700;margin-bottom:6px}
     .sv-cola-r{display:grid;grid-template-columns:84px 1fr;gap:8px;margin:5px 0}
     .sv-cola-r .k{color:#b9cbf0}.sv-cola small{font-size:12px}.sv-cola .m{color:#b9cbf0}.sv-cola .ok{color:#7fe8a0}
-    .sv-cola-tot{margin:8px 0 2px;color:#7fe8a0}.pause-box .sv-cola{max-width:460px;margin:14px auto 4px}.sv-cola-p{margin:6px 0 0;color:#8fa3c4;font-size:11px}`;
+    .sv-cola-tot{margin:8px 0 2px;color:#7fe8a0}.pause-box .sv-cola{max-width:460px;margin:14px auto 4px}.sv-cola-p{margin:6px 0 0;color:#8fa3c4;font-size:11px}
+    .sv-cola-bt{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 4px}
+    .sv-cb{font:inherit;font-size:12px;font-weight:700;padding:6px 10px;border-radius:8px;border:2px solid rgba(185,203,240,.55);background:rgba(20,36,80,.8);color:#e8f0ff;cursor:pointer}
+    .sv-cb:hover{filter:brightness(1.15)}.sv-cb:disabled{opacity:.55;cursor:wait}
+    .sv-cb.gold{border-color:#ffd23f;color:#ffd23f;background:rgba(60,44,8,.6)}.sv-otim{margin-left:8px;white-space:nowrap}`;
   // painel da colinha num lugar da página: a ficha da coleção ou a tela de pausa (0.8.0)
   function painelCola(onde, depoisDe, dex, extra) {
     let box = onde.querySelector('.sv-cola');
@@ -632,9 +699,9 @@
       return;
     }
     if (!r) { box.remove(); return; }
-    const sig = chave + '|' + lang;
+    const sig = chave + '|' + lang + '|' + (otimOcupado() ? OT.onde : '');
     if (box.dataset.sig === sig) return;
-    box.innerHTML = htmlCola(r); box.dataset.sig = sig;
+    box.innerHTML = htmlCola(r, onde.id === 'dex-detail'); box.dataset.sig = sig;
   }
   function desenharCola() {
     const d = document.getElementById('dex-detail'), ext = d && d.querySelector('.mon-extra');
@@ -1030,7 +1097,7 @@
     tick.n = tick.n || 0;
     if (dead || !alive()) return;
     ui();
-    try { desenharCola(); } catch (_) {}
+    try { desenharCola(); desenharOtim(); } catch (_) {}
     if (tick.lang !== lang) { tick.lang = lang; mandarCfg(); }
     const t = tela();
     const fab = root.querySelector('.fab');
@@ -1173,6 +1240,7 @@
     try { ext.storage.onChanged.removeListener(onStore); ext.runtime.onMessage.removeListener(onMsg); } catch (_) {}
     document.removeEventListener('sobrevida:st', onSt);
     document.removeEventListener('sobrevida:colinha', onCola);
+    document.removeEventListener('sobrevida:otimizado', onOtimizado); document.removeEventListener('click', onColaClick, true);
     document.querySelectorAll('.sv-cola, #sv-cola-css').forEach((el) => el.remove());
     if (host) host.remove();
   }

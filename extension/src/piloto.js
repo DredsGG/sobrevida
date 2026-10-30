@@ -485,11 +485,13 @@
   // 0.4.0: Golpe inicial, Segundo golpe inicial e Veto agora são configurados pela base de cálculo → valem mais
   const UPG_VALUE = { def: 1.2, xp: 1.15, atk: 1.1, cd: 1.1, coins: 1.1, reroll: 1.0, moves: 1.0, hp: 0.9, magnet: 0.9, crit: 0.8, regen: 0.8, spd: 0.5, start: 1.2, start2: 0.9, ban: 0.8 };
   // reserva calculada sozinha: 10% das moedas, no máximo o preço de uma Menta (1.500). Conta nova não fica travada.
-  const reserva = (ns) => Math.min(cfg.reserve, Math.floor(((ns.DB.save && ns.DB.save.coins) || 0) * 0.1));
-  async function melhorias(ns) {
+  const reserva = (ns) => (M.manual ? 0 : Math.min(cfg.reserve, Math.floor(((ns.DB.save && ns.DB.save.coins) || 0) * 0.1)));
+  // 0.11.3: as compras seguem com o farm ligado OU num "Aplicar tudo" pedido pela pessoa (M.manual)
+  const segue = () => cfg.on || !!M.manual;
+  async function melhorias(ns, dexPedido) {
     const s = ns.DB.save, U = ns.Upgrades;
     if (!s || !U) return;
-    const dex = s.partner;
+    const dex = dexPedido || s.partner;
     const piso = reserva(ns);   // fixa no começo: 10% do que tinha (no máximo 1.500) fica guardado
     const escolher = () => {
       const lv = ns.DB.upgradesOf(dex) || {};
@@ -509,7 +511,7 @@
     const sel = document.getElementById('upg-mon');
     if (sel && +sel.value !== dex) { sel.value = String(dex); sel.dispatchEvent(new Event('change')); await sleep(300); }
     const comprados = [];
-    for (let k = 0; k < 120 && cfg.on; k++) {
+    for (let k = 0; k < 120 && segue(); k++) {
       const i = escolher();
       if (i == null) break;
       const btn = document.querySelectorAll('#upg-list .upg-item')[i];
@@ -534,6 +536,9 @@
   // O que já está na Mochila é usado se passar do mínimo. Compra pelos botões da loja e usa pelos botões da ficha
   // do Pokémon na coleção, um item por vez (cada troca muda a conta das outras).
   const LOJA_MIN = { mint: 0.03, cap: 0.03, caph: 0.05, tm: 0.04 };
+  // 0.11.3 (pedido do André): natureza e habilidade vêm ANTES de qualquer melhoria — definem a build. Menta e Cápsulas
+  // passam na frente sempre que o ganho passa do mínimo e sobra moeda; só a MT continua comparada com a Fuerza por moeda.
+  // A conta usa todos os inimigos possíveis (a mesma da colinha), para não trocar de natureza a cada sorteio de partida.
   function lojaEscolha(ns, dex) {
     const s = ns.DB.save, U = ns.Upgrades;
     const lv = (ns.DB.upgradesOf(dex) || {}).atk | 0;
@@ -541,9 +546,10 @@
     const ref = u && lv < u.max ? (0.04 / (1 + 0.04 * lv)) / U.cost('atk', lv) : 0;
     const livre = (s.coins || 0) - reserva(ns);
     let best = null, bs = 0;
-    for (const o of opcoesLoja(ns, dex)) {
+    for (const o of comGeral(ns, () => opcoesLoja(ns, dex))) {
       if (o.ganho < (LOJA_MIN[o.tipo] || 0.05)) continue;
-      const sc = o.tem ? o.ganho * 1e6 : (o.preco <= livre && o.ganho / o.preco >= ref ? o.ganho / o.preco : 0);
+      const build = !!o.build;
+      const sc = o.tem ? 1e9 + o.ganho : !(o.preco <= livre) ? 0 : build ? 1e6 + o.ganho / o.preco : (o.ganho / o.preco >= ref ? o.ganho / o.preco : 0);
       if (sc > bs) { bs = sc; best = o; }
     }
     return best;
@@ -606,11 +612,11 @@
       return ns.Mons.abilityName(o.ab);
     } catch (_) { return String(o.alvo); }
   }
-  async function loja(ns) {
-    const s = ns.DB.save, dex = s && s.partner;
+  async function loja(ns, dexPedido) {
+    const s = ns.DB.save, dex = dexPedido || (s && s.partner);
     if (!dex || !ns.Shop || !ns.Mons) return;
     M.dexBusca = false;
-    for (let k = 0; k < 4 && cfg.on; k++) {
+    for (let k = 0; k < 4 && segue(); k++) {
       let o = null;
       try { o = lojaEscolha(ns, dex); } catch (e) { log('loja', e); }
       if (!o) break;
@@ -647,8 +653,8 @@
     }
     return Object.keys(out).length ? out : null;
   }
-  async function golpes(ns) {
-    const s = ns.DB.save, dex = s && s.partner;
+  async function golpes(ns, dexPedido) {
+    const s = ns.DB.save, dex = dexPedido || (s && s.partner);
     if (!dex) return;
     const pend = golpesPendentes(ns, dex);
     if (!pend) return;
@@ -682,6 +688,45 @@
     if (Object.keys(feito).length) act('moves', { dex, nome: nome(ns, dex), start: nm(feito.start), start2: nm(feito.start2), bans: (feito.bans || []).map(nm) });
     await voltar('upgrades');
   }
+
+  // ---------- 8c. 0.11.3: "Aplicar tudo" pedido pela pessoa (colinha da coleção ou tela de Melhorias) ----------
+  // Para um Pokémon qualquer, mesmo com o farm desligado: Menta/Cápsula/MT pela colinha, melhorias por valor e golpe
+  // inicial/veto. Só no menu, pelos botões do jogo, gastando também a reserva (foi a pessoa que pediu).
+  async function aoMenu() {
+    for (const go of ['dex', 'upgrades', 'shop']) if (open(SCR[go])) { if (go === 'dex') await sairDaColecao(); else await voltar(go); }
+    return waitFor(() => open('scr-menu'), 2500);
+  }
+  async function otimizar(ns, dex, volta) {
+    const s = ns.DB.save;
+    if (!s || !s.owned || !s.owned[dex]) return { ok: false, motivo: 'naoTem' };
+    if (ns.Game.state !== 'ui') return { ok: false, motivo: 'partida' };
+    if (M.busy) return { ok: false, motivo: 'ocupado' };
+    const antes = { coins: s.coins, nat: ns.Mons.natureOf(dex).id, ab: ns.Mons.abilityOf(dex).slot, tm: ns.Mons.taught(dex).length, upg: Object.values(ns.DB.upgradesOf(dex) || {}).reduce((a, b) => a + b, 0) };
+    M.busy = true; M.manual = true;
+    try {
+      if (!await aoMenu()) return { ok: false, motivo: 'menu' };
+      M.task = 'shop'; await loja(ns, dex);
+      M.task = 'upgrades'; await melhorias(ns, dex);
+      M.task = 'moves'; await golpes(ns, dex);
+      esquecer(dex); delete powerCache[dex];
+      // volta para onde a pessoa estava, já no Pokémon
+      if (volta === 'dex') await fichaDe(ns, dex);
+      else if (volta === 'upgrades' && await ir('upgrades')) { const sel = document.getElementById('upg-mon'); if (sel && +sel.value !== dex) { sel.value = String(dex); sel.dispatchEvent(new Event('change')); } }
+    } catch (e) { log('otimizar', e); }
+    finally { M.manual = false; M.busy = false; M.task = ''; }
+    const d = ns.DB.save;
+    return { ok: true, nome: nome(ns, dex), gasto: Math.max(0, antes.coins - d.coins), nat: ns.Mons.natureOf(dex).id !== antes.nat ? ns.Mons.name(ns.Mons.natureOf(dex).n) : null,
+             ab: ns.Mons.abilityOf(dex).slot !== antes.ab ? ns.Mons.abilityName(ns.Mons.abilityOf(dex).id) : null, tm: ns.Mons.taught(dex).length - antes.tm,
+             upg: Object.values(ns.DB.upgradesOf(dex) || {}).reduce((a, b) => a + b, 0) - antes.upg };
+  }
+  document.addEventListener('sobrevida:pedir', (e) => {
+    let q = null;
+    try { q = JSON.parse(e.detail || '{}'); } catch (_) { return; }
+    if (!q || q.tipo !== 'otimizar' || !NS) return;
+    otimizar(NS, +q.dex, q.volta).then((r) => {
+      try { document.dispatchEvent(new CustomEvent('sobrevida:otimizado', { detail: JSON.stringify(Object.assign({ dex: +q.dex }, r)) })); } catch (_) {}
+    });
+  });
 
   // ---------- 9. rotina: Halloween (skins de bruja por 300 doces) ----------
   async function skins(ns) {
@@ -1069,26 +1114,30 @@
     const f0 = forca(mon0, ab0, pool0);
     if (!(f0 > 0)) return [];
     const out = [], preco = (k) => ((ns.Shop.ITEMS || {})[k] || {}).price || 0;
-    // natureza: +10% num stat, −10% noutro (G.Mons.monFor)
-    let bestN = null, fN = f0;
-    for (const n of ns.NATURES) {
-      const m = Object.assign({}, base);
-      if (n.up) m[n.up] = base[n.up] * 1.1;
-      if (n.down) m[n.down] = base[n.down] * 0.9;
-      m.atk = Math.max(m.pa, m.sa); m.nature = n.id;
-      const f = forca(m, ab0, pool0);
-      if (f > fN * 1.0001) { fN = f; bestN = n; }
+    // 0.11.3: natureza e habilidade decididas JUNTAS (uma muda a outra), o mesmo alvo da colinha. Assim a Menta não vai
+    // para uma natureza que deixa de ser a melhor depois da Cápsula (1.500 moedas jogadas fora).
+    const comNat = (n) => { const m = Object.assign({}, base); if (n && n.up) { m[n.up] = base[n.up] * 1.1; m[n.down] = base[n.down] * 0.9; } m.atk = Math.max(m.pa, m.sa); m.nature = n ? n.id : ''; return m; };
+    const slots = ns.Mons.slots(dex), atualSlot = ns.Mons.abilityOf(dex).slot, natAtual = ns.Mons.natureOf(dex).id;
+    let podeCap = [], podeOc = [];
+    try { podeCap = ns.Mons.abilityChoices(dex, false) || []; podeOc = ns.Mons.abilityChoices(dex, true) || []; } catch (_) {}
+    const habs = [{ i: atualSlot, id: ab0 }].concat([0, 1, 2].filter((i) => i !== atualSlot && slots[i] && slots[i] !== ab0 && (podeCap.includes(i) || podeOc.includes(i)))
+      .map((i) => ({ i, id: slots[i], item: podeCap.includes(i) ? 'cap' : 'caph' })));
+    let alvo = { n: null, h: habs[0], f: f0 };
+    for (const h of habs) for (const n of ns.NATURES) {
+      const f = forca(n.id === natAtual ? mon0 : comNat(n), h.id, pool0);
+      const exige = h.item === 'caph' ? 1.03 : 1.0001; // a Oculta custa 5.000: só se render bem mais
+      if (f > alvo.f * (h === alvo.h ? 1.0001 : exige)) alvo = { n, h, f };
     }
-    if (bestN) out.push({ tipo: 'mint', item: 'mint', alvo: bestN.id, ganho: fN / f0 - 1, preco: preco('mint'), tem: ns.Shop.count('mint') > 0 });
-    // habilidade: Cápsula (as normais) e Cápsula Oculta (inclui a oculta)
-    const slots = ns.Mons.slots(dex);
-    for (const [item, oculta] of [['cap', false], ['caph', true]]) {
-      let best = null, fA = f0;
-      for (const i of ns.Mons.abilityChoices(dex, oculta)) {
-        const f = forca(mon0, slots[i], pool0);
-        if (f > fA * 1.0001) { fA = f; best = i; }
+    if (alvo.f > f0 * 1.0001) {
+      const nOk = !alvo.n || alvo.n.id === natAtual, hOk = alvo.h.i === atualSlot;
+      if (!nOk) {
+        const fSemNat = hOk ? f0 : forca(mon0, alvo.h.id, pool0);
+        out.push({ tipo: 'mint', item: 'mint', alvo: alvo.n.id, ganho: alvo.f / fSemNat - 1, preco: preco('mint'), tem: ns.Shop.count('mint') > 0, build: true });
       }
-      if (best != null) out.push({ tipo: item, item, alvo: best, ab: slots[best], ganho: fA / f0 - 1, preco: preco(item), tem: ns.Shop.count(item) > 0 });
+      if (!hOk) {
+        const fSemAb = nOk ? f0 : forca(comNat(alvo.n), ab0, pool0);
+        out.push({ tipo: alvo.h.item, item: alvo.h.item, alvo: alvo.h.i, ab: alvo.h.id, ganho: alvo.f / fSemAb - 1, preco: preco(alvo.h.item), tem: ns.Shop.count(alvo.h.item) > 0, build: true });
+      }
     }
     // MT: as 8 do dia e as que já estão na Mochila
     let hoje = [];
@@ -1208,9 +1257,10 @@
     let q = null;
     try { q = JSON.parse(e.detail || '{}'); } catch (_) { return; }
     if (!q || q.tipo !== 'colinha' || !NS) return;
+    if (q.forca) { COLA.clear(); esquecer(+q.dex); } // botão "Recalcular" da colinha
     let r = null;
     try { r = colinha(NS, +q.dex); } catch (er) { log('colinha', er); }
-    try { document.dispatchEvent(new CustomEvent('sobrevida:colinha', { detail: JSON.stringify({ dex: +q.dex, r }) })); } catch (_) {}
+    try { document.dispatchEvent(new CustomEvent('sobrevida:colinha', { detail: JSON.stringify({ dex: +q.dex, r, forca: !!q.forca }) })); } catch (_) {}
   });
 
   // ======================= visual novo da partida (0.6.0) =======================

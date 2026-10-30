@@ -2,6 +2,12 @@
 // Frases curtas, do ponto de vista de quem usa. Aparece uma vez, na primeira abertura depois da atualização.
 globalThis.SV_NOVIDADES = {
   pt: {
+    '0.12.0': [
+      "Loja Kecleon antes de tudo: entre as partidas, a natureza e a habilidade da colinha são conferidas primeiro, e a Menta ou a Cápsula entram antes de qualquer melhoria. A conta é refeita a cada volta (evolução e golpes novos mudam a build).",
+      "Natureza e habilidade agora são escolhidas juntas: a Menta não vai mais para uma natureza que deixa de ser a melhor depois da Cápsula.",
+      "Colinha da coleção com dois botões: \"↻ Recalcular\" e \"⚡ Aplicar tudo\" (compra Menta, Cápsula e MT que valem e gasta o resto nas melhorias, pelos botões do jogo). Funciona com o farm desligado.",
+      "Na tela de Melhorias do jogo, o botão \"⚡ Otimizar com a Sobrevida\" faz o mesmo para o Pokémon escolhido.",
+    ],
     '0.11.2': [
       "Novo botão Apoiar ♥ no rodapé, opcional: Pix (Brasil) ou GitHub Sponsors (outros países). Não muda nada na Sobrevida.",
     ],
@@ -99,6 +105,12 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   en: {
+    '0.12.0': [
+      "Kecleon Shop comes first: between runs, the cheat sheet's nature and ability are checked first, and the Mint or Capsule go in before any upgrade. The math is redone every round (evolutions and new moves change the build).",
+      "Nature and ability are now chosen together: the Mint no longer goes to a nature that stops being the best after the Capsule.",
+      "Collection cheat sheet with two buttons: \"↻ Recalculate\" and \"⚡ Apply all\" (buys the Mint, Capsule and TMs worth it and spends the rest on upgrades, through the game's buttons). Works with the farm off.",
+      "On the game's Upgrades screen, the \"⚡ Optimize with Sobrevida\" button does the same for the chosen Pokémon.",
+    ],
     '0.11.2': [
       "New optional Support ♥ button in the footer: Pix (Brazil) or GitHub Sponsors (other countries). It doesn't change anything in Sobrevida.",
     ],
@@ -196,6 +208,12 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   es: {
+    '0.12.0': [
+      "La Tienda Kecleon va primero: entre partidas, la naturaleza y la habilidad de la chuleta se revisan primero, y la Menta o la Cápsula entran antes de cualquier mejora. La cuenta se rehace en cada vuelta (las evoluciones y los movimientos nuevos cambian la build).",
+      "Naturaleza y habilidad ahora se eligen juntas: la Menta ya no va a una naturaleza que deja de ser la mejor después de la Cápsula.",
+      "Chuleta de la colección con dos botones: \"↻ Recalcular\" y \"⚡ Aplicar todo\" (compra la Menta, la Cápsula y las MT que valen y gasta el resto en mejoras, con los botones del juego). Funciona con el farm apagado.",
+      "En la pantalla de Mejoras del juego, el botón \"⚡ Optimizar con Sobrevida\" hace lo mismo para el Pokémon elegido.",
+    ],
     '0.11.2': [
       "Nuevo botón Apoyar ♥ en el pie, opcional: Pix (Brasil) o GitHub Sponsors (otros países). No cambia nada en Sobrevida.",
     ],
