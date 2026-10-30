@@ -604,27 +604,104 @@
     return `<div class="sv-cola-t">${esc(C.titulo)}</div>
       <div class="sv-cola-r"><span class="k">${esc(C.nat)}</span><div><b>${esc(r.nat.nome)}</b> <small>${esc(natTxt)}</small><br><small class="m">${suaNat}</small></div></div>
       <div class="sv-cola-r"><span class="k">${esc(C.hab)}</span><div><b>${esc(r.ab.nome)}</b>${r.ab.oculta ? ` <small class="gold">${esc(C.oculta)}</small>` : ''}<br><small class="m">${esc(r.ab.desc || '')}</small>${suaAb ? `<br><small class="m">${suaAb}</small>` : ''}</div></div>
-      ${b ? `<div class="sv-cola-r"><span class="k">${esc(C.build)}</span><div><b>${esc([b.a, b.b].filter(Boolean).join(' + '))}</b>${b.lado ? ` <small>(${esc(C.lado[b.lado] || '')})</small>` : ''}<br><small class="m">${esc(C.buffs)}: ${esc(b.buffs.join(', ') || '—')} · ${esc(C.troca)}: ${esc(b.parceiro || '—')}</small></div></div>` : ''}
+      ${b ? `<div class="sv-cola-r"><span class="k">${esc(C.build)}</span><div><b>${esc([b.a, b.b].filter(Boolean).map((x) => (b.mt && b.mt.includes(x) ? x + ' (' + C.mtTag + ')' : x)).join(' + '))}</b>${b.lado ? ` <small>(${esc(C.lado[b.lado] || '')})</small>` : ''}<br><small class="m">${esc(C.buffs)}: ${esc(b.buffs.join(', ') || '—')} · ${esc(C.troca)}: ${esc(b.parceiro || '—')}</small></div></div>` : ''}
       ${r.inicio && r.inicio.a ? `<div class="sv-cola-r"><span class="k">${esc(C.inicio)}</span><div><b>${esc(r.inicio.a)}</b>${r.inicio.b ? ` <small>· ${esc(C.seg)}: ${esc(r.inicio.b)}</small>` : ''}${r.inicio.vetos.length ? `<br><small class="m">${esc(C.veto)}: ${esc(r.inicio.vetos.join(', '))}</small>` : ''}</div></div>` : ''}
-      <div class="sv-cola-r"><span class="k">${esc(C.mt)}</span><div>${r.mts.length ? r.mts.map((m) => `<b>${esc(m.nome)}</b> <small>${esc(sinal(m.ganho))}</small>`).join('<br>') : `<small class="m">${esc(C.nada)}</small>`}</div></div>
+      <div class="sv-cola-r"><span class="k">${esc(C.mt)}</span><div>${r.mts.length ? r.mts.map((m) => `<b>${esc(m.nome)}</b> <small>${esc(sinal(m.ganho))}</small> <small class="${m.agora ? 'ok' : 'm'}">${esc(m.agora ? (m.mochila ? C.mtMochila : C.mtHoje(nf(m.preco))) : m.hoje ? C.mtHoje(nf(m.preco)) : C.mtFora)}</small>`).join('<br>') : `<small class="m">${esc(C.nada)}</small>`}${r.muda ? `<br><small class="m">${esc(C.mtMuda(r.muda.mt, r.muda.nat))}</small>` : ''}</div></div>
       ${r.total > 0 ? `<p class="sv-cola-tot">${esc(C.total(r.total))}</p>` : ''}
-      <p class="sv-cola-p">${esc(C.rod)}</p>${botoes ? botoesCola(r) : ''}`;
+      <p class="sv-cola-p">${esc(C.rod)}</p>${botoes ? botoesCola(r, botoes) : ''}`;
   }
-  // ---------- 0.11.3: botões da colinha (Recalcular / Aplicar tudo) e "Otimizar" na tela de Melhorias ----------
+  // ---------- 0.12.0/0.12.1: botões da colinha (Recalcular / Aplicar tudo) e "Otimizar" na tela de Melhorias ----------
   // O piloto faz pelos botões do jogo, mesmo com o farm desligado: Menta/Cápsula/MT que a colinha manda, melhorias por
-  // valor e golpe inicial/veto. Só no menu; nada aqui mexe no save direto.
-  const OT = { dex: 0, onde: '', desde: 0 };
-  const otimOcupado = () => OT.dex && Date.now() - OT.desde < 90000;
-  function botoesCola(r) {
-    const C = L().f.cola, ocup = otimOcupado();
-    return `<div class="sv-cola-bt"><button type="button" class="sv-cb" data-sv-cola="recalc"${ocup ? ' disabled' : ''}>${esc(C.recalc)}</button>${r.dono ? `<button type="button" class="sv-cb gold" data-sv-cola="aplicar"${ocup ? ' disabled' : ''}>${esc(ocup && OT.onde === 'dex' ? C.aplicando : C.aplicar)}</button>` : ''}</div>${r.dono ? `<small class="m">${esc(C.dica)}</small>` : ''}`;
+  // valor e golpe inicial/veto. Só no menu; nada aqui mexe no save direto. Enquanto isso, um quadro com barra de
+  // progresso cobre o jogo (as trocas de tela ficam por baixo) e, no fim, a pessoa está de volta na mesma tela.
+  // 0.12.1: o botão diz o que falta ("✓ Tudo aplicado" quando não falta nada) e nunca fica preso: o piloto sempre
+  // responde, há um vigia de 25 s sem notícia e, se a página ainda roda o piloto de uma versão antiga (atualização sem
+  // F5: só a parte da extensão é trocada nas abas abertas), o botão pede para recarregar.
+  const OT = { dex: 0, onde: '', desde: 0, ultimo: 0, fim: null };
+  const PEND = { dex: 0, p: undefined, em: 0, pedidoEm: 0 };
+  const otimOcupado = () => !!OT.dex;
+  const pilotoVelho = () => !!(pst && pst.ok && pst.v !== VERSION);
+  const nf = (n) => Number(n || 0).toLocaleString(lang === 'en' ? 'en-US' : lang === 'es' ? 'es-ES' : 'pt-BR');
+  function pedirPend(dex) {
+    if (!dex || pilotoVelho() || otimOcupado()) return;
+    if (PEND.dex === dex && Date.now() - PEND.pedidoEm < 1500) return;
+    PEND.pedidoEm = Date.now();
+    try { document.dispatchEvent(new CustomEvent('sobrevida:pedir', { detail: JSON.stringify({ tipo: 'pend', dex }) })); } catch (_) {}
   }
-  function pedirOtim(dex, onde) {
+  const onPend = (e) => {
+    let o = null;
+    try { o = JSON.parse(e.detail); } catch (_) { return; }
+    if (!o || !o.dex) return;
+    PEND.dex = o.dex; PEND.p = o.p || null; PEND.em = Date.now();
+    try { desenharCola(); desenharOtim(); } catch (_) {}
+  };
+  document.addEventListener('sobrevida:pend', onPend);
+  // o que o botão de aplicar mostra para este Pokémon
+  function estadoAplicar(dex, escopo) {
+    const C = L().f.cola, melh = escopo === 'melh';
+    if (pilotoVelho()) return { k: 'reload', txt: C.recarregar, cls: 'sv-cb gold' };
+    if (otimOcupado()) return { k: 'ocup', txt: C.aplicando, cls: 'sv-cb gold', off: true };
+    if (PEND.dex !== dex || PEND.p === undefined || Date.now() - PEND.em > 20000) { pedirPend(dex); }
+    const p = PEND.dex === dex ? PEND.p : undefined;
+    if (p && (melh ? p.melh : p.cola)) return { k: 'ok', txt: melh ? C.melhOk : C.colaOk, cls: 'sv-cb ok', off: true, dica: melh ? C.melhOkDica : C.colaOkDica };
+    if (p) {
+      const falta = melh ? [p.upg > 0 && C.pUpg(p.upg), p.golpes && C.pGolpes] : [...p.loja.map((x) => (C.item[x.tipo] || '') + ' → ' + x.nome), p.golpes && C.pGolpes];
+      const guarda = melh && p.guardar > 0 ? ' ' + C.guardando(nf(p.guardar)) : '';
+      return { k: 'falta', txt: melh ? C.otim : C.aplicar, cls: 'sv-cb gold', dica: C.falta(falta.filter(Boolean).join(' · ')) + guarda };
+    }
+    return { k: '?', txt: melh ? C.otim : C.aplicar, cls: 'sv-cb gold', dica: melh ? C.dicaMelh : C.dica };
+  }
+  const sigBotoes = (dex) => { const e = estadoAplicar(dex, 'cola'); return e.k + '|' + (e.dica || ''); };
+  function botoesCola(r, dex) {
+    const C = L().f.cola, e = r.dono ? estadoAplicar(dex, 'cola') : null;
+    return `<div class="sv-cola-bt"><button type="button" class="sv-cb" data-sv-cola="recalc" data-dex="${dex}"${otimOcupado() ? ' disabled' : ''}>${esc(C.recalc)}</button>${e ? `<button type="button" class="${e.cls}" data-sv-cola="${e.k === 'reload' ? 'reload' : 'aplicar'}" data-dex="${dex}"${e.off ? ' disabled' : ''}>${esc(e.txt)}</button>` : ''}</div>${e ? `<small class="${e.k === 'ok' ? 'ok' : 'm'}">${esc(e.k === 'reload' ? C.recarregarDica : e.dica || C.dica)}</small>` : ''}`;
+  }
+  // ----- quadro de progresso por cima do jogo -----
+  function quadroOtim(estado, p, linha, fim) {
+    let ov = document.getElementById('sv-otim-ov');
+    if (estado === 'fechar') { if (ov) { ov.classList.add('sai'); setTimeout(() => ov.remove(), 220); } return; }
+    if (!document.getElementById('sv-cola-css')) { const st = document.createElement('style'); st.id = 'sv-cola-css'; st.textContent = COLA_CSS; document.head.appendChild(st); }
+    const C = L().f.cola;
+    if (!ov) {
+      ov = document.createElement('div'); ov.id = 'sv-otim-ov'; ov.setAttribute('translate', 'no');
+      ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true'); ov.setAttribute('aria-live', 'polite');
+      ov.innerHTML = `<div class="sv-ov-box"><div class="sv-ov-t"></div><div class="sv-ov-bar"><i></i></div><div class="sv-ov-l"></div><div class="sv-ov-b"><button type="button" class="sv-cb" data-sv-ov="x"></button></div></div>`;
+      // o quadro engole cliques e teclas: o jogo por baixo está sendo usado pela Sobrevida
+      ov.addEventListener('click', (e) => { e.stopPropagation(); const b = e.target.closest && e.target.closest('[data-sv-ov]'); if (!b) return;
+        if (OT.dex) { try { document.dispatchEvent(new CustomEvent('sobrevida:pedir', { detail: JSON.stringify({ tipo: 'otimCancel', dex: OT.dex }) })); } catch (_) {} b.disabled = true; b.textContent = C.cancelando; }
+        else quadroOtim('fechar'); }, true);
+      document.body.appendChild(ov);
+    }
+    ov.classList.toggle('fim', !!fim); ov.classList.toggle('erro', estado === 'erro');
+    ov.querySelector('.sv-ov-t').textContent = estado === 'ok' ? C.concluido : estado === 'erro' ? C.naoDeu : C.aplicandoT;
+    ov.querySelector('.sv-ov-bar i').style.width = Math.round(Math.max(0.03, Math.min(1, p)) * 100) + '%';
+    ov.querySelector('.sv-ov-l').textContent = linha || '';
+    const b = ov.querySelector('[data-sv-ov]');
+    if (!b.disabled || fim) { b.disabled = false; b.textContent = fim ? C.fechar : C.cancelar; }
+  }
+  const textoEtapa = (o) => { const E = L().f.cola.etapa; return o.etapa === 'loja' ? E.loja(o.txt) : o.etapa === 'upg' ? E.upg(o.txt) : (E[o.etapa] || E.menu); };
+  const onProg = (e) => {
+    let o = null;
+    try { o = JSON.parse(e.detail); } catch (_) { return; }
+    if (!o || o.dex !== OT.dex) return;
+    OT.ultimo = Date.now();
+    quadroOtim('rodando', o.p || 0, textoEtapa(o));
+  };
+  document.addEventListener('sobrevida:otimProg', onProg);
+  function pedirOtim(dex, onde, escopo) {
     if (!dex || otimOcupado()) return;
+    if (pilotoVelho()) { location.reload(); return; }
     if (semPiloto() || !pronto()) { toast(L().f.cola.erro.menu, false); return; }
-    OT.dex = dex; OT.onde = onde; OT.desde = Date.now();
-    toast(L().f.cola.aplicando, true);
-    try { document.dispatchEvent(new CustomEvent('sobrevida:pedir', { detail: JSON.stringify({ tipo: 'otimizar', dex, volta: onde }) })); } catch (_) {}
+    OT.dex = dex; OT.onde = onde; OT.desde = OT.ultimo = Date.now();
+    quadroOtim('rodando', 0, L().f.cola.etapa.menu);
+    try { document.dispatchEvent(new CustomEvent('sobrevida:pedir', { detail: JSON.stringify({ tipo: 'otimizar', dex, volta: onde, escopo }) })); } catch (_) {}
+    redesenharBotoes();
+  }
+  // vigia: sem notícia do piloto por 25 s, solta o botão e avisa (nunca fica "Aplicando…" para sempre)
+  function vigiaOtim() {
+    if (!OT.dex || Date.now() - OT.ultimo < 25000) return;
+    OT.dex = 0;
+    quadroOtim('erro', 1, L().f.cola.erro.semResposta, true);
     redesenharBotoes();
   }
   function redesenharBotoes() { document.querySelectorAll('.sv-cola').forEach((x) => { x.dataset.sig = ''; }); try { desenharCola(); desenharOtim(); } catch (_) {} }
@@ -634,10 +711,14 @@
     if (!o || o.dex !== OT.dex) return;
     OT.dex = 0;
     const C = L().f.cola;
-    if (!o.ok) toast(C.erro[o.motivo] || C.erro.menu, false);
+    if (o.pend !== undefined) { PEND.dex = o.dex; PEND.p = o.pend; PEND.em = Date.now(); }
+    if (!o.ok) quadroOtim('erro', 1, C.erro[o.motivo] || C.erro.menu, true);
     else {
       const partes = [o.nat && C.pNat(o.nat), o.ab && C.pAb(o.ab), o.tm > 0 && C.pTm(o.tm), o.upg > 0 && C.pUpg(o.upg)].filter(Boolean);
-      toast(partes.length ? C.feito(o.nome, o.gasto.toLocaleString(lang === 'en' ? 'en-US' : lang === 'es' ? 'es-ES' : 'pt-BR'), partes.join(' · ')) : C.nadaFeito(o.nome), true);
+      const resto = o.pend && !o.pend.ok ? ' ' + C.aindaFalta : '';
+      const msg = o.nada ? C.jaAplicado(o.nome) : (partes.length ? C.feito(o.nome, nf(o.gasto), partes.join(' · ')) : C.nadaFeito(o.nome)) + (o.cancelado ? ' ' + C.cancelado : resto);
+      quadroOtim('ok', 1, msg, true);
+      setTimeout(() => { if (!OT.dex) quadroOtim('fechar'); }, o.nada ? 1600 : 2600);
       registrar({ type: 'otimizar', ok: true });
     }
     COLA.dados = {}; COLA.chave = '';
@@ -648,30 +729,37 @@
     const b = e.target && e.target.closest && e.target.closest('[data-sv-cola]');
     if (!b || b.disabled) return;
     e.preventDefault(); e.stopPropagation();
-    const dex = dexDaFicha();
+    const dex = +b.dataset.dex || dexDaFicha();
+    const onde = document.querySelector('#scr-upgrades:not(.hidden)') ? 'upgrades' : 'dex';
     if (b.dataset.svCola === 'recalc') {
       if (!dex) return;
       // o pedido forçado limpa o cache do piloto e refaz a conta na hora (evento síncrono); o desenho pede de novo já fresco
-      COLA.dados = {}; COLA.chave = '';
+      COLA.dados = {}; COLA.chave = ''; PEND.p = undefined;
       try { document.dispatchEvent(new CustomEvent('sobrevida:pedir', { detail: JSON.stringify({ tipo: 'colinha', dex, forca: true }) })); } catch (_) {}
       redesenharBotoes(); toast(L().f.cola.recalcOk, true);
-    } else if (b.dataset.svCola === 'aplicar') pedirOtim(dex, 'dex');
-    else if (b.dataset.svCola === 'upg') { const sel = document.getElementById('upg-mon'); pedirOtim(sel ? +sel.value : 0, 'upgrades'); }
+    } else if (b.dataset.svCola === 'reload') location.reload();
+    else if (b.dataset.svCola === 'aplicar') pedirOtim(dex, onde, 'cola');
+    else if (b.dataset.svCola === 'upg') { const sel = document.getElementById('upg-mon'); pedirOtim(sel ? +sel.value : 0, 'upgrades', 'melh'); }
   };
   document.addEventListener('click', onColaClick, true);
   // botão na tela de Melhorias do jogo, ao lado do seletor de Pokémon
   function desenharOtim() {
+    vigiaOtim();
     const tela = document.querySelector('#scr-upgrades:not(.hidden)');
     const velho = document.querySelector('.sv-otim');
     if (!tela || !farm.cola || dead || semPiloto()) { if (velho) velho.remove(); return; }
     const sel = tela.querySelector('#upg-mon'), linha = sel && sel.parentElement;
     if (!linha) return;
     if (!document.getElementById('sv-cola-css')) { const st = document.createElement('style'); st.id = 'sv-cola-css'; st.textContent = COLA_CSS; document.head.appendChild(st); }
-    const C = L().f.cola, ocup = otimOcupado(), txt = ocup && OT.onde === 'upgrades' ? C.aplicando : C.otim;
+    const C = L().f.cola, e = estadoAplicar(+sel.value, 'melh');
+    const txt = e.txt;
     let b = linha.querySelector('.sv-otim');
-    if (!b) { b = document.createElement('button'); b.type = 'button'; b.className = 'sv-cb gold sv-otim'; b.setAttribute('translate', 'no'); b.dataset.svCola = 'upg'; linha.appendChild(b); linha.style.flexWrap = 'wrap'; linha.style.rowGap = '6px'; }
+    if (!b) { b = document.createElement('button'); b.type = 'button'; b.setAttribute('translate', 'no'); linha.appendChild(b); linha.style.flexWrap = 'wrap'; linha.style.rowGap = '6px'; }
+    const cls = e.cls + ' sv-otim';
+    if (b.className !== cls) b.className = cls;
+    b.dataset.svCola = e.k === 'reload' ? 'reload' : 'upg';
     if (b.textContent !== txt) b.textContent = txt;
-    b.disabled = !!ocup; b.title = C.dica;
+    b.disabled = !!e.off; b.title = e.k === 'reload' ? C.recarregarDica : e.dica || C.dicaMelh;
   }
   const COLA_CSS = `.sv-cola{margin:10px 0 6px;padding:10px 12px;border:2px solid rgba(255,210,63,.55);border-radius:10px;background:rgba(10,20,48,.45);text-align:left;font-size:13px;line-height:1.35}
     .sv-cola-t{color:#ffd23f;font-weight:700;margin-bottom:6px}
@@ -681,7 +769,19 @@
     .sv-cola-bt{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 4px}
     .sv-cb{font:inherit;font-size:12px;font-weight:700;padding:6px 10px;border-radius:8px;border:2px solid rgba(185,203,240,.55);background:rgba(20,36,80,.8);color:#e8f0ff;cursor:pointer}
     .sv-cb:hover{filter:brightness(1.15)}.sv-cb:disabled{opacity:.55;cursor:wait}
-    .sv-cb.gold{border-color:#ffd23f;color:#ffd23f;background:rgba(60,44,8,.6)}.sv-otim{margin-left:8px;white-space:nowrap}`;
+    .sv-cb.gold{border-color:#ffd23f;color:#ffd23f;background:rgba(60,44,8,.6)}.sv-cb.ok{border-color:#7fe8a0;color:#7fe8a0;background:rgba(10,48,28,.6)}.sv-cb.ok:disabled{opacity:1;cursor:default}
+    .sv-otim{margin-left:8px;white-space:nowrap}
+    #sv-otim-ov{position:fixed;inset:0;z-index:2147483646;display:flex;align-items:center;justify-content:center;background:rgba(6,12,30,.88);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);font:inherit;animation:svOvIn .18s ease-out;padding:16px}
+    #sv-otim-ov.sai{opacity:0;transition:opacity .2s}
+    @keyframes svOvIn{from{opacity:0}to{opacity:1}}
+    .sv-ov-box{width:min(420px,100%);padding:16px 18px;border:3px solid #fff;outline:3px solid #0b1838;border-radius:12px;background:linear-gradient(#2c519f,#1a3170);color:#e8f0ff;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.5)}
+    .sv-ov-t{color:#ffd23f;font-weight:700;font-size:16px;margin-bottom:12px}
+    #sv-otim-ov.fim .sv-ov-t{color:#7fe8a0}#sv-otim-ov.erro .sv-ov-t{color:#ff9a8a}
+    .sv-ov-bar{height:14px;border-radius:7px;background:rgba(5,12,32,.75);border:2px solid #0b1838;overflow:hidden}
+    .sv-ov-bar i{display:block;height:100%;width:3%;background:linear-gradient(90deg,#ffd23f,#ffe98a);transition:width .25s ease-out}
+    #sv-otim-ov.fim .sv-ov-bar i{background:linear-gradient(90deg,#4fd07c,#9af0b6)}#sv-otim-ov.erro .sv-ov-bar i{background:#d9655a}
+    .sv-ov-l{margin:10px 0 12px;font-size:13px;line-height:1.4;min-height:18px}
+    @media (prefers-reduced-motion:reduce){#sv-otim-ov,.sv-ov-bar i{animation:none;transition:none}}`;
   // painel da colinha num lugar da página: a ficha da coleção ou a tela de pausa (0.8.0)
   function painelCola(onde, depoisDe, dex, extra) {
     let box = onde.querySelector('.sv-cola');
@@ -699,9 +799,10 @@
       return;
     }
     if (!r) { box.remove(); return; }
-    const sig = chave + '|' + lang + '|' + (otimOcupado() ? OT.onde : '');
+    const comBotoes = onde.id === 'dex-detail' || onde.id === 'scr-upgrades';
+    const sig = chave + '|' + lang + '|' + (comBotoes && r && r.dono ? sigBotoes(dex) : '') + '|' + otimOcupado();
     if (box.dataset.sig === sig) return;
-    box.innerHTML = htmlCola(r, onde.id === 'dex-detail'); box.dataset.sig = sig;
+    box.innerHTML = htmlCola(r, comBotoes ? dex : 0); box.dataset.sig = sig;
   }
   function desenharCola() {
     const d = document.getElementById('dex-detail'), ext = d && d.querySelector('.mon-extra');
@@ -709,6 +810,12 @@
     if (!farm.cola || dead) { document.querySelectorAll('.sv-cola').forEach((x) => x.remove()); return; }
     if (ext) { const dex = dexDaFicha(); if (dex) painelCola(d, ext, dex, (ext.textContent || '').replace(/\s+/g, ' ').trim()); }
     else if (d) { const x = d.querySelector('.sv-cola'); if (x) x.remove(); }
+    // 0.12.1: na tela de Melhorias, a colinha do Pokémon escolhido no seletor (sem precisar ir à coleção)
+    const upg = document.querySelector('#scr-upgrades:not(.hidden)');
+    if (upg) {
+      const cab = upg.querySelector('.upg-head'), sel = upg.querySelector('#upg-mon');
+      if (cab && sel && +sel.value) painelCola(upg, cab, +sel.value, 'melh');
+    }
     // pausa: a colinha do Pokémon desta partida (o parceiro), embaixo dos botões
     if (pausa && pst && pst.partner && pst.partner.dex) {
       const linha = pausa.querySelector('.row') || pausa.lastElementChild;
@@ -1240,7 +1347,7 @@
     try { ext.storage.onChanged.removeListener(onStore); ext.runtime.onMessage.removeListener(onMsg); } catch (_) {}
     document.removeEventListener('sobrevida:st', onSt);
     document.removeEventListener('sobrevida:colinha', onCola);
-    document.removeEventListener('sobrevida:otimizado', onOtimizado); document.removeEventListener('click', onColaClick, true);
+    document.removeEventListener('sobrevida:otimizado', onOtimizado); document.removeEventListener('sobrevida:otimProg', onProg); document.removeEventListener('sobrevida:pend', onPend); document.removeEventListener('click', onColaClick, true);
     document.querySelectorAll('.sv-cola, #sv-cola-css').forEach((el) => el.remove());
     if (host) host.remove();
   }

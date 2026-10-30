@@ -2,6 +2,14 @@
 // Frases curtas, do ponto de vista de quem usa. Aparece uma vez, na primeira abertura depois da atualização.
 globalThis.SV_NOVIDADES = {
   pt: {
+    '0.12.1': [
+      "\"Aplicar\" não fica mais carregando para sempre. Se a Sobrevida se atualizou com o jogo aberto, o botão pede para recarregar a página; e o jogo sempre responde (ou avisa em 25 s).",
+      "Dois botões com papéis separados: na colinha, \"Aplicar a colinha\" (MT, Menta, Cápsula, golpe inicial e veto); na tela de Melhorias, \"Comprar as melhores melhorias\" (como o farm), guardando o dinheiro da Menta/Cápsula que a colinha ainda pede.",
+      "Enquanto aplica, um quadro com barra de progresso cobre o jogo; no fim você está de volta na mesma tela. Os botões mostram \"✓\" quando já está tudo certo, ou o que falta.",
+      "A colinha aparece também na tela de Melhorias.",
+      "MT: golpe que o Pokémon só aprende por MT entra na conta da build, e a MT vem antes da Menta. A colinha diz se a MT está na loja hoje, na Mochila ou fora.",
+      "Conta da build refeita com o dano real de cada golpe, medido no motor do jogo (92 golpes, sozinhos, nível 1 e máximo). Pokémon especial agora sai com build especial (Alakazam: Confusion + Psychic) e o Substitute deixou de aparecer em quase toda build.",
+    ],
     '0.12.0': [
       "Loja Kecleon antes de tudo: entre as partidas, a natureza e a habilidade da colinha são conferidas primeiro, e a Menta ou a Cápsula entram antes de qualquer melhoria. A conta é refeita a cada volta (evolução e golpes novos mudam a build).",
       "Natureza e habilidade agora são escolhidas juntas: a Menta não vai mais para uma natureza que deixa de ser a melhor depois da Cápsula.",
@@ -105,6 +113,14 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   en: {
+    '0.12.1': [
+      "\"Apply\" no longer spins forever. If Sobrevida updated with the game open, the button asks you to reload the page; and the game always answers (or you get a notice within 25 s).",
+      "Two buttons with separate jobs: on the cheat sheet, \"Apply the cheat sheet\" (TM, Mint, Capsule, starting move and ban); on the Upgrades screen, \"Buy the best upgrades\" (like the farm), keeping the coins for the Mint/Capsule the cheat sheet still asks for.",
+      "While it applies, a box with a progress bar covers the game; at the end you are back on the same screen. The buttons show \"✓\" when everything is set, or what is missing.",
+      "The cheat sheet also shows on the Upgrades screen.",
+      "TMs: moves a Pokémon only learns by TM now count in the build math, and the TM comes before the Mint. The cheat sheet says whether the TM is in today's shop, in your Bag or not available.",
+      "Build math redone with each move's real damage, measured in the game engine (92 moves, alone, level 1 and max). Special Pokémon now get special builds (Alakazam: Confusion + Psychic) and Substitute no longer shows up in almost every build.",
+    ],
     '0.12.0': [
       "Kecleon Shop comes first: between runs, the cheat sheet's nature and ability are checked first, and the Mint or Capsule go in before any upgrade. The math is redone every round (evolutions and new moves change the build).",
       "Nature and ability are now chosen together: the Mint no longer goes to a nature that stops being the best after the Capsule.",
@@ -208,6 +224,14 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   es: {
+    '0.12.1': [
+      "\"Aplicar\" ya no se queda cargando para siempre. Si Sobrevida se actualizó con el juego abierto, el botón pide recargar la página; y el juego siempre responde (o avisa en 25 s).",
+      "Dos botones con papeles separados: en la chuleta, \"Aplicar la chuleta\" (MT, Menta, Cápsula, movimiento inicial y veto); en la pantalla de Mejoras, \"Comprar las mejores mejoras\" (como el farm), guardando las monedas de la Menta/Cápsula que la chuleta aún pide.",
+      "Mientras aplica, un cuadro con barra de progreso cubre el juego; al final vuelves a la misma pantalla. Los botones muestran \"✓\" cuando ya está todo listo, o lo que falta.",
+      "La chuleta también aparece en la pantalla de Mejoras.",
+      "MT: los movimientos que el Pokémon solo aprende por MT entran en la cuenta de la build, y la MT va antes de la Menta. La chuleta dice si la MT está en la tienda hoy, en la Mochila o no está.",
+      "Cuenta de la build rehecha con el daño real de cada movimiento, medido en el motor del juego (92 movimientos, solos, nivel 1 y máximo). Los Pokémon especiales ahora salen con build especial (Alakazam: Confusion + Psychic) y Substitute dejó de aparecer en casi todas las builds.",
+    ],
     '0.12.0': [
       "La Tienda Kecleon va primero: entre partidas, la naturaleza y la habilidad de la chuleta se revisan primero, y la Menta o la Cápsula entran antes de cualquier mejora. La cuenta se rehace en cada vuelta (las evoluciones y los movimientos nuevos cambian la build).",
       "Naturaleza y habilidad ahora se eligen juntas: la Menta ya no va a una naturaleza que deja de ser la mejor después de la Cápsula.",

@@ -14,6 +14,7 @@
 //  - partida que o farm tocou NUNCA vai para o ranking (Ranking.submit* bloqueado + selo bloqueado pelo fundo).
 (() => {
   'use strict';
+  const VERSAO = '0.12.1';
   if (window.__sobrevidaPiloto) return;
   window.__sobrevidaPiloto = true;
   const HOOK_KEY = 'Game';
@@ -84,6 +85,105 @@
   // estado do motor da partida (PSBot)
   const S = { pickTimer: null, lastPos: null, stuckT: 0, unstickT: 0, unstickDir: null, wanderA: Math.random() * 6.28, lastSlotCheck: 0, lastOrb: 0, lastT: performance.now(), lastDir: null, lastOffer: null, orbGoal: null, plan: null, seen: {}, ban: {}, noGo: {}, jCenter: null, holding: false, holdKey: null, holdSince: 0, wd: null, losBadT: 0, spin: 1, spinBlockT: 0, loopC: null, dirIdx: -1, holdT: 0, out: [1, 0], mode: '' };
   const act = (k, a) => { acts.unshift({ k, a: a || null, t: Date.now() }); acts.length = Math.min(acts.length, 8); };
+  // Calibração dos golpes (gerada por testes/lab-banco-golpes.cjs + gen-cal.py, 92 golpes): dano/s MEDIDO no motor do
+  // jogo, com o golpe sozinho, atk = 1 e tipos neutros: [alvo nível 1, horda nível 1, alvo nível máx., horda nível máx.],
+  // na unidade da conta (÷ 0.844). Alvo = boneco a 150 px ou vindo até você (o melhor dos dois); horda = alvo + metade do
+  // extra do anel de 24 bonecos (70–250 px), ou 0,8 × 1 boneco vindo até você (ajustado a partidas reais do farm). Rastro e armadilha ficam com a conta.
+  const CAL_GOLPES = {
+    'acid-spray': [13.86, 34.65, 50.0, 159.87],
+    'aerial-ace': [25.99, 26.96, 72.99, 72.99],
+    'air-slash': [31.65, 30.71, 160.92, 159.44],
+    'ancient-power': [0.0, 27.33, 0.0, 151.42],
+    'aura-sphere': [29.46, 29.46, 162.52, 162.52],
+    'bite': [36.64, 29.31, 102.59, 82.07],
+    'body-slam': [33.17, 26.53, 111.47, 89.18],
+    'bonemerang': [35.7, 40.95, 137.7, 174.53],
+    'bubble': [9.75, 36.03, 60.37, 166.05],
+    'bubble-beam': [66.66, 53.33, 195.08, 156.06],
+    'bug-bite': [27.43, 21.95, 78.44, 62.75],
+    'bug-buzz': [17.61, 71.4, 48.96, 197.97],
+    'bulldoze': [16.22, 30.38, 48.51, 262.92],
+    'confusion': [22.52, 22.52, 124.29, 182.12],
+    'dark-pulse': [158.17, 126.53, 308.36, 270.03],
+    'dazzling-gleam': [19.9, 38.98, 57.72, 272.43],
+    'disarming-voice': [13.47, 10.77, 21.57, 17.26],
+    'discharge': [17.23, 68.23, 47.89, 427.02],
+    'dragon-breath': [70.74, 56.59, 190.06, 152.04],
+    'dragon-claw': [48.53, 38.82, 138.78, 111.02],
+    'dragon-rage': [26.54, 25.96, 76.96, 71.9],
+    'draining-kiss': [22.17, 22.17, 179.34, 179.34],
+    'dynamic-punch': [23.7, 32.82, 54.36, 82.35],
+    'electro-ball': [18.05, 43.06, 58.79, 130.41],
+    'ember': [39.56, 39.56, 224.97, 210.33],
+    'energy-ball': [32.42, 32.42, 262.13, 262.13],
+    'extrasensory': [14.68, 11.74, 17.26, 13.81],
+    'fairy-wind': [119.08, 95.26, 367.8, 294.24],
+    'fire-spin': [0.0, 36.75, 0.0, 197.38],
+    'flame-charge': [27.43, 27.64, 72.62, 73.18],
+    'flamethrower': [55.47, 44.38, 140.33, 112.81],
+    'flash-cannon': [25.43, 24.52, 73.75, 74.91],
+    'freeze-dry': [17.7, 23.99, 40.75, 61.12],
+    'giga-drain': [14.55, 65.17, 52.72, 473.26],
+    'gust': [0.0, 0.84, 0.0, 2.05],
+    'gyro-ball': [38.78, 31.02, 121.58, 97.26],
+    'hail': [23.22, 42.67, 49.15, 181.57],
+    'heat-wave': [86.8, 69.44, 351.41, 281.13],
+    'hex': [22.32, 43.15, 49.57, 101.19],
+    'hydro-pump': [22.84, 33.91, 57.95, 94.21],
+    'hyper-beam': [31.4, 30.68, 93.0, 100.36],
+    'hyper-voice': [116.38, 93.1, 280.56, 224.45],
+    'ice-beam': [21.0, 21.0, 57.97, 57.97],
+    'ice-shard': [25.99, 25.99, 237.4, 237.4],
+    'karate-chop': [44.61, 35.69, 119.22, 95.38],
+    'leaf-storm': [0.0, 49.7, 0.0, 260.89],
+    'lick': [30.96, 24.77, 88.58, 164.55],
+    'magnitude': [38.38, 71.95, 95.38, 172.92],
+    'metal-claw': [37.98, 30.38, 108.62, 86.9],
+    'meteor-mash': [21.55, 44.6, 93.73, 193.13],
+    'mirror-shot': [17.06, 43.31, 64.14, 129.41],
+    'mist-ball': [22.17, 22.17, 175.09, 166.41],
+    'mud-shot': [16.38, 29.23, 62.28, 148.7],
+    'night-shade': [19.39, 80.32, 53.87, 465.64],
+    'night-slash': [36.33, 29.06, 113.88, 91.1],
+    'ominous-wind': [19.19, 63.57, 60.64, 267.61],
+    'outrage': [43.77, 35.01, 132.83, 106.27],
+    'play-rough': [47.91, 38.33, 123.38, 98.7],
+    'poison-sting': [23.58, 22.39, 113.3, 116.6],
+    'powder-snow': [12.92, 55.44, 48.94, 413.9],
+    'power-gem': [18.77, 47.5, 70.55, 205.14],
+    'psybeam': [15.67, 16.73, 47.7, 70.7],
+    'psychic': [65.07, 68.91, 288.0, 230.4],
+    'psycho-cut': [45.25, 36.2, 196.83, 157.46],
+    'quick-attack': [28.88, 29.96, 76.42, 76.42],
+    'rapid-spin': [29.72, 23.78, 91.18, 72.95],
+    'razor-leaf': [49.24, 39.39, 184.49, 147.59],
+    'rock-slide': [36.39, 58.15, 58.91, 201.12],
+    'rock-throw': [34.66, 33.58, 115.47, 121.05],
+    'rock-tomb': [23.35, 30.21, 53.11, 77.37],
+    'rolling-kick': [35.56, 28.45, 112.66, 90.13],
+    'sand-tomb': [19.9, 69.24, 58.51, 303.3],
+    'seed-bomb': [17.06, 42.79, 65.53, 190.32],
+    'shadow-ball': [32.42, 33.4, 181.98, 198.15],
+    'shadow-sneak': [31.71, 31.71, 246.2, 248.07],
+    'signal-beam': [18.04, 43.44, 64.13, 130.43],
+    'sludge': [29.01, 29.23, 169.95, 152.06],
+    'solar-beam': [32.55, 49.32, 101.57, 107.28],
+    'substitute': [34.46, 32.15, 153.11, 148.28],
+    'sucker-punch': [33.14, 31.52, 285.65, 285.65],
+    'tackle': [33.76, 27.01, 96.54, 77.23],
+    'thunder-shock': [35.19, 35.19, 125.85, 161.23],
+    'thunder-wave': [15.8, 28.67, 36.78, 72.75],
+    'thunderbolt': [23.73, 45.64, 62.85, 128.84],
+    'u-turn': [24.54, 24.73, 80.33, 64.27],
+    'vacuum-wave': [19.2, 15.36, 18.42, 14.74],
+    'vine-whip': [31.52, 25.22, 86.4, 69.12],
+    'water-gun': [30.77, 30.77, 164.04, 175.82],
+    'whirlpool': [17.06, 66.65, 48.65, 306.24],
+    'whirlwind': [10.54, 8.43, 15.51, 12.4],
+    'will-o-wisp': [24.87, 23.62, 133.53, 120.15],
+    'wing-attack': [27.47, 21.98, 70.51, 56.41]
+  };
+  const ns0 = () => NS;
 
   // ---------- 3. liga no jogo ----------
   const M = { needMaint: true, busy: false, task: '', lastPlay: -1e9, overAt: -1e9, lastSave: 0, touched: false, lastState: '', err: '', userPausedAt: -1e9, pausedAt: 0, lvlOpenAt: 0 };
@@ -485,9 +585,16 @@
   // 0.4.0: Golpe inicial, Segundo golpe inicial e Veto agora são configurados pela base de cálculo → valem mais
   const UPG_VALUE = { def: 1.2, xp: 1.15, atk: 1.1, cd: 1.1, coins: 1.1, reroll: 1.0, moves: 1.0, hp: 0.9, magnet: 0.9, crit: 0.8, regen: 0.8, spd: 0.5, start: 1.2, start2: 0.9, ban: 0.8 };
   // reserva calculada sozinha: 10% das moedas, no máximo o preço de uma Menta (1.500). Conta nova não fica travada.
-  const reserva = (ns) => (M.manual ? 0 : Math.min(cfg.reserve, Math.floor(((ns.DB.save && ns.DB.save.coins) || 0) * 0.1)));
+  const reserva = (ns) => (M.manual ? (M.pisoManual | 0) : Math.min(cfg.reserve, Math.floor(((ns.DB.save && ns.DB.save.coins) || 0) * 0.1)));
   // 0.11.3: as compras seguem com o farm ligado OU num "Aplicar tudo" pedido pela pessoa (M.manual)
-  const segue = () => cfg.on || !!M.manual;
+  const segue = () => (M.manual ? !M.cancel : cfg.on);
+  // 0.12.1: progresso do "Aplicar tudo" (a extensão desenha a barra por cima do jogo enquanto ele usa os botões)
+  function prog(peso, etapa, txt) {
+    const P = M.prog;
+    if (!M.manual || !P) return;
+    P.feito += peso || 0;
+    try { document.dispatchEvent(new CustomEvent('sobrevida:otimProg', { detail: JSON.stringify({ dex: P.dex, p: Math.min(0.97, P.feito / P.total), etapa, txt: txt == null ? '' : String(txt) }) })); } catch (_) {}
+  }
   async function melhorias(ns, dexPedido) {
     const s = ns.DB.save, U = ns.Upgrades;
     if (!s || !U) return;
@@ -519,10 +626,11 @@
       if (!b || b.disabled) break;
       const before = (ns.DB.upgradesOf(dex) || {})[U.LIST[i].id] || 0;
       b.click();
-      await sleep(140);
+      await sleep(M.manual ? 25 : 140);
       const after = (ns.DB.upgradesOf(dex) || {})[U.LIST[i].id] || 0;
       if (after <= before) break;
       comprados.push(U.LIST[i].id);
+      prog(0.15, 'upg', comprados.length);
     }
     if (comprados.length) act('upgrades', { dex, nome: nome(ns, dex), n: comprados.length, ids: [...new Set(comprados)].slice(0, 6) });
     await voltar('upgrades');
@@ -549,7 +657,7 @@
     for (const o of comGeral(ns, () => opcoesLoja(ns, dex))) {
       if (o.ganho < (LOJA_MIN[o.tipo] || 0.05)) continue;
       const build = !!o.build;
-      const sc = o.tem ? 1e9 + o.ganho : !(o.preco <= livre) ? 0 : build ? 1e6 + o.ganho / o.preco : (o.ganho / o.preco >= ref ? o.ganho / o.preco : 0);
+      const sc = o.tem ? 1e9 + o.ganho : !(o.preco <= livre) ? 0 : build ? (o.tipo === 'tm' ? 2e6 : 1e6) + o.ganho / o.preco : (o.ganho / o.preco >= ref ? o.ganho / o.preco : 0);
       if (sc > bs) { bs = sc; best = o; }
     }
     return best;
@@ -620,6 +728,7 @@
       let o = null;
       try { o = lojaEscolha(ns, dex); } catch (e) { log('loja', e); }
       if (!o) break;
+      prog(0, 'loja', nomeLoja(ns, o));
       let comprou = false;
       if (!o.tem) {
         comprou = await comprarLoja(ns, o.item);
@@ -630,6 +739,7 @@
       const ok = await usarNaFicha(ns, dex, o);
       esquecer(dex); delete powerCache[dex];
       act('shop', { dex, nome: nome(ns, dex), tipo: o.tipo, alvo: nomeLoja(ns, o), ganho: Math.round(o.ganho * 100), preco: comprou ? o.preco : 0, ok });
+      prog(2, 'loja', nomeLoja(ns, o));
       if (!ok) break;
     }
     if (open('scr-shop')) await voltar('shop');
@@ -658,6 +768,7 @@
     if (!dex) return;
     const pend = golpesPendentes(ns, dex);
     if (!pend) return;
+    prog(0, 'golpes');
     if (!await ir('upgrades')) return;
     const sel = document.getElementById('upg-mon');
     if (sel && +sel.value !== dex) { sel.value = String(dex); sel.dispatchEvent(new Event('change')); await sleep(300); }
@@ -686,46 +797,103 @@
     }
     const nm = (id) => { const d = id && ns.Moves.BY_ID[id]; return d ? (ns.T ? ns.T(d.name, 'move') : d.name) : id; };
     if (Object.keys(feito).length) act('moves', { dex, nome: nome(ns, dex), start: nm(feito.start), start2: nm(feito.start2), bans: (feito.bans || []).map(nm) });
+    prog(1.5, 'golpes');
     await voltar('upgrades');
   }
 
-  // ---------- 8c. 0.11.3: "Aplicar tudo" pedido pela pessoa (colinha da coleção ou tela de Melhorias) ----------
+  // ---------- 8c. 0.12.0/0.12.1: "Aplicar tudo" pedido pela pessoa (colinha da coleção ou tela de Melhorias) ----------
   // Para um Pokémon qualquer, mesmo com o farm desligado: Menta/Cápsula/MT pela colinha, melhorias por valor e golpe
-  // inicial/veto. Só no menu, pelos botões do jogo, gastando também a reserva (foi a pessoa que pediu).
+  // inicial/veto. Só no menu, pelos botões do jogo, gastando também a reserva (foi a pessoa que pediu). A extensão cobre
+  // a tela com uma barra de progresso enquanto isso e, no fim, volta para a mesma tela.
   async function aoMenu() {
     for (const go of ['dex', 'upgrades', 'shop']) if (open(SCR[go])) { if (go === 'dex') await sairDaColecao(); else await voltar(go); }
     return waitFor(() => open('scr-menu'), 2500);
   }
-  async function otimizar(ns, dex, volta) {
+  // O que falta aplicar com as moedas de agora (sem mexer em nada): Menta/Cápsula/MT, quantas melhorias cabem e golpes
+  function pendencias(ns, dex) {
+    const s = ns.DB.save, U = ns.Upgrades;
+    if (!s || !s.owned || !s.owned[dex] || !U) return null;
+    let coins = s.coins || 0, guardar = 0;
+    const loja = [];
+    try {
+      const l0 = (ns.DB.upgradesOf(dex) || {}).atk | 0, u = U.BY && U.BY.atk;
+      const ref = u && l0 < u.max ? (0.04 / (1 + 0.04 * l0)) / U.cost('atk', l0) : 0;
+      for (const o of comGeral(ns, () => opcoesLoja(ns, dex))) {
+        if (o.ganho < (LOJA_MIN[o.tipo] || 0.05)) continue;
+        if (!o.build && !o.tem && o.ganho / o.preco < ref) continue;
+        if (!o.tem && o.preco > coins) continue;
+        if (!o.tem) { coins -= o.preco; guardar += o.preco; }
+        loja.push({ tipo: o.tipo, nome: nomeLoja(ns, o) });
+      }
+    } catch (e) { log('pend', e); }
+    let upg = 0;
+    const lv = Object.assign({}, ns.DB.upgradesOf(dex) || {});
+    for (let k = 0; k < 500; k++) {
+      let best = null, bs = 0;
+      for (const u of U.LIST) {
+        const l = lv[u.id] || 0;
+        if (l >= u.max || (u.needs && !lv[u.needs])) continue;
+        const c = U.cost(u.id, l);
+        if (c > coins) continue;
+        const sc = (UPG_VALUE[u.id] || 0.5) / c;
+        if (sc > bs) { bs = sc; best = u; }
+      }
+      if (!best) break;
+      coins -= U.cost(best.id, lv[best.id] || 0); lv[best.id] = (lv[best.id] || 0) + 1; upg++;
+    }
+    let golpes = false;
+    try { golpes = !!golpesPendentes(ns, dex); } catch (_) {}
+    // 0.12.1: dois botões, dois escopos. Colinha (coleção) = Menta/Cápsula/MT + golpe inicial/veto; Melhorias = compra das
+    // melhorias (+ golpe inicial/veto, que fica nessa tela). As melhorias guardam o dinheiro da Menta/Cápsula pendente.
+    return { loja, upg, golpes, guardar, cola: !loja.length && !golpes, melh: !upg && !golpes, ok: !loja.length && !upg && !golpes };
+  }
+  async function otimizar(ns, dex, volta, escopo) {
     const s = ns.DB.save;
     if (!s || !s.owned || !s.owned[dex]) return { ok: false, motivo: 'naoTem' };
     if (ns.Game.state !== 'ui') return { ok: false, motivo: 'partida' };
     if (M.busy) return { ok: false, motivo: 'ocupado' };
-    const antes = { coins: s.coins, nat: ns.Mons.natureOf(dex).id, ab: ns.Mons.abilityOf(dex).slot, tm: ns.Mons.taught(dex).length, upg: Object.values(ns.DB.upgradesOf(dex) || {}).reduce((a, b) => a + b, 0) };
-    M.busy = true; M.manual = true;
+    const pend = pendencias(ns, dex);
+    const soCola = escopo === 'cola', soMelh = escopo === 'melh';
+    if (pend && (soCola ? pend.cola : soMelh ? pend.melh : pend.ok)) return { ok: true, nome: nome(ns, dex), gasto: 0, nada: true, pend, escopo };
+    const soma = () => Object.values(ns.DB.upgradesOf(dex) || {}).reduce((a, b) => a + b, 0);
+    const antes = { coins: s.coins, nat: ns.Mons.natureOf(dex).id, ab: ns.Mons.abilityOf(dex).slot, tm: ns.Mons.taught(dex).length, upg: soma() };
+    M.busy = true; M.manual = true; M.cancel = false; M.pisoManual = soMelh && pend ? pend.guardar : 0;
+    M.prog = { dex, feito: 0, total: 1 + (pend ? (soMelh ? 0 : pend.loja.length * 2) + (soCola ? 0 : pend.upg * 0.15) + (pend.golpes ? 1.5 : 0) : 6) };
+    let cancelado = false;
     try {
+      prog(0, 'menu');
       if (!await aoMenu()) return { ok: false, motivo: 'menu' };
-      M.task = 'shop'; await loja(ns, dex);
-      M.task = 'upgrades'; await melhorias(ns, dex);
+      if (!soMelh) { M.task = 'shop'; await loja(ns, dex); }
+      if (!soCola) { M.task = 'upgrades'; await melhorias(ns, dex); }
       M.task = 'moves'; await golpes(ns, dex);
       esquecer(dex); delete powerCache[dex];
-      // volta para onde a pessoa estava, já no Pokémon
+      cancelado = !!M.cancel;
+      M.cancel = false; // a volta para a tela acontece mesmo se a pessoa cancelou
+      prog(0, 'volta');
       if (volta === 'dex') await fichaDe(ns, dex);
       else if (volta === 'upgrades' && await ir('upgrades')) { const sel = document.getElementById('upg-mon'); if (sel && +sel.value !== dex) { sel.value = String(dex); sel.dispatchEvent(new Event('change')); } }
     } catch (e) { log('otimizar', e); }
-    finally { M.manual = false; M.busy = false; M.task = ''; }
+    finally { M.manual = false; M.busy = false; M.task = ''; M.prog = null; M.cancel = false; M.pisoManual = 0; }
     const d = ns.DB.save;
-    return { ok: true, nome: nome(ns, dex), gasto: Math.max(0, antes.coins - d.coins), nat: ns.Mons.natureOf(dex).id !== antes.nat ? ns.Mons.name(ns.Mons.natureOf(dex).n) : null,
-             ab: ns.Mons.abilityOf(dex).slot !== antes.ab ? ns.Mons.abilityName(ns.Mons.abilityOf(dex).id) : null, tm: ns.Mons.taught(dex).length - antes.tm,
-             upg: Object.values(ns.DB.upgradesOf(dex) || {}).reduce((a, b) => a + b, 0) - antes.upg };
+    return { ok: true, escopo, cancelado, guardou: M_guardou(pend, soMelh), nome: nome(ns, dex), gasto: Math.max(0, antes.coins - d.coins),
+             nat: ns.Mons.natureOf(dex).id !== antes.nat ? ns.Mons.name(ns.Mons.natureOf(dex).n) : null,
+             ab: ns.Mons.abilityOf(dex).slot !== antes.ab ? ns.Mons.abilityName(ns.Mons.abilityOf(dex).id) : null,
+             tm: ns.Mons.taught(dex).length - antes.tm, upg: soma() - antes.upg, pend: pendencias(ns, dex) };
   }
+  const M_guardou = (pend, soMelh) => (soMelh && pend && pend.guardar ? pend.guardar : 0);
+  const responder = (tipo, o) => { try { document.dispatchEvent(new CustomEvent(tipo, { detail: JSON.stringify(o) })); } catch (_) {} };
   document.addEventListener('sobrevida:pedir', (e) => {
     let q = null;
     try { q = JSON.parse(e.detail || '{}'); } catch (_) { return; }
-    if (!q || q.tipo !== 'otimizar' || !NS) return;
-    otimizar(NS, +q.dex, q.volta).then((r) => {
-      try { document.dispatchEvent(new CustomEvent('sobrevida:otimizado', { detail: JSON.stringify(Object.assign({ dex: +q.dex }, r)) })); } catch (_) {}
-    });
+    if (!q || !NS) return;
+    const dex = +q.dex;
+    if (q.tipo === 'otimCancel') { if (M.manual) M.cancel = true; return; }
+    if (q.tipo === 'pend') { let p = null; try { p = pendencias(NS, dex); } catch (er) { log('pend', er); } responder('sobrevida:pend', { dex, p }); return; }
+    if (q.tipo !== 'otimizar') return;
+    // sempre responde, mesmo com erro: a extensão nunca fica presa em "Aplicando…"
+    Promise.resolve().then(() => otimizar(NS, dex, q.volta, q.escopo))
+      .catch((er) => { log('otimizar', er); M.manual = false; M.busy = false; M.prog = null; return { ok: false, motivo: 'erro' }; })
+      .then((r) => responder('sobrevida:otimizado', Object.assign({ dex }, r)));
   });
 
   // ---------- 9. rotina: Halloween (skins de bruja por 300 doces) ----------
@@ -788,7 +956,7 @@
     } catch (_) {}
     const scr = document.querySelector('#app > .scr:not(.hidden), body > .scr:not(.hidden), .scr:not(.hidden)');
     emit({
-      ok: true, on: cfg.on, st, fps: FPS.v, scr: scr ? scr.id : null, mode: inRun ? (S.mode || '') : '', task: M.task, err: M.err,
+      ok: true, v: VERSAO, on: cfg.on, st, fps: FPS.v, scr: scr ? scr.id : null, mode: inRun ? (S.mode || '') : '', task: M.task, err: M.err,
       modo: cfg.modo, coop: emGrupo(ns), coopOk: !!M.coopOk || anfitriao(ns), coopHost: !!(ns.Coop && ns.Coop.active && ns.Coop.isHost), party: naSala(ns), hidden: document.visibilityState !== 'visible', userPaused: M.userPausedAt > 0 && st === 'paused',
       run: inRun ? { hp: Math.round(p.hp), max: Math.round(p.maxHp), lv: p.level, t: Math.round((ns.Game.st && ns.Game.st.time) || 0), k: p.kills, dex: p.dex } : null,
       coins: s ? s.coins : null, t1: s && s.tickets ? s.tickets.t1 : null, t10: s && s.tickets ? s.tickets.t10 : null,
@@ -838,9 +1006,26 @@
     }
   }
   // Dano por segundo "cru" de uma instância de golpe (sem os atributos do Pokémon): [chefe, horda].
-  function rawDps(m) {
+  function rawDps(m, crua) {
     if (!m || m.kind === 'buff' || !m.dmg) return [0, 0];
     let [h1, hN] = hitsOf(m);
+    if (crua) { const per = m.kind === 'orbit' ? 1 : Math.max(0.1, m.cd || 1); return [m.dmg * h1 / per, m.dmg * hN / per]; }
+    // 0.12.1: dano/s MEDIDO no motor do jogo (banco de golpes do laboratório: cada golpe sozinho, nível 1 e máximo, alvo
+    // único e horda). A conta antiga (hitsOf) supervalorizava torreta, bumerangue e golpes de área parada e
+    // subvalorizava projéteis/feixes contra alvo único — daí tanta build física com Substitute.
+    const cal = CAL_GOLPES[m.id], ns = ns0();
+    if (cal && ns) {
+      const mx = (ns.Moves.BY_ID[m.id] || {}).maxLvl || 5, lv = m.lvl || 1, t = Math.max(0, Math.min(1, (lv - 1) / Math.max(1, mx - 1)));
+      let s = cal[0] + (cal[2] - cal[0]) * t, h = cal[1] + (cal[3] - cal[1]) * t;
+      // instância diferente da padrão no mesmo nível (evoluída): aplica a diferença que a conta vê
+      const pad = inst(ns, m.id, lv, false);
+      if (pad && pad !== m) { const [ps, ph] = rawDps(pad, true), [ms, mh] = rawDps(m, true); if (ps > 0) s *= ms / ps; if (ph > 0) h *= mh / ph; }
+      // o que as partidas de verdade mediram (KB.learn) ainda corrige, com peso menor
+      const L = KB.learn[m.id];
+      if (L && L.n > 20) { const c = Math.min(0.5, L.n / 600), mod = (0.4 * h1 + 0.6 * hN) || 1, k = Math.max(0.5, Math.min(2, (1 - c) + c * (L.eff / mod))); s *= k; h *= k; }
+      const dot = (m.burn || m.poison) ? 1.15 : 1;
+      return [s * dot, h * dot];
+    }
     // aprendido nas partidas: acertos efetivos por disparo medidos de verdade (inclui tipo, crítico e erros de mira)
     const L = KB.learn[m.id] || KB.learn['k:' + m.kind];
     if (L && L.n > 20) { const c = Math.min(0.85, L.n / 300), mod = (0.4 * h1 + 0.6 * hN) || 1; const k = (1 - c) + c * (L.eff / mod); h1 *= k; hN *= k; }
@@ -976,7 +1161,7 @@
     }
     // o farm luta andando em volta da horda (kite): golpe de alcance curto acerta menos do que a conta pura diz, e
     // órbita não combina com a troca de ataque (sumiria a cada troca)
-    if (!(KB.learn[m.id] && KB.learn[m.id].n > 20)) k *= Math.max(0.5, Math.min(1, moveReach(m) / 200));
+    if (!CAL_GOLPES[m.id] && !(KB.learn[m.id] && KB.learn[m.id].n > 20)) k *= Math.max(0.5, Math.min(1, moveReach(m) / 200));
     if (m.kind === 'orbit') k *= 0.6;
     const cv = (KB.cov && KB.cov[m.type]) || 1, cb = (KB.covBoss && KB.covBoss[m.type]) || 1;
     return k * (0.4 * s * cb + 0.6 * h * cv);
@@ -1105,6 +1290,29 @@
   // Para cada natureza (25), cada habilidade que a Cápsula/Cápsula Oculta deixa pôr e cada MT (do dia ou já na
   // Mochila) que ele aprende, refaz a build e a força com a mesma base de cálculo. Devolve as opções que melhoram,
   // com o ganho relativo de força e o preço.
+  // MT que valem para o Pokémon AGORA: as da Mochila e as 8 da loja de hoje que ele aprende e ainda não sabe.
+  // Escolha gulosa (cada uma medida já com a anterior), no máximo 2, cada uma com ganho ≥ 4%.
+  function tmsAgora(ns, dex) {
+    const s = ns.DB.save;
+    let hoje = [];
+    try { hoje = ns.Shop.dailyTms() || []; } catch (_) {}
+    const ja = new Set(ns.Mons.taught(dex));
+    return [...new Set(hoje.concat(Object.keys((s && s.tms) || {})))].filter((id) => !ja.has(id) && ns.Mons.canLearn(dex, id) && ns.Moves.BY_ID[id]);
+  }
+  function tmsAlvo(ns, dex, forcaCom, pool0, lista) {
+    const escolhidas = [];
+    let pool = pool0.slice(), fAt = forcaCom(pool);
+    if (!(fAt > 0)) return escolhidas;
+    const cand = (lista || tmsAgora(ns, dex)).filter((id) => !pool.includes(id));
+    for (let k = 0; k < 2; k++) {
+      let best = null, fb = fAt * (1 + (LOJA_MIN_TM || 0.04));
+      for (const id of cand) { if (escolhidas.some((t) => t.id === id)) continue; const f = forcaCom(pool.concat([id])); if (f > fb) { fb = f; best = id; } }
+      if (!best) break;
+      escolhidas.push({ id: best, ganho: fb / fAt - 1 }); pool = pool.concat([best]); fAt = fb;
+    }
+    return escolhidas;
+  }
+  const LOJA_MIN_TM = 0.04;
   function opcoesLoja(ns, dex) {
     const s = ns.DB && ns.DB.save, base = ns.DEX_BY && ns.DEX_BY[dex];
     if (!s || !base || !ns.Mons || !ns.NATURES || !ns.Shop || !(s.owned && s.owned[dex])) return [];
@@ -1114,40 +1322,36 @@
     const f0 = forca(mon0, ab0, pool0);
     if (!(f0 > 0)) return [];
     const out = [], preco = (k) => ((ns.Shop.ITEMS || {})[k] || {}).price || 0;
-    // 0.11.3: natureza e habilidade decididas JUNTAS (uma muda a outra), o mesmo alvo da colinha. Assim a Menta não vai
-    // para uma natureza que deixa de ser a melhor depois da Cápsula (1.500 moedas jogadas fora).
+    // 0.12.1: MT primeiro. Golpe que o Pokémon só aprende por MT entra no conjunto de golpes e pode mudar a build — e
+    // com ela a melhor natureza/habilidade. Então: (1) as MT disponíveis agora (Mochila ou loja de hoje) que rendem
+    // ≥ 4%, escolhidas uma a uma (no máximo 2); (2) natureza e habilidade decididas JUNTAS já com essas MT (o mesmo
+    // alvo da colinha). Assim a Menta não vai para uma natureza que deixa de ser a melhor depois da MT ou da Cápsula.
     const comNat = (n) => { const m = Object.assign({}, base); if (n && n.up) { m[n.up] = base[n.up] * 1.1; m[n.down] = base[n.down] * 0.9; } m.atk = Math.max(m.pa, m.sa); m.nature = n ? n.id : ''; return m; };
+    const mts = tmsAlvo(ns, dex, (pool) => forca(mon0, ab0, pool), pool0);
+    for (const t of mts) out.push({ tipo: 'tm', item: 'tm:' + t.id, alvo: t.id, ganho: t.ganho, preco: ns.Shop.tmPrice(t.id), tem: ns.Shop.tmCount(t.id) > 0, build: true });
+    const poolAlvo = pool0.concat(mts.map((t) => t.id));
+    const fBase = mts.length ? forca(mon0, ab0, poolAlvo) : f0;
     const slots = ns.Mons.slots(dex), atualSlot = ns.Mons.abilityOf(dex).slot, natAtual = ns.Mons.natureOf(dex).id;
     let podeCap = [], podeOc = [];
     try { podeCap = ns.Mons.abilityChoices(dex, false) || []; podeOc = ns.Mons.abilityChoices(dex, true) || []; } catch (_) {}
     const habs = [{ i: atualSlot, id: ab0 }].concat([0, 1, 2].filter((i) => i !== atualSlot && slots[i] && slots[i] !== ab0 && (podeCap.includes(i) || podeOc.includes(i)))
       .map((i) => ({ i, id: slots[i], item: podeCap.includes(i) ? 'cap' : 'caph' })));
-    let alvo = { n: null, h: habs[0], f: f0 };
+    let alvo = { n: null, h: habs[0], f: fBase };
     for (const h of habs) for (const n of ns.NATURES) {
-      const f = forca(n.id === natAtual ? mon0 : comNat(n), h.id, pool0);
+      const f = forca(n.id === natAtual ? mon0 : comNat(n), h.id, poolAlvo);
       const exige = h.item === 'caph' ? 1.03 : 1.0001; // a Oculta custa 5.000: só se render bem mais
       if (f > alvo.f * (h === alvo.h ? 1.0001 : exige)) alvo = { n, h, f };
     }
-    if (alvo.f > f0 * 1.0001) {
+    if (alvo.f > fBase * 1.0001) {
       const nOk = !alvo.n || alvo.n.id === natAtual, hOk = alvo.h.i === atualSlot;
       if (!nOk) {
-        const fSemNat = hOk ? f0 : forca(mon0, alvo.h.id, pool0);
+        const fSemNat = hOk ? fBase : forca(mon0, alvo.h.id, poolAlvo);
         out.push({ tipo: 'mint', item: 'mint', alvo: alvo.n.id, ganho: alvo.f / fSemNat - 1, preco: preco('mint'), tem: ns.Shop.count('mint') > 0, build: true });
       }
       if (!hOk) {
-        const fSemAb = nOk ? f0 : forca(comNat(alvo.n), ab0, pool0);
+        const fSemAb = nOk ? fBase : forca(comNat(alvo.n), ab0, poolAlvo);
         out.push({ tipo: alvo.h.item, item: alvo.h.item, alvo: alvo.h.i, ab: alvo.h.id, ganho: alvo.f / fSemAb - 1, preco: preco(alvo.h.item), tem: ns.Shop.count(alvo.h.item) > 0, build: true });
       }
-    }
-    // MT: as 8 do dia e as que já estão na Mochila
-    let hoje = [];
-    try { hoje = ns.Shop.dailyTms() || []; } catch (_) {}
-    for (const id of new Set(hoje.concat(Object.keys(s.tms || {})))) {
-      if (!ns.Mons.canLearn(dex, id)) continue;
-      const tem = ns.Shop.tmCount(id) > 0;
-      if (!tem && !hoje.includes(id)) continue;
-      const f = forca(mon0, ab0, pool0.concat([id]));
-      if (f > f0 * 1.0001) out.push({ tipo: 'tm', item: 'tm:' + id, alvo: id, ganho: f / f0 - 1, preco: ns.Shop.tmPrice(id), tem });
     }
     return out.sort((a, b) => b.ganho - a.ganho);
   }
@@ -1198,15 +1402,20 @@
     const dono = !!(s && s.owned && s.owned[dex]);
     const nat0 = dono ? ns.Mons.natureOf(dex) : null, ab0 = dono ? ns.Mons.abilityOf(dex) : null;
     const ensinadas = dono ? ns.Mons.taught(dex) : [];
-    const chave = [dex, nat0 && nat0.id, ab0 && ab0.slot, ensinadas.join(','), Object.keys(KB.learn).length].join('|');
+    let hojeK = ''; try { hojeK = (ns.Shop.dailyTms() || []).join(','); } catch (_) {}
+    const chave = [dex, nat0 && nat0.id, ab0 && ab0.slot, ensinadas.join(','), Object.keys(KB.learn).length, hojeK, Object.keys((s && s.tms) || {}).join(',')].join('|');
     if (COLA.has(chave)) return COLA.get(chave);
     const nm = (id) => { const d = id && ns.Moves.BY_ID[id]; return d ? (ns.T ? ns.T(d.name, 'move') : d.name) : null; };
     const r = comGeral(ns, () => {
       const comNat = (n) => { const m = Object.assign({}, base); if (n && n.up) { m[n.up] = base[n.up] * 1.1; m[n.down] = base[n.down] * 0.9; } m.atk = Math.max(m.pa, m.sa); m.nature = n ? n.id : ''; return m; };
       const slots = ns.Mons.slots(dex);
       const abAtual = ab0 ? ab0.id : slots[0];
-      const pool0 = poolDe(ns, dono ? ns.Mons.monFor(dex) : base);
+      const poolBase = poolDe(ns, dono ? ns.Mons.monFor(dex) : base);
       const forca = (mon, ab, pool) => { const fx = fxDe(ns, mon, ab); const p = planoCalc(ns, mon, fx, pool); return [p ? forcaPlano(mon, fx, p) : 0, p]; };
+      // 0.12.1: as MT que dá para pôr AGORA (Mochila ou loja de hoje) entram na conta antes da natureza/habilidade —
+      // golpe que só vem por MT muda a build. É o mesmo alvo do "Aplicar" e da rotina do farm.
+      const mtsAgora = dono ? tmsAlvo(ns, dex, (pool) => forca(ns.Mons.monFor(dex), abilDe(ns, dex), pool)[0], poolBase) : [];
+      const pool0 = poolBase.concat(mtsAgora.map((t) => t.id));
       // 1) melhor natureza com a habilidade atual (ou a 1ª, se não tem o Pokémon)
       let bestN = null, fN = -1;
       for (const n of ns.NATURES) { const [f] = forca(comNat(n), abAtual, pool0); if (f > fN * 1.0001) { fN = f; bestN = n; } }
@@ -1221,14 +1430,30 @@
       for (const n of ns.NATURES) { const [f] = forca(comNat(n), melhorAb.id, pool0); if (f > fN2 * 1.0001) { fN2 = f; bestN2 = n; } }
       const monF = comNat(bestN2);
       const [fFinal, plano] = forca(monF, melhorAb.id, pool0);
-      // 4) MT que melhoram (todas as que ele aprende, não só as do dia)
+      // 4) MT: as que entram agora (já contadas na build) e as que valeriam quando aparecerem na loja
       let mts = [];
       try {
-        const lista = ns.Mons.learnable ? (dono ? ns.Mons.learnable(dex) : (ns.TM_OF(dex) || []).filter((id) => ns.Moves.BY_ID[id] && !ns.Mons.natural(dex, id))) : [];
-        mts = lista.map((id) => ({ id, nome: nm(id), ganho: forca(monF, melhorAb.id, pool0.concat([id]))[0] / fFinal - 1, preco: ns.Shop ? ns.Shop.tmPrice(id) : 0 }))
-          .filter((x) => x.ganho >= 0.02).sort((a, b) => b.ganho - a.ganho).slice(0, 3)
-          .map((x) => ({ nome: x.nome, ganho: Math.round(x.ganho * 100), preco: x.preco }));
+        let hoje = []; try { hoje = ns.Shop.dailyTms() || []; } catch (_) {}
+        const mochila = (s && s.tms) || {};
+        const ja = new Set(dono ? ns.Mons.taught(dex) : []);
+        const lista = (ns.TM_OF(dex) || []).filter((id) => ns.Moves.BY_ID[id] && !ns.Mons.natural(dex, id) && !ja.has(id));
+        const fSem = (id) => forca(monF, melhorAb.id, pool0.filter((x) => x !== id))[0];
+        mts = lista.map((id) => {
+          const agora = mtsAgora.some((t) => t.id === id);
+          // ganho: das que entram agora, quanto a build perde sem ela; das outras, quanto ganha com ela
+          const ganho = agora ? fFinal / Math.max(1e-9, fSem(id)) - 1 : forca(monF, melhorAb.id, pool0.concat([id]))[0] / fFinal - 1;
+          return { id, nome: nm(id), ganho, preco: ns.Shop ? ns.Shop.tmPrice(id) : 0, agora, hoje: hoje.includes(id), mochila: !!mochila[id] };
+        }).filter((x) => x.agora || x.ganho >= 0.02).sort((a, b) => (b.agora - a.agora) || (b.ganho - a.ganho)).slice(0, 4)
+          .map((x) => ({ nome: x.nome, ganho: Math.round(x.ganho * 100), preco: x.preco, agora: x.agora, hoje: x.hoje, mochila: x.mochila }));
+        // a MT que mais vale e não está na loja hoje: com ela, a natureza ideal muda?
+        const fora = lista.filter((id) => !mtsAgora.some((t) => t.id === id)).map((id) => ({ id, f: forca(monF, melhorAb.id, pool0.concat([id]))[0] })).sort((a, b) => b.f - a.f)[0];
+        if (fora && fora.f > fFinal * 1.04) {
+          let nB = bestN2, fB = -1;
+          for (const n of ns.NATURES) { const [f] = forca(comNat(n), melhorAb.id, pool0.concat([fora.id])); if (f > fB * 1.0001) { fB = f; nB = n; } }
+          if (nB.id !== bestN2.id) mts.muda = { mt: nm(fora.id), nat: ns.Mons.name(nB.n) };
+        }
       } catch (_) {}
+      const muda = mts.muda || null;
       // ganhos em relação ao que o Pokémon tem hoje
       let fHoje = 0;
       if (dono) fHoje = forca(ns.Mons.monFor(dex), abAtual, pool0)[0];
@@ -1243,9 +1468,10 @@
               ganho: dono && fSoNat > 0 ? Math.round((fFinal / fSoNat - 1) * 100) : null,
               desc: (() => { try { const fx = ns.AbilityFX.of(melhorAb.id, monF), t = (x) => (x && ns.T ? ns.T(x) : x); return [t(fx.d), t(fx.d2)].filter(Boolean).join(' '); } catch (_) { return ''; } })() },
         build: plano ? { a: nm(plano.a), b: nm(plano.b), buffs: plano.buffs.map(nm).filter(Boolean), parceiro: nm(plano.parceiro),
+                         mt: [plano.a, plano.b, plano.parceiro].concat(plano.buffs).filter((id) => id && !ns.Mons.natural(dex, id)).map(nm),
                          lado: (ns.Moves.BY_ID[plano.a] || {}).cat || '' } : null,
         inicio: escolhas ? { a: nm(escolhas.start), b: nm(escolhas.start2), vetos: escolhas.bans.slice(0, 3).map(nm).filter(Boolean) } : null,
-        mts, total: dono && fHoje > 0 ? Math.round((fFinal / fHoje - 1) * 100) : null,
+        mts, muda, total: dono && fHoje > 0 ? Math.round((fFinal / fHoje - 1) * 100) : null,
       };
     });
     if (COLA.size > 200) COLA.clear();
@@ -1256,6 +1482,8 @@
   document.addEventListener('sobrevida:pedir', (e) => {
     let q = null;
     try { q = JSON.parse(e.detail || '{}'); } catch (_) { return; }
+    // laboratório (banco de golpes): o dano/s "cru" que a conta dá para um golpe num nível (para calibrar contra o medido)
+    if (q && q.tipo === 'debugRaw' && NS) { const out = {}; for (const [id, lv] of q.lista || []) { try { const m = inst(NS, id, lv, false); out[id + '@' + lv] = rawDps(m, true); } catch (_) {} } try { document.dispatchEvent(new CustomEvent('sobrevida:debugRaw', { detail: JSON.stringify(out) })); } catch (_) {} return; }
     if (!q || q.tipo !== 'colinha' || !NS) return;
     if (q.forca) { COLA.clear(); esquecer(+q.dex); } // botão "Recalcular" da colinha
     let r = null;
