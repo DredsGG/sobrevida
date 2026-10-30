@@ -2,6 +2,13 @@
 // Frases curtas, do ponto de vista de quem usa. Aparece uma vez, na primeira abertura depois da atualização.
 globalThis.SV_NOVIDADES = {
   pt: {
+    '0.11.2': [
+      "Novo botão Apoiar ♥ no rodapé, opcional: Pix (Brasil) ou GitHub Sponsors (outros países). Não muda nada na Sobrevida.",
+    ],
+    '0.11.1': [
+      "Farm: quando as melhorias compradas entre as partidas deixam o parceiro em 100%, ele troca na hora para o próximo (e já compra as melhorias dele). Antes ainda jogava uma partida inteira com o Pokémon completo.",
+      "A troca de parceiro agora é feita pelo botão \"Escolher parceiro\" da coleção do jogo.",
+    ],
     '0.11.0': [
       "Farm em grupo joga junto com os amigos: se um companheiro cai, o farm vai até ele e fica do lado até ele levantar (o jogo exige ficar colado por 3 s).",
       "Fica perto do grupo sem grudar: longe demais de todos, volta; colado em alguém, prefere as gemas do outro lado. Gema, baú, altar e ladrão mais perto de um companheiro ficam para ele (a experiência é do time).",
@@ -92,6 +99,13 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   en: {
+    '0.11.2': [
+      "New optional Support ♥ button in the footer: Pix (Brazil) or GitHub Sponsors (other countries). It doesn't change anything in Sobrevida.",
+    ],
+    '0.11.1': [
+      "Farm: when the upgrades bought between runs take the partner to 100%, it switches to the next one right away (and buys its upgrades too). Before, it still played a whole run with the finished Pokémon.",
+      "The partner switch now goes through the game's own \"Choose partner\" button in the collection.",
+    ],
     '0.11.0': [
       "The group farm plays with your friends: when a teammate goes down, the farm goes to them and stays close until they're back up (the game needs you right next to them for 3 s).",
       "It stays near the group without sticking to it: too far from everyone, it comes back; right on top of someone, it goes for the gems on the other side. Gems, chests, altars and thieves closer to a teammate are left to them (XP is shared).",
@@ -182,6 +196,13 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   es: {
+    '0.11.2': [
+      "Nuevo botón Apoyar ♥ en el pie, opcional: Pix (Brasil) o GitHub Sponsors (otros países). No cambia nada en Sobrevida.",
+    ],
+    '0.11.1': [
+      "Farm: cuando las mejoras compradas entre partidas dejan al compañero al 100 %, cambia al siguiente en el momento (y compra sus mejoras). Antes jugaba todavía una partida entera con el Pokémon completo.",
+      "El cambio de compañero ahora se hace con el botón \"Elegir compañero\" de la colección del juego.",
+    ],
     '0.11.0': [
       "El farm en grupo juega con tus amigos: si un compañero cae, el farm va hasta él y se queda al lado hasta que se levanta (el juego pide estar pegado 3 s).",
       "Se queda cerca del grupo sin pegarse: muy lejos de todos, vuelve; pegado a alguien, prefiere las gemas del otro lado. Gemas, cofres, altares y ladrones más cerca de un compañero se quedan para él (la experiencia es del equipo).",

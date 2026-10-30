@@ -9,7 +9,7 @@ Choose your partner Pokémon before the 8-question personality quiz and get exac
 
 ![Manifest V3](https://img.shields.io/badge/Manifest-V3-4285F4?logo=googlechrome&logoColor=white)
 ![Firefox](https://img.shields.io/badge/Firefox-140%2B-FF7139?logo=firefoxbrowser&logoColor=white)
-![Version](https://img.shields.io/badge/version-0.11.0-f4b400)
+![Version](https://img.shields.io/badge/version-0.11.2-f4b400)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 **Works on:** Chrome · Edge · Brave · Opera GX · Firefox 140+
@@ -45,7 +45,7 @@ Open the heart menu and press **Start farm** (or **Alt+F** anywhere in the game)
   1. claims finished missions;
   2. pulls the gacha with your tickets: during Halloween on the ghost banner, otherwise on the region with the fewest Pokémon missing (closer to the Iris charm, which doubles shiny odds), or, with the option "prioritize the region where you have the fewest Pokémon", on the banner with the best chance of a new Pokémon per pull (rarity counts);
   3. switches your partner to **the strongest Pokémon you own that isn't at 100% yet**;
-  4. buys that partner's upgrades, best value first, keeping a reserve of 10% of your coins (at most 1,500);
+  4. buys that partner's upgrades, best value first, keeping a reserve of 10% of your coins (at most 1,500); if those upgrades take the partner to 100%, it switches to the next one right away (through the collection's own button) and buys for the new one too, instead of playing one more run with a finished Pokémon;
   5. saves to the cloud and starts the next run.
 - **Never on the leaderboard.** Farm runs are blocked from the game's leaderboard twice: the game's submit is skipped, and the request that seals a run on PokéSurvivor's server is blocked by the browser before it leaves.
 - **A panel that says what it's doing:** the current task or move, level and HP, your partner's upgrade progress, coins and tickets per hour, and the last things it did. During a run a small bar in the top-right corner (out of the way of the game) shows the same with **Stop**; with the farm off it stays there with **Start**, so you can open the menu or hand the run over to the farm at any moment. Every step can be turned off under *Options*.
@@ -122,9 +122,14 @@ The game is never copied into this repository: the tests clone the public [Poké
 
 See [tests/README.md](tests/README.md) to run them.
 
+## Support
+
+Sobrevida is free and always will be. If it saves you time and you'd like to say thanks, **Support ♥** in the menu footer opens a small box: Pix (Brazil) with a QR code made inside the extension, or [GitHub Sponsors](https://github.com/sponsors/DredsGG) from anywhere else. It's optional, never opens by itself and changes nothing in Sobrevida.
+
 ## Credits
 
 - The in-run engine (movement, dodging, pathfinding, cards, bonds, items, rifts) is adapted from [PSBot](https://github.com/BoundlessEgret/pokesurvivor-autofarm) by BoundlessEgret, MIT. See [THIRD-PARTY-NOTICES](extension/THIRD-PARTY-NOTICES.md).
+- The Pix QR code is drawn with [qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) 1.4.4 by Kazuhiko Arase, MIT, bundled in `extension/src/vendor/`.
 - [PokéSurvivor](https://pokesurvivor.com) is © 2026 JPTER78. Its sprites come from [SpriteCollab](https://github.com/PMDCollab/SpriteCollab) (CC BY-NC 4.0) and are loaded from the game's own site; none are included here.
 - Pokémon is © Nintendo / Creatures Inc. / GAME FREAK / The Pokémon Company.
 

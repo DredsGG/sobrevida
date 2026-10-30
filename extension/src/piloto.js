@@ -284,7 +284,7 @@
   // "Ahora no" do aviso de vídeo novo: o jogo já guardou que mostrou esse vídeo, então ele não volta
   function fecharVideo() {
     const b = document.getElementById('video-close');
-    if (b && open('scr-video')) { b.click(); act('video', {}); log('aviso de vídeo fechado'); }
+    if (b && open('scr-video')) { b.click(); if (!M.videoLog) { M.videoLog = true; act('video', {}); } log('aviso de vídeo fechado'); }
   }
   async function routine(ns) {
     if (open('scr-video')) { fecharVideo(); await sleep(300); }
@@ -292,10 +292,17 @@
       M.needMaint = false;
       if (cfg.missions) { M.task = 'missions'; await missoes(ns); }
       if (cfg.gacha) { M.task = 'gacha'; await gacha(ns); }
-      if (cfg.partner) { M.task = 'partner'; await parceiro(ns); }
-      if (cfg.shop) { M.task = 'shop'; await loja(ns); }
-      if (cfg.upgrades) { M.task = 'upgrades'; await melhorias(ns); }
-      if (cfg.upgrades) { M.task = 'moves'; await golpes(ns); }
+      // 0.11.1: se as melhorias desta rotina deixam o parceiro em 100%, troca na hora e já cuida do novo (antes,
+      // ainda jogava uma partida inteira com o 100% — com um Pokémon forte, isso podia ser meia hora)
+      for (let volta = 0; volta < 3 && cfg.on; volta++) {
+        const antes = ns.DB.save && ns.DB.save.partner;
+        if (cfg.partner) { M.task = 'partner'; await parceiro(ns); }
+        if (volta > 0 && (ns.DB.save && ns.DB.save.partner) === antes) break;
+        if (cfg.shop) { M.task = 'shop'; await loja(ns); }
+        if (cfg.upgrades) { M.task = 'upgrades'; await melhorias(ns); }
+        if (cfg.upgrades) { M.task = 'moves'; await golpes(ns); }
+        if (!cfg.partner) break;
+      }
       if (cfg.skins && ns.Halloween && ns.Halloween.on) { M.task = 'skins'; await skins(ns); }
       M.task = 'save'; await guardar(ns);
       if (!cfg.on) return;
@@ -453,12 +460,24 @@
     const t = alvo(ns);
     if (!t || t === s.partner) return;
     const de = s.partner;
-    // o mesmo que o botão "Elegir compañero" da coleção faz
-    s.partner = t;
-    s.partnerShiny = !!(s.shiny && s.shiny[t]);
-    ns.DB.commit();
+    // 0.11.1: pelo botão "Elegir compañero" da ficha na coleção (o jogo faz a troca do jeito dele); se a tela não
+    // abrir, faz o mesmo que esse botão faz
+    let pelaTela = false;
+    try {
+      if (await fichaDe(ns, t)) {
+        const b = document.getElementById('dex-pick');
+        if (b && !b.disabled) { b.click(); await waitFor(() => ns.DB.save && ns.DB.save.partner === t, 2500); pelaTela = ns.DB.save.partner === t; }
+      }
+    } catch (e) { log('parceiro tela', e); }
+    await sairDaColecao();
+    if (!pelaTela) {
+      const s2 = ns.DB.save;
+      s2.partner = t;
+      s2.partnerShiny = !!(s2.shiny && s2.shiny[t]);
+      ns.DB.commit();
+      if (ns.Flow && ns.Flow.goMenu) ns.Flow.goMenu();
+    }
     act('partner', { de, para: t, deN: nome(ns, de), paraN: nome(ns, t) });
-    if (ns.Flow && ns.Flow.goMenu) ns.Flow.goMenu();
     await sleep(500);
   }
 

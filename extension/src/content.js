@@ -263,6 +263,25 @@
   /* quadros no meio da tela (tutorial, novidades, versão nova) */
   .card { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(.94); width: min(460px, calc(100vw - 24px)); max-height: calc(100vh - 24px); overflow: auto; padding: 16px 18px 14px; display: flex; flex-direction: column; gap: 10px; }
   .card.on { transform: translate(-50%, -50%); }
+  .ap h3 { margin: 0 0 8px; }
+  .ap-ops { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 8px; }
+  .ap-op { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 14px 10px; border-radius: 12px; cursor: pointer; font: inherit; color: #fff;
+    background: rgba(0,0,0,.22); border: 2px solid rgba(244,248,255,.25); text-align: center; }
+  .ap-op .fl { font-size: 30px; line-height: 1; }
+  .ap-op b { font-size: 17px; } .ap-op small { color: var(--muted); font-size: 13px; }
+  .ap-op.dest { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(255,210,63,.35) inset; }
+  .ap-op:hover, .ap-op:focus-visible { border-color: var(--gold); outline: none; }
+  .ap-vals { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+  .ap-v { font: inherit; font-size: 14px; padding: 6px 12px; border-radius: 9px; cursor: pointer; color: #fff; background: rgba(0,0,0,.25); border: 2px solid rgba(244,248,255,.25); }
+  .ap-v.on { background: linear-gradient(180deg, #ffe37a, #f0a31e); color: #1a3170; border-color: #f4f8ff; font-weight: 700; }
+  .ap-in { width: 100%; box-sizing: border-box; font: inherit; font-size: 15px; padding: 7px 10px; border-radius: 9px; border: 2px solid rgba(244,248,255,.4); background: rgba(0,0,0,.3); color: #fff; margin-bottom: 2px; }
+  .ap-qr { display: grid; place-items: center; margin: 10px auto; background: #fff; border-radius: 10px; padding: 6px; width: max-content; }
+  .ap-qr canvas { display: block; width: 232px; height: 232px; image-rendering: pixelated; }
+  .ap-qr.vazio { display: none; }
+  .ap-cp { width: 100%; } .ap-ok { display: block; text-align: center; color: #7fe8a0; font-size: 13px; min-height: 16px; }
+  .ap-key { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; margin: 4px 0 6px; }
+  .ap-key code { font-size: 12px; background: rgba(0,0,0,.3); padding: 3px 6px; border-radius: 6px; user-select: all; word-break: break-all; }
+  .ap-gh { display: block; text-align: center; text-decoration: none; margin-top: 8px; }
   .card .bd h3 { margin: 0 0 4px; font-size: 19px; }
   .card .bd p, .card .bd li { font-size: 15px; margin: 0; }
   .card .bd ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 5px; }
@@ -467,7 +486,7 @@
         ${pausado() ? `<p class="warn">${esc(T.pausedUrg)}</p>` : ''}
         ${run ? `<div class="row"><span class="note">${esc(statusTxt())}</span><button class="btn sm ghost stop" type="button">${esc(T.stop)}</button></div>` : ''}</div>
       ${chkMsg ? `<p class="chk">${esc(chkMsg)}</p>` : ''}
-      <div class="ft"><div class="links"><button class="lk bug" type="button">${esc(T.bug)}</button><button class="lk chkb" type="button">${esc(T.check)}</button><button class="lk nov" type="button">${esc(T.news)}</button></div>
+      <div class="ft"><div class="links"><button class="lk bug" type="button">${esc(T.bug)}</button><button class="lk chkb" type="button">${esc(T.check)}</button><button class="lk nov" type="button">${esc(T.news)}</button><button class="lk apoiar" type="button">${esc(T.apoiar)}</button></div>
         ${langsHtml()}
         <span class="sig">${esc(T.madeBy)} <a href="https://github.com/DredsGG" target="_blank" rel="noopener noreferrer">Dreds</a> · v${esc(VERSION)}</span></div>`;
     if (s) { const c = spriteCanvas(s.dex, 64, 64, 2); c.style.setProperty('--cc', corTipo(s.types[0])); m.querySelector('.cv').replaceWith(c); animar(); }
@@ -479,6 +498,7 @@
     const st = m.querySelector('.stop'); if (st) st.addEventListener('click', () => { pararTeste(); renderMenu(); });
     m.querySelector('.bug').addEventListener('click', abrirRelato);
     m.querySelector('.nov').addEventListener('click', () => { fecharMenu(); newsFrom = ''; news(true); });
+    m.querySelector('.apoiar').addEventListener('click', () => { fecharMenu(); apoio(); });
     m.querySelector('.chkb').addEventListener('click', async () => {
       chkMsg = L().chk.busy; renderMenu(); placeMenu();
       const r = (await updCmd('check')) || {};
@@ -825,6 +845,7 @@
     if (was === 'news') marcarNovLidas();
     if (was === 'update' && urgente()) return; // urgente: não fecha
     hideEl(card());
+    card().setAttribute('aria-modal', 'false');
     open = null;
     if (was === 'update') {
       adiado = { ultima: upd.ultima, ate: Date.now() + ADIA_MS, pagina: PAGE_ID };
@@ -866,6 +887,80 @@
     wireCard(c, news);
     c.querySelector('.go').addEventListener('click', () => closeCard(false));
     paint(c);
+  }
+  // ---------- 0.11.2: "Apoiar ♥" (regra 16 do hub) ----------
+  // Só abre pelo clique no rodapé; não volta sozinho, não trava nada, não muda recurso. Sem rede: o Pix e o QR são
+  // montados aqui (src/pix.js + src/vendor/qrcode.js). A última escolha (Brasil/outro país, valor) fica salva só
+  // para abrir no mesmo lugar.
+  const AP = { passo: 'onde', valor: 10, outro: '', msg: '' };
+  const brl = (v) => (Number.isInteger(v) ? String(v) : v.toFixed(2).replace('.', ','));
+  async function copiarTexto(t) {
+    try { await navigator.clipboard.writeText(t); return true; } catch (_) {}
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = t; ta.setAttribute('readonly', ''); ta.style.cssText = 'position:fixed;left:-9999px;top:0';
+      document.body.appendChild(ta); ta.select();
+      const ok = document.execCommand('copy'); ta.remove(); return ok;
+    } catch (_) { return false; }
+  }
+  function apoio(passo) {
+    if (urgente()) return;
+    fecharPicker();
+    if (passo) AP.passo = passo;
+    open = 'apoio';
+    renderApoio();
+    paint(card());
+    const f = card().querySelector('.foco') || card().querySelector('button');
+    if (f) setTimeout(() => f.focus(), 30);
+  }
+  function renderApoio() {
+    const T = L(), A = T.apoio, c = card(), P = globalThis.SV_PIX;
+    c.setAttribute('aria-label', A.titulo);
+    c.setAttribute('aria-modal', 'true');
+    let bd = '';
+    if (AP.passo === 'onde' || !P) {
+      const brPrimeiro = lang === 'pt';
+      const cartao = (k, flag, t, sub) => `<button class="ap-op${(k === 'br') === brPrimeiro ? ' dest foco' : ''}" type="button" data-ap="${k}"><span class="fl">${flag}</span><b>${esc(t)}</b><small>${esc(sub)}</small></button>`;
+      bd = `<h3>${esc(A.onde)}</h3><div class="ap-ops">${cartao('br', '🇧🇷', A.br, A.brSub)}${cartao('fora', '🌎', A.fora, A.foraSub)}</div><p class="note">${esc(A.opcional)}</p>`;
+    } else if (AP.passo === 'br') {
+      const val = AP.valor === 'outro' ? P.lerValor(AP.outro) : AP.valor;
+      const cod = P.codigo(val || 0);
+      const bt = (v, t) => `<button class="ap-v${AP.valor === v ? ' on' : ''}" type="button" data-v="${v}">${esc(t)}</button>`;
+      bd = `<div class="ap-vals">${bt(5, 'R$ 5')}${bt(10, 'R$ 10')}${bt(25, 'R$ 25')}${bt('outro', A.outro)}</div>
+        ${AP.valor === 'outro' ? `<input class="ap-in" type="text" inputmode="decimal" value="${esc(AP.outro)}" placeholder="${esc(A.outroPh)}" aria-label="${esc(A.outro)}">
+          <small class="note">${esc(val === null ? A.invalido : val ? 'R$ ' + brl(val) : A.livre)}</small>` : ''}
+        <div class="ap-qr"><canvas role="img" aria-label="${esc(A.alt(val ? brl(val) : ''))}"></canvas></div>
+        <button class="btn gold ap-cp foco" type="button">${esc(A.copiar)}</button><span class="ap-ok" aria-live="polite">${esc(AP.msg === 'cod' ? A.copiado : '')}</span>
+        <div class="ap-key"><small>${esc(A.chave)}</small><code>${esc(P.APOIO.chave)}</code><button class="lk ap-ck" type="button">${esc(AP.msg === 'chave' ? A.copiado : A.copiarChave)}</button></div>
+        <p class="note">${esc(A.banco)}</p>`;
+      AP.cod = val === null ? '' : cod;
+    } else {
+      bd = `<p>${esc(A.foraTxt)}</p><a class="btn gold foco ap-gh" href="${P.APOIO.sponsors}" target="_blank" rel="noopener noreferrer">${esc(A.abrir)} ↗</a>`;
+    }
+    c.innerHTML = `${head('♥', 'Sobrevida', A.titulo)}<div class="bd ap">${bd}</div>
+      <div class="cf">${AP.passo !== 'onde' ? `<button class="lk ap-back" type="button">${esc(A.voltar)}</button>` : '<span class="dots"></span>'}${langsHtml()}</div>`;
+    wireCard(c, renderApoio);
+    for (const b of c.querySelectorAll('[data-ap]')) b.addEventListener('click', () => { AP.passo = b.dataset.ap; AP.msg = ''; salvarApoio(); renderApoio(); const f = c.querySelector('.foco'); if (f) f.focus(); });
+    const bk = c.querySelector('.ap-back'); if (bk) bk.addEventListener('click', () => { AP.passo = 'onde'; AP.msg = ''; salvarApoio(); renderApoio(); const f = c.querySelector('.foco'); if (f) f.focus(); });
+    for (const b of c.querySelectorAll('[data-v]')) b.addEventListener('click', () => { AP.valor = b.dataset.v === 'outro' ? 'outro' : Number(b.dataset.v); AP.msg = ''; salvarApoio(); renderApoio(); const i = c.querySelector('.ap-in'); (i || c.querySelector(`[data-v="${b.dataset.v}"]`)).focus(); });
+    const inp = c.querySelector('.ap-in');
+    if (inp) inp.addEventListener('input', () => { AP.outro = inp.value; AP.msg = ''; clearTimeout(AP.t); AP.t = setTimeout(() => { const pos = inp.selectionStart; renderApoio(); const n = c.querySelector('.ap-in'); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (_) {} } }, 350); });
+    const cv = c.querySelector('.ap-qr canvas');
+    if (cv && P) { if (AP.cod) P.desenhar(cv, AP.cod, 232); else { cv.width = cv.height = 1; cv.parentElement.classList.add('vazio'); } }
+    const cp = c.querySelector('.ap-cp');
+    if (cp) { cp.disabled = !AP.cod; cp.addEventListener('click', async () => { if (await copiarTexto(AP.cod)) { AP.msg = 'cod'; c.querySelector('.ap-ok').textContent = A.copiado; } }); }
+    const ck = c.querySelector('.ap-ck');
+    if (ck) ck.addEventListener('click', async () => { if (await copiarTexto(P.APOIO.chave)) { AP.msg = 'chave'; ck.textContent = A.copiado; } });
+  }
+  function salvarApoio() { try { ext.storage.local.set({ 'sv.apoio': { passo: AP.passo, valor: AP.valor } }); } catch (_) {} }
+  // foco preso no quadro do Apoiar (Tab e Shift+Tab giram dentro dele)
+  function prenderFoco(e) {
+    if (open !== 'apoio' || e.key !== 'Tab') return;
+    const c = card(), els = [...c.querySelectorAll('button:not([disabled]), a[href], input')].filter((x) => x.offsetParent !== null);
+    if (!els.length) return;
+    const at = root.activeElement, i = els.indexOf(at);
+    if (e.shiftKey && (i <= 0)) { e.preventDefault(); els[els.length - 1].focus(); }
+    else if (!e.shiftKey && (i === els.length - 1 || i < 0)) { e.preventDefault(); els[0].focus(); }
   }
   const updCmd = (cmd, data) => new Promise((ok) => {
     try { ext.runtime.sendMessage({ type: 'sobrevida:update', cmd, data }).then(ok, () => ok(null)); } catch (_) { ok(null); }
@@ -986,6 +1081,7 @@
       if (!typing && !pausado()) { e.preventDefault(); e.stopPropagation(); setFarm({ on: !farm.on }); }
       return;
     }
+    if (e.key === 'Tab' && open === 'apoio') { prenderFoco(e); return; }
     if (e.key !== 'Escape') return;
     // o Esc que fecha algo da Sobrevida não chega ao jogo (senão ele pausaria a partida ou voltaria de tela)
     const engole = () => { e.preventDefault(); e.stopImmediatePropagation(); };
@@ -995,6 +1091,7 @@
   };
   addEventListener('keydown', onKey, true);
   const onDocDown = (e) => {
+    if (open === 'apoio' && e.isTrusted) { const path = e.composedPath ? e.composedPath() : []; if (!path.includes(card())) { closeCard(false); return; } }
     if (!menuOpen || !e.isTrusted) return;
     const path = e.composedPath ? e.composedPath() : [];
     if (path.includes(host)) return;
@@ -1083,7 +1180,7 @@
   SYNC.get(null).then((s) => {
     if (s.auto === false) S.auto = false;
     if (I.LANGS.includes(s.lang)) lang = s.lang;
-  }).catch(() => {}).then(() => ext.storage.local.get(['sv.alvo', 'sv.fab', 'sv.farm']).then((l) => { alvo = byDex(l['sv.alvo']) ? l['sv.alvo'] : null; fabPos = l['sv.fab'] || null; farm = Object.assign({}, FARM_DEF, l['sv.farm'] || {}); }, () => {})).finally(() => {
+  }).catch(() => {}).then(() => ext.storage.local.get(['sv.alvo', 'sv.fab', 'sv.farm', 'sv.apoio']).then((l) => { alvo = byDex(l['sv.alvo']) ? l['sv.alvo'] : null; fabPos = l['sv.fab'] || null; farm = Object.assign({}, FARM_DEF, l['sv.farm'] || {}); const ap = l['sv.apoio']; if (ap && ['onde', 'br', 'fora'].includes(ap.passo)) { AP.passo = ap.passo; if ([5, 10, 25, 'outro'].includes(ap.valor)) AP.valor = ap.valor; } }, () => {})).finally(() => {
     if (dead) return;
     ui(); placeFab();
     mandarCfg(); setInterval(() => { if (!dead) mandarCfg(); }, 5000);

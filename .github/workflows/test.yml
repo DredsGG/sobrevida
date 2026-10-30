@@ -25,6 +25,9 @@ jobs:
           npm i --no-save --silent playwright@1
           npx playwright install --with-deps chromium
 
+      - name: Pix codes
+        run: node tests/pix.cjs
+
       - name: Starter picker and quiz
         run: node tests/e2e.cjs extension out/e2e
 
