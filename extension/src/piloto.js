@@ -1483,6 +1483,7 @@
     let q = null;
     try { q = JSON.parse(e.detail || '{}'); } catch (_) { return; }
     // laboratório (banco de golpes): o dano/s "cru" que a conta dá para um golpe num nível (para calibrar contra o medido)
+    if (q && q.tipo === 'debugPlano' && NS) { let p = null; try { p = planoDe(NS, +q.dex); } catch (_) {} try { document.dispatchEvent(new CustomEvent('sobrevida:debugPlano', { detail: JSON.stringify(p) })); } catch (_) {} return; }
     if (q && q.tipo === 'debugRaw' && NS) { const out = {}; for (const [id, lv] of q.lista || []) { try { const m = inst(NS, id, lv, false); out[id + '@' + lv] = rawDps(m, true); } catch (_) {} } try { document.dispatchEvent(new CustomEvent('sobrevida:debugRaw', { detail: JSON.stringify(out) })); } catch (_) {} return; }
     if (!q || q.tipo !== 'colinha' || !NS) return;
     if (q.forca) { COLA.clear(); esquecer(+q.dex); } // botão "Recalcular" da colinha
@@ -1917,26 +1918,33 @@
     let plano = null;
     try { plano = planoDe(ns, pl.mon.dex); } catch (_) {}
     if (!plano) return 0;
-    const ids = [plano.a, plano.b, plano.parceiro].filter(Boolean), buffs = plano.buffs || [];
+    // 0.12.1: o parceiro de troca é opcional (o jogo dá 4 espaços; o 5º golpe só cabe depois de fundir) — fica à parte e
+    // não conta para "completa"; cada golpe mostra o nível (cheio = nível máximo)
+    const ids = [plano.a, plano.b].filter(Boolean), buffs = plano.buffs || [], opc = plano.parceiro || null;
     const tem = new Set((pl.moves || []).map((m) => m.id));
+    const nivel = (id) => { const m = (pl.moves || []).find((x) => x.id === id); if (!m) return 0; const mx = (ns.Moves.BY_ID[id] || {}).maxLvl || 5; return Math.min(1, (m.lvl || 1) / mx); };
     const x = L.card.x, y = L.card.y + L.card.h + 8, I = 18, G = 4;
     ctx.font = FNT(800, 10);
     const lw = ctx.measureText(ct().faixa).width;
-    const w = 12 + lw + 8 + (ids.length + buffs.length) * (I + G) + 10 + 6;
+    const w = 12 + lw + 8 + (ids.length + buffs.length + (opc ? 1 : 0)) * (I + G) + 10 + (opc ? 10 : 0) + 6;
     rr(ctx, x - 1.5, y - 1.5, w + 3, 27, 9); ctx.fillStyle = COR.edgeOut; ctx.fill();
     rr(ctx, x, y, w, 24, 8); ctx.fillStyle = 'rgba(26,49,112,.94)'; ctx.fill();
     ctx.lineWidth = 1.5; ctx.strokeStyle = COR.gold; ctx.stroke();
     txt(ctx, ct().faixa, x + 8, y + 16, COR.gold, FNT(800, 10));
     let cx = x + 12 + lw + 4;
-    const icone = (id) => {
-      ctx.globalAlpha = tem.has(id) ? 1 : 0.35;
-      if (ns.Icons) ns.Icons.draw(ctx, 'move:' + id, cx, y + 3, I);
+    const icone = (id, opcional) => {
+      ctx.globalAlpha = tem.has(id) ? 1 : opcional ? 0.25 : 0.35;
+      if (ns.Icons) ns.Icons.draw(ctx, 'move:' + id, cx, y + 2, I);
       ctx.globalAlpha = 1;
+      // barrinha de nível embaixo do ícone (dourada no máximo)
+      const nv = nivel(id);
+      if (nv > 0) { ctx.fillStyle = 'rgba(5,12,32,.85)'; ctx.fillRect(cx + 1, y + 20, I - 2, 2); ctx.fillStyle = nv >= 1 ? COR.gold : '#7fe8a0'; ctx.fillRect(cx + 1, y + 20, Math.max(2, (I - 2) * nv), 2); }
       cx += I + G;
     };
-    ids.forEach(icone);
+    ids.forEach((id) => icone(id));
     cx += 6; ctx.fillStyle = 'rgba(244,248,255,.35)'; ctx.fillRect(cx - 5, y + 5, 1, 14);
-    buffs.forEach(icone);
+    buffs.forEach((id) => icone(id));
+    if (opc) { cx += 6; ctx.fillStyle = 'rgba(244,248,255,.2)'; ctx.fillRect(cx - 5, y + 5, 1, 14); icone(opc, true); }
     return 32;
   }
 
@@ -2041,8 +2049,13 @@
     // faz o grupo inteiro voltar com 35% da recarga a cada troca. Mais que isso, não.
     if (atk >= 3) return -100;
     if (rel == null) return atk === 2 ? 520 + Math.max(0, aoeScore(ns, p, m)) / 2 : 800 + aoeScore(ns, p, m);
-    if (atk === 2) return 520 + Math.round(30 * rel) + (plano.parceiro === id ? 15 : 0);
+    // 0.12.1: o 3º ataque (parceiro de troca) só se for da build; outro golpe qualquer ocupava o espaço e ainda roubava
+    // as melhorias da build (lab: Charmander pegou Substitute e subiu ele no lugar do Heat Wave)
+    if (atk === 2) return [plano.parceiro, plano.a, plano.b].includes(id) ? 520 + Math.round(30 * rel) + 15 : 330 + Math.round(20 * rel);
     if (rel < 0.25) return 480;                                   // golpe muito fraco para este Pokémon: só se nada melhor
+    // 0.12.1: o 2º ataque fica para sempre (4 espaços: 2 ataques + 2 buffs). Se não é da build, vale menos que 500:
+    // com troca de cartas disponível, troca para tentar o da build; sem troca, ainda pega (melhor que um atributo)
+    if (plano.a !== id && plano.b !== id && rel < 0.9) return 480 + Math.round(15 * rel);
     return 800 + Math.round(60 * rel) + (plano.b === id || plano.a === id ? 10 : 0);
   }
 
@@ -2060,6 +2073,19 @@
     return AOE_PRI[m.kind] + (fit >= 0.999 ? 0 : -15) + ((p.mon.types || []).includes(m.type) ? 8 : 0);
   }
 
+  // 0.12.1: núcleo da build na partida = os 2 ataques que a build manda (a e b), mesmo que hoje estejam em nível 1;
+  // sem build, os de maior valor no nível MÁXIMO (não no nível de agora: o que já subiu não pode ganhar só por ter subido)
+  function nucleo(ns, p, todos) {
+    const meus = p.moves.filter(x => x.kind !== 'buff').map(x => x.id);
+    let plano = null;
+    try { plano = planoDe(ns, p.mon.dex); } catch (_) {}
+    const pot = (id) => { try { return valorBuild(ns, p.mon, id); } catch (_) { return 0; } };
+    const ord = meus.slice().sort((x, y) => {
+      const px = plano ? (x === plano.a ? 0 : x === plano.b ? 1 : 2) : 2, py = plano ? (y === plano.a ? 0 : y === plano.b ? 1 : 2) : 2;
+      return px - py || pot(y) - pot(x);
+    });
+    return todos ? ord : ord.slice(0, 2);
+  }
   function countOwned(p, ids) { return ids.filter(id => p.hasMove(id)).length; }
 
   function scoreCard(ns, p, c) {
@@ -2086,7 +2112,7 @@
       let core = [], g = 0;
       try {
         const vals = p.moves.filter(x => x.kind !== 'buff').map(x => ({ id: x.id, v: valorGolpe(ns, p.mon, x), g: ganhoMelhoria(ns, p.mon, x) }));
-        vals.sort((x, y) => y.v - x.v); core = vals.slice(0, 2).map(x => x.id);
+        core = nucleo(ns, p);
         const maxG = Math.max(1e-6, ...vals.map(x => x.g)); g = (vals.find(x => x.id === id) || { g: 0 }).g / maxG;
       } catch (e) { log('ganho', e); }
       const isCore = core.includes(id);
@@ -2118,7 +2144,7 @@
     // 0.4.0: núcleo da fusão = o golpe de maior valor + Fortaleza + buff do lado + o 2º golpe; o resto fica solto
     // (um solto é o parceiro de troca da rotação)
     let ord = null;
-    try { ord = p.moves.filter(x => x.kind !== 'buff').map(x => ({ id: x.id, v: valorGolpe(ns, p.mon, x) })).sort((x, y) => y.v - x.v).map(x => x.id); } catch (_) {}
+    try { ord = nucleo(ns, p, true); } catch (_) {}
     const first = ord ? { id: ord[0] } : p.moves.find(x => x.kind !== 'buff');
     if (first && mv.id === first.id) return 0;
     if (mv.id === 'harden') return 1;

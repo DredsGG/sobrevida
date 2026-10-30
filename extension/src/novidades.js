@@ -3,6 +3,7 @@
 globalThis.SV_NOVIDADES = {
   pt: {
     '0.12.1': [
+      "Na partida, o farm sobe os golpes da build (mesmo que estejam no nível 1) em vez do que já está mais alto, e não ocupa o espaço do 3º ataque com golpe fora da build. A faixa Colinha mostra o nível de cada golpe, e o parceiro de troca fica à parte (opcional: o jogo dá 4 espaços e o 5º golpe só cabe depois de fundir).",
       "\"Aplicar\" não fica mais carregando para sempre. Se a Sobrevida se atualizou com o jogo aberto, o botão pede para recarregar a página; e o jogo sempre responde (ou avisa em 25 s).",
       "Dois botões com papéis separados: na colinha, \"Aplicar a colinha\" (MT, Menta, Cápsula, golpe inicial e veto); na tela de Melhorias, \"Comprar as melhores melhorias\" (como o farm), guardando o dinheiro da Menta/Cápsula que a colinha ainda pede.",
       "Enquanto aplica, um quadro com barra de progresso cobre o jogo; no fim você está de volta na mesma tela. Os botões mostram \"✓\" quando já está tudo certo, ou o que falta.",
@@ -114,6 +115,7 @@ globalThis.SV_NOVIDADES = {
   },
   en: {
     '0.12.1': [
+      "In a run, the farm levels up the build's moves (even at level 1) instead of whatever is already higher, and no longer fills the 3rd attack slot with a move outside the build. The Cheat sheet strip shows each move's level, and the switch move sits apart (optional: the game gives 4 slots and a 5th move only fits after fusing).",
       "\"Apply\" no longer spins forever. If Sobrevida updated with the game open, the button asks you to reload the page; and the game always answers (or you get a notice within 25 s).",
       "Two buttons with separate jobs: on the cheat sheet, \"Apply the cheat sheet\" (TM, Mint, Capsule, starting move and ban); on the Upgrades screen, \"Buy the best upgrades\" (like the farm), keeping the coins for the Mint/Capsule the cheat sheet still asks for.",
       "While it applies, a box with a progress bar covers the game; at the end you are back on the same screen. The buttons show \"✓\" when everything is set, or what is missing.",
@@ -225,6 +227,7 @@ globalThis.SV_NOVIDADES = {
   },
   es: {
     '0.12.1': [
+      "En la partida, el farm sube los movimientos de la build (aunque estén en nivel 1) en vez del que ya está más alto, y no ocupa el espacio del 3.er ataque con un movimiento fuera de la build. La franja Chuleta muestra el nivel de cada movimiento, y el compañero de cambio queda aparte (opcional: el juego da 4 espacios y el 5.º solo cabe después de fusionar).",
       "\"Aplicar\" ya no se queda cargando para siempre. Si Sobrevida se actualizó con el juego abierto, el botón pide recargar la página; y el juego siempre responde (o avisa en 25 s).",
       "Dos botones con papeles separados: en la chuleta, \"Aplicar la chuleta\" (MT, Menta, Cápsula, movimiento inicial y veto); en la pantalla de Mejoras, \"Comprar las mejores mejoras\" (como el farm), guardando las monedas de la Menta/Cápsula que la chuleta aún pide.",
       "Mientras aplica, un cuadro con barra de progreso cubre el juego; al final vuelves a la misma pantalla. Los botones muestran \"✓\" cuando ya está todo listo, o lo que falta.",
