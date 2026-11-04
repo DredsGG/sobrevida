@@ -2,6 +2,10 @@
 // Frases curtas, do ponto de vista de quem usa. Aparece uma vez, na primeira abertura depois da atualização.
 globalThis.SV_NOVIDADES = {
   pt: {
+    '0.12.2': [
+      "O jogo passou a fechar o acesso interno e a trancar a tela com \"extensão não compatível\" quando acha a Sobrevida. Voltou a funcionar.",
+      "A troca de parceiro agora é só pelo botão do jogo (sem o caminho de reserva que mexia no save).",
+    ],
     '0.12.1': [
       "Na partida, o farm sobe os golpes da build (mesmo que estejam no nível 1) em vez do que já está mais alto, e não ocupa o espaço do 3º ataque com golpe fora da build. A faixa Colinha mostra o nível de cada golpe, e o parceiro de troca fica à parte (opcional: o jogo dá 4 espaços e o 5º golpe só cabe depois de fundir).",
       "\"Aplicar\" não fica mais carregando para sempre. Se a Sobrevida se atualizou com o jogo aberto, o botão pede para recarregar a página; e o jogo sempre responde (ou avisa em 25 s).",
@@ -114,6 +118,10 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   en: {
+    '0.12.2': [
+      "The game started closing its internal access and locking the screen with \"extension not compatible\" when it finds Sobrevida. It works again.",
+      "Switching partner now only goes through the game's button (no more fallback that wrote to the save).",
+    ],
     '0.12.1': [
       "In a run, the farm levels up the build's moves (even at level 1) instead of whatever is already higher, and no longer fills the 3rd attack slot with a move outside the build. The Cheat sheet strip shows each move's level, and the switch move sits apart (optional: the game gives 4 slots and a 5th move only fits after fusing).",
       "\"Apply\" no longer spins forever. If Sobrevida updated with the game open, the button asks you to reload the page; and the game always answers (or you get a notice within 25 s).",
@@ -226,6 +234,10 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   es: {
+    '0.12.2': [
+      "El juego empezó a cerrar su acceso interno y a bloquear la pantalla con \"extensión no compatible\" cuando encuentra Sobrevida. Vuelve a funcionar.",
+      "El cambio de compañero ahora es solo con el botón del juego (sin el camino de reserva que tocaba la partida guardada).",
+    ],
     '0.12.1': [
       "En la partida, el farm sube los movimientos de la build (aunque estén en nivel 1) en vez del que ya está más alto, y no ocupa el espacio del 3.er ataque con un movimiento fuera de la build. La franja Chuleta muestra el nivel de cada movimiento, y el compañero de cambio queda aparte (opcional: el juego da 4 espacios y el 5.º solo cabe después de fusionar).",
       "\"Aplicar\" ya no se queda cargando para siempre. Si Sobrevida se actualizó con el juego abierto, el botón pide recargar la página; y el juego siempre responde (o avisa en 25 s).",

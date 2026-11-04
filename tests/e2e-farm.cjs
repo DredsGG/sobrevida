@@ -36,10 +36,9 @@ const CT = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
   page.on('console', (m) => { if (m.type() === 'error') console.log('console.error', m.text().slice(0, 200)); });
   await page.addInitScript(() => {
     window.__st = null; document.addEventListener('sobrevida:st', (e) => { window.__st = JSON.parse(e.detail); });
-    Object.defineProperty(Object.prototype, 'RunUI', { configurable: true, get() { return undefined; },
-      set(v) { Object.defineProperty(this, 'RunUI', { value: v, writable: true, enumerable: true, configurable: true }); if (this && this.BUILT === true) { delete Object.prototype.RunUI; window.__NS = this; } } });
+     (() => { const co = Object.create, lista = []; Object.create = function create(p, d) { const o = d === undefined ? co(p) : co(p, d); if (p === null && !window.__NS && lista.length < 500) lista.push(o); return o; }; const t = setInterval(() => { const n = lista.find((o) => o && o.BUILT === true && 'LIFT' in o); if (n || window.__NS) { if (n && !window.__NS) window.__NS = n; clearInterval(t); lista.length = 0; } }, 20); })(); (() => { setInterval(() => { const h = [...document.querySelectorAll('body > div, html > div')].find((e) => e.shadowRoot && e.shadowRoot.querySelector('.fab')); if (h && h.id !== 'teste-host') { h.dataset.idReal = h.id; h.id = 'teste-host'; } }, 100); })();
   });
-  const shadow = (sel) => page.locator(`#sobrevida-host >> css=${sel}`);
+  const shadow = (sel) => page.locator(`#teste-host >> css=${sel}`);
   const vis = () => page.evaluate(() => [...document.querySelectorAll('.scr')].filter((e) => !e.classList.contains('hidden')).map((e) => e.id));
   await page.goto('https://pokesurvivor.com/');
   await sleep(3500);
@@ -53,6 +52,8 @@ const CT = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
   ok(await page.evaluate(() => window.__NS.DB.save.partner) === 54, 'teste respondido sozinho → Psyduck (recurso da 0.1.0 continua)');
   await page.evaluate(() => { const s = window.__NS.DB.save; s.coins = 5000; s.tickets.t10 = 2; s.tickets.t1 = 15; window.__NS.UI.refreshCoins(); });
   await sleep(800);
+  // quadros da extensão (novidades/tutorial) podem abrir depois do menu: fecha antes de clicar no coração
+  for (let i = 0; i < 3 && await shadow('.card.on').count(); i++) { await page.keyboard.press('Escape'); await sleep(400); }
   await shadow('.fab').click(); await sleep(700);
   ok(await shadow('.menu .farm .fgo').count() === 1, 'menu do coração tem a seção Farm automático');
   // 0.2.6: dois modos separados, Sozinho e Em grupo
@@ -96,7 +97,7 @@ const CT = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
       await page.screenshot({ path: path.join(SHOTS, '12-farm-pilula.png') });
       ok(await shadow('.menu.on').count() === 0, 'menu da Sobrevida fecha sozinho quando o farm começa a partida (não cobre o jogo)');
       await shadow('.pill span').click(); await sleep(800);
-      console.log('  menu depois do clique na pílula:', await page.evaluate(() => { const r = document.querySelector('#sobrevida-host').shadowRoot; const m = r.querySelector('.menu'); return { hidden: m.hidden, on: m.classList.contains('on'), txt: m.innerText.slice(0, 160) }; }));
+      console.log('  menu depois do clique na pílula:', await page.evaluate(() => { const r = document.querySelector('#teste-host').shadowRoot; const m = r.querySelector('.menu'); return { hidden: m.hidden, on: m.classList.contains('on'), txt: m.innerText.slice(0, 160) }; }));
       await page.screenshot({ path: path.join(SHOTS, '13-farm-menu-partida.png') });
       ok(await shadow('.menu.on').count() === 1 && /Nv \d+/.test(await shadow('.menu .farm').innerText()), 'menu aberto na partida mostra o que o farm está fazendo');
       await page.keyboard.press('Escape'); await sleep(400);

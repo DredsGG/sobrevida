@@ -14,30 +14,43 @@
 //  - partida que o farm tocou NUNCA vai para o ranking (Ranking.submit* bloqueado + selo bloqueado pelo fundo).
 (() => {
   'use strict';
-  const VERSAO = '0.12.1';
-  if (window.__sobrevidaPiloto) return;
-  window.__sobrevidaPiloto = true;
-  const HOOK_KEY = 'Game';
+  const VERSAO = '0.12.2';
+  // 0.12.2: marca de "já carregou" num Symbol (não aparece como nome no window)
+  const MARCA = Symbol.for('sv.p');
+  if (window[MARCA]) return;
+  try { Object.defineProperty(window, MARCA, { value: true }); } catch (_) {}
   const DEBUG = /[?&]svdebug=1/.test(location.search);
   const log = (...a) => { if (DEBUG) console.log('%c[Sobrevida]', 'color:#ffd23f', ...a); };
 
   // ---------- 1. pega o namespace do jogo ----------
-  // O jogo publicado guarda tudo num objeto interno (ns = {BUILT:true, LIFT:18}; ns.Game = ...) que não vai para o window.
-  // Um setter temporário 'Game' em Object.prototype recebe esse objeto na hora em que o jogo faz ns.Game = ..., e sai.
-  const own = (obj, k, v) => Object.defineProperty(obj, k, { value: v, writable: true, enumerable: true, configurable: true });
-  Object.defineProperty(Object.prototype, HOOK_KEY, {
-    configurable: true,
-    get() { return undefined; },
-    set(v) {
-      own(this, HOOK_KEY, v);
-      if (this && this.BUILT === true && 'LIFT' in this) {
-        delete Object.prototype[HOOK_KEY];
-        try { boot(this); } catch (e) { console.error('[Sobrevida] boot', e); }
-      }
-    },
-  });
-  // se nada pegar em 20 s (jogo mudou), tira a armadilha e avisa a extensão
-  setTimeout(() => { if (!NS) { try { delete Object.prototype[HOOK_KEY]; } catch (_) {} emit({ ok: false, err: 'namespace' }); } }, 20000);
+  // O jogo guarda tudo num objeto interno (ns = {BUILT:true, LIFT:18, Game, UI, …}) que não vai para o window.
+  // Desde 31/10 (jogo e5997d5) esse objeto nasce com Object.create(null), e o jogo passou a recusar a página quando
+  // Object.prototype tem algo a mais (era assim que a Sobrevida pegava o objeto até a 0.12.1). Agora: Object.create
+  // fica embrulhado só durante o carregamento, guardando os objetos sem protótipo; o que tiver BUILT/LIFT é o do jogo.
+  // Achou (ou 20 s), o Object.create original volta. Nada fica em Object.prototype nem no window.
+  const createOrig = Object.create;
+  const semProto = [];
+  const createEmbrulhado = { create(proto, props) {
+    const o = props === undefined ? createOrig(proto) : createOrig(proto, props);
+    if (proto === null && !NS && semProto.length < 500) semProto.push(o);
+    return o;
+  } }.create;
+  try { Object.defineProperty(Object, 'create', { value: createEmbrulhado, writable: true, configurable: true, enumerable: false }); } catch (_) { Object.create = createEmbrulhado; }
+  const devolverCreate = () => {
+    if (Object.create === createEmbrulhado) { try { Object.defineProperty(Object, 'create', { value: createOrig, writable: true, configurable: true, enumerable: false }); } catch (_) { Object.create = createOrig; } }
+    semProto.length = 0;
+  };
+  const achar = () => {
+    if (NS) return true;
+    const ns = semProto.find((o) => o && o.BUILT === true && 'LIFT' in o);
+    if (!ns) return false;
+    devolverCreate();
+    try { boot(ns); } catch (e) { console.error('[Sobrevida] boot', e); }
+    return true;
+  };
+  const procura = setInterval(() => { if (achar()) { clearInterval(procura); devolverCreate(); } }, 15);
+  // se nada pegar em 20 s (jogo mudou), devolve tudo e avisa a extensão
+  setTimeout(() => { clearInterval(procura); devolverCreate(); if (!NS) emit({ ok: false, err: 'namespace' }); }, 20000);
 
   // ---------- 2. configuração (vem da extensão) e ponte ----------
   // A extensão (mundo isolado) manda 'sobrevida:cfg' com JSON; o piloto responde 'sobrevida:st' com JSON a cada 500 ms.
@@ -560,8 +573,9 @@
     const t = alvo(ns);
     if (!t || t === s.partner) return;
     const de = s.partner;
-    // 0.11.1: pelo botão "Elegir compañero" da ficha na coleção (o jogo faz a troca do jeito dele); se a tela não
-    // abrir, faz o mesmo que esse botão faz
+    // 0.11.1: pelo botão "Elegir compañero" da ficha na coleção (o jogo faz a troca do jeito dele).
+    // 0.12.2: sem o caminho de reserva que escrevia no save — o jogo passou a desfazer save mexido fora dos botões
+    // (30/10, "Contra las trampas"); se a tela não abrir, tenta de novo na próxima volta da rotina
     let pelaTela = false;
     try {
       if (await fichaDe(ns, t)) {
@@ -570,13 +584,7 @@
       }
     } catch (e) { log('parceiro tela', e); }
     await sairDaColecao();
-    if (!pelaTela) {
-      const s2 = ns.DB.save;
-      s2.partner = t;
-      s2.partnerShiny = !!(s2.shiny && s2.shiny[t]);
-      ns.DB.commit();
-      if (ns.Flow && ns.Flow.goMenu) ns.Flow.goMenu();
-    }
+    if (!pelaTela) { log('parceiro: a tela não trocou'); return; }
     act('partner', { de, para: t, deN: nome(ns, de), paraN: nome(ns, t) });
     await sleep(500);
   }
@@ -1506,6 +1514,8 @@
   const BUFF_TXT = { atk: 'ATK', patk: 'ATK', satk: 'AT.E', spd: 'VEL', def: 'DEF', regen: 'REG' };
   const lim = (v, a, b) => Math.max(a, Math.min(b, v));
 
+  // 0.12.2: id do estilo da colinha na partida sorteado por página (o jogo recusa a página quando acha os nomes fixos)
+  const ID_CSS_JOGO = 'c' + Math.random().toString(36).slice(2, 9);
   function rr(ctx, x, y, w, h, r) {
     r = Math.max(0, Math.min(r, w / 2, h / 2));
     ctx.beginPath();
@@ -1872,9 +1882,9 @@
                      es: { selo: 'Chuleta', trocar: 'Chuleta: cambiar cartas', faixa: 'Chuleta' } };
   const ct = () => COLA_TXT[cfg.lang] || COLA_TXT.pt;
   function colaCss() {
-    if (document.getElementById('sv-cola-jogo')) return;
+    if (document.getElementById(ID_CSS_JOGO)) return;
     const st = document.createElement('style');
-    st.id = 'sv-cola-jogo';
+    st.id = ID_CSS_JOGO;
     st.textContent = `.sv-reco{position:relative;outline:3px solid #ffd23f !important;outline-offset:2px;box-shadow:0 0 22px rgba(255,210,63,.55) !important}
       .sv-reco::before{content:attr(data-sv);position:absolute;top:-12px;left:50%;transform:translateX(-50%);z-index:2;white-space:nowrap;
         background:linear-gradient(180deg,#ffe37a,#f0a31e);color:#1a3170;font:700 12px Pixelify,'Segoe UI',sans-serif;padding:2px 10px;border-radius:9px;

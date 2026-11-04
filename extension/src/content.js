@@ -298,12 +298,15 @@
     x: '<svg viewBox="0 0 14 14"><path d="M2 2l10 10M12 2L2 12" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg>',
     star: '⭐', gift: '🎁', alert: '⚠️',
   };
+  // 0.12.2: ids sorteados por página (o jogo recusa a página quando acha #sobrevida-host / #sv-cola-css)
+  const sorteio = () => 'x' + Math.random().toString(36).slice(2, 9);
+  const ID_HOST = sorteio(), ID_CSS = sorteio();
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
   function ui() {
     if (root) return root;
     host = document.createElement('div');
-    host.id = 'sobrevida-host';
+    host.id = ID_HOST;
     root = host.attachShadow({ mode: 'open' });
     root.innerHTML = `<style>${CSS}</style><div class="w">
       <button class="fab" type="button" hidden>${ICO.heart}<span class="dot" hidden></span></button>
@@ -660,7 +663,7 @@
   function quadroOtim(estado, p, linha, fim) {
     let ov = document.getElementById('sv-otim-ov');
     if (estado === 'fechar') { if (ov) { ov.classList.add('sai'); setTimeout(() => ov.remove(), 220); } return; }
-    if (!document.getElementById('sv-cola-css')) { const st = document.createElement('style'); st.id = 'sv-cola-css'; st.textContent = COLA_CSS; document.head.appendChild(st); }
+    if (!document.getElementById(ID_CSS)) { const st = document.createElement('style'); st.id = ID_CSS; st.textContent = COLA_CSS; document.head.appendChild(st); }
     const C = L().f.cola;
     if (!ov) {
       ov = document.createElement('div'); ov.id = 'sv-otim-ov'; ov.setAttribute('translate', 'no');
@@ -750,7 +753,7 @@
     if (!tela || !farm.cola || dead || semPiloto()) { if (velho) velho.remove(); return; }
     const sel = tela.querySelector('#upg-mon'), linha = sel && sel.parentElement;
     if (!linha) return;
-    if (!document.getElementById('sv-cola-css')) { const st = document.createElement('style'); st.id = 'sv-cola-css'; st.textContent = COLA_CSS; document.head.appendChild(st); }
+    if (!document.getElementById(ID_CSS)) { const st = document.createElement('style'); st.id = ID_CSS; st.textContent = COLA_CSS; document.head.appendChild(st); }
     const C = L().f.cola, e = estadoAplicar(+sel.value, 'melh');
     const txt = e.txt;
     let b = linha.querySelector('.sv-otim');
@@ -785,7 +788,7 @@
   // painel da colinha num lugar da página: a ficha da coleção ou a tela de pausa (0.8.0)
   function painelCola(onde, depoisDe, dex, extra) {
     let box = onde.querySelector('.sv-cola');
-    if (!document.getElementById('sv-cola-css')) { const st = document.createElement('style'); st.id = 'sv-cola-css'; st.textContent = COLA_CSS; document.head.appendChild(st); }
+    if (!document.getElementById(ID_CSS)) { const st = document.createElement('style'); st.id = ID_CSS; st.textContent = COLA_CSS; document.head.appendChild(st); }
     // a chave inclui o que a ficha mostra (natureza, habilidade, MT): depois de uma Menta/Cápsula/MT, recalcula
     const chave = dex + '|' + extra;
     if (!box) { box = document.createElement('div'); box.className = 'sv-cola'; box.setAttribute('translate', 'no'); depoisDe.insertAdjacentElement('afterend', box); }
@@ -1348,7 +1351,7 @@
     document.removeEventListener('sobrevida:st', onSt);
     document.removeEventListener('sobrevida:colinha', onCola);
     document.removeEventListener('sobrevida:otimizado', onOtimizado); document.removeEventListener('sobrevida:otimProg', onProg); document.removeEventListener('sobrevida:pend', onPend); document.removeEventListener('click', onColaClick, true);
-    document.querySelectorAll('.sv-cola, #sv-cola-css').forEach((el) => el.remove());
+    document.querySelectorAll('.sv-cola, #' + ID_CSS).forEach((el) => el.remove());
     if (host) host.remove();
   }
 

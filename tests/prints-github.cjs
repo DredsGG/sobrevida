@@ -27,10 +27,9 @@ const CT = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
   await page.bringToFront();
   await page.addInitScript(() => {
     window.__st = null; document.addEventListener('sobrevida:st', (e) => { window.__st = JSON.parse(e.detail); });
-    Object.defineProperty(Object.prototype, 'RunUI', { configurable: true, get() { return undefined; },
-      set(v) { Object.defineProperty(this, 'RunUI', { value: v, writable: true, enumerable: true, configurable: true }); if (this && this.BUILT === true) { delete Object.prototype.RunUI; window.__NS = this; } } });
+     (() => { const co = Object.create, lista = []; Object.create = function create(p, d) { const o = d === undefined ? co(p) : co(p, d); if (p === null && !window.__NS && lista.length < 500) lista.push(o); return o; }; const t = setInterval(() => { const n = lista.find((o) => o && o.BUILT === true && 'LIFT' in o); if (n || window.__NS) { if (n && !window.__NS) window.__NS = n; clearInterval(t); lista.length = 0; } }, 20); })(); (() => { setInterval(() => { const h = [...document.querySelectorAll('body > div, html > div')].find((e) => e.shadowRoot && e.shadowRoot.querySelector('.fab')); if (h && h.id !== 'teste-host') { h.dataset.idReal = h.id; h.id = 'teste-host'; } }, 100); })();
   });
-  const shadow = (sel) => page.locator(`#sobrevida-host >> css=${sel}`);
+  const shadow = (sel) => page.locator(`#teste-host >> css=${sel}`);
   const vis = () => page.evaluate(() => [...document.querySelectorAll('.scr')].filter((e) => !e.classList.contains('hidden')).map((e) => e.id));
   await page.goto('https://pokesurvivor.com/'); await sleep(3500);
   if (await shadow('.card.on').count()) { await sleep(600); await page.screenshot({ path: path.join(OUT, 'sobrevida-tutorial.png') }); await page.keyboard.press('Escape'); await sleep(400); }
