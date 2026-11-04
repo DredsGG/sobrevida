@@ -60,7 +60,7 @@ def click(x, y):
 
 
 def click_shadow(sel):
-    r = js("const h = document.querySelector('#sobrevida-host'); const e = h && h.shadowRoot.querySelector(arguments[0]);"
+    r = js("const h = [...document.querySelectorAll('body > div, html > div')].find(e => e.shadowRoot && e.shadowRoot.querySelector('.fab')); const e = h && h.shadowRoot.querySelector(arguments[0]);"
            "if (!e || e.hidden) return null; const b = e.getBoundingClientRect(); return [b.left + b.width / 2, b.top + b.height / 2];", sel)
     if r:
         click(*r)
@@ -68,7 +68,7 @@ def click_shadow(sel):
 
 
 def shadow_count(sel):
-    return js("const h = document.querySelector('#sobrevida-host'); return h ? h.shadowRoot.querySelectorAll(arguments[0]).length : -1;", sel)
+    return js("const h = [...document.querySelectorAll('body > div, html > div')].find(e => e.shadowRoot && e.shadowRoot.querySelector('.fab')); return h ? h.shadowRoot.querySelectorAll(arguments[0]).length : -1;", sel)
 
 
 def visible_screens():
@@ -111,7 +111,7 @@ try:
     pick = wait_for(lambda: shadow_count('.pick.on') == 1, 8)
     check('menu "Escolha seu parceiro" abre na aba Criar conta', pick)
     time.sleep(0.8); shot('ff-02-parceiro.png')
-    sel = js("const h = document.querySelector('#sobrevida-host').shadowRoot.querySelector('.pick .info h3'); return h && h.textContent;")
+    sel = js("const h = [...document.querySelectorAll('body > div, html > div')].find(e => e.shadowRoot && e.shadowRoot.querySelector('.fab')).shadowRoot.querySelector('.pick .info h3'); return h && h.textContent;")
     check('Psyduck vem marcado como melhor', sel and 'Psyduck' in sel, sel)
     click_shadow('.pick .go'); time.sleep(0.6)
     js("document.querySelector('#btn-guest').click();")
