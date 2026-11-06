@@ -2,6 +2,11 @@
 // Frases curtas, do ponto de vista de quem usa. Aparece uma vez, na primeira abertura depois da atualização.
 globalThis.SV_NOVIDADES = {
   pt: {
+    '0.12.4': [
+      "Botão Auto na partida: no lugar da barrinha do farm, só um botão com um ponto (cinza = desligado, verde = ligado) e um \"⋯\" para abrir o menu. Clicar faz o mesmo que Alt+F. Quando o farm não pode jogar, o botão fica âmbar com um aviso curto. Quem prefere a barra de antes escolhe \"completa\" no menu.",
+      "Gacha de shiny: com a coleção completa, o farm continua tirando gacha atrás dos shinies que faltam, no banner com mais shinies faltando. Para quando pega todos, depois de 3.000 tiros seguidos sem shiny novo ou quando os tickets acabam. O painel mostra \"Shiny: X de Y\". É uma opção do menu (ligada).",
+      "O Firefox saiu da lista de navegadores: a Sobrevida fica só para Chrome, Edge, Brave e Opera GX.",
+    ],
     '0.12.3': [
       "Volta a funcionar com o jogo de 05/11: o jogo passou a esconder os nomes por dentro, e a Sobrevida agora reconhece cada parte pelo que ela tem.",
       "Se o jogo mudar de novo e a Sobrevida não reconhecer alguma parte, o farm não liga e o painel diz qual parte faltou.",
@@ -122,6 +127,11 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   en: {
+    '0.12.4': [
+      "Auto button during a run: instead of the farm bar, just one button with a dot (grey = off, green = on) and a \"⋯\" that opens the menu. Clicking does the same as Alt+F. When the farm can't play, the button turns amber with a short note. If you prefer the old bar, pick \"full\" in the menu.",
+      "Shiny gacha: once the collection is complete, the farm keeps pulling for the shinies you're missing, on the banner with the most missing. It stops when it has them all, after 3,000 pulls in a row without a new shiny, or when tickets run out. The panel shows \"Shiny: X of Y\". It's a menu option (on).",
+      "Firefox is gone from the supported browsers: Sobrevida is now for Chrome, Edge, Brave and Opera GX only.",
+    ],
     '0.12.3': [
       "Works again with the 11/05 game update: the game started hiding its internal names, and Sobrevida now recognizes each part by what it contains.",
       "If the game changes again and Sobrevida can't recognize a part, the farm stays off and the panel says which part is missing.",
@@ -242,6 +252,11 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   es: {
+    '0.12.4': [
+      "Botón Auto en la partida: en lugar de la barrita del farm, solo un botón con un punto (gris = apagado, verde = activado) y un \"⋯\" que abre el menú. Hacer clic equivale a Alt+F. Cuando el farm no puede jugar, el botón se pone ámbar con un aviso corto. Si prefieres la barra de antes, elige \"completa\" en el menú.",
+      "Gacha de shiny: con la colección completa, el farm sigue tirando gacha por los shinies que faltan, en el banner con más shinies pendientes. Para al conseguirlos todos, tras 3.000 tiradas seguidas sin shiny nuevo o cuando se acaban los tickets. El panel muestra \"Shiny: X de Y\". Es una opción del menú (activada).",
+      "Firefox sale de los navegadores compatibles: Sobrevida queda solo para Chrome, Edge, Brave y Opera GX.",
+    ],
     '0.12.3': [
       "Vuelve a funcionar con el juego del 05/11: el juego empezó a esconder sus nombres internos y Sobrevida ahora reconoce cada parte por lo que contiene.",
       "Si el juego vuelve a cambiar y Sobrevida no reconoce alguna parte, el farm no se enciende y el panel dice qué parte falta.",

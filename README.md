@@ -8,11 +8,10 @@
 Choose your partner Pokémon before the 8-question personality quiz and get exactly that one. Then let the auto farm play runs, claim missions, pull the gacha and buy upgrades while you watch.
 
 ![Manifest V3](https://img.shields.io/badge/Manifest-V3-4285F4?logo=googlechrome&logoColor=white)
-![Firefox](https://img.shields.io/badge/Firefox-140%2B-FF7139?logo=firefoxbrowser&logoColor=white)
-![Version](https://img.shields.io/badge/version-0.12.3-f4b400)
+![Version](https://img.shields.io/badge/version-0.12.4-f4b400)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-**Works on:** Chrome · Edge · Brave · Opera GX · Firefox 140+
+**Works on:** Chrome · Edge · Brave · Opera GX
 
 <img src="docs/sobrevida-farm-menu.png" width="720" alt="PokéSurvivor's main menu with the Sobrevida panel open on the left, in the game's blue Mystery Dungeon style: AUTO FARM with a gold Start farm button and Alt+F, the partner Psyduck with Upgrades 0/92, Options, and the footer Report a bug, Check for updates, What's new, PT EN ES and made by Dreds v0.2.1">
 
@@ -43,12 +42,12 @@ Open the heart menu and press **Start farm** (or **Alt+F** anywhere in the game)
 - **Switches attacks for you.** Only the active move slot attacks in PokéSurvivor, and switching slots leaves the new slot almost ready. Right after a move fires, the farm switches to the slot that will be ready first (preferring super-effective moves), and slips buffs like Swords Dance and Harden in between so they stay stacked. In our lab runs this gave 3 to 7 times more damage per second than staying on one slot. It also fights bosses at the range of the move it's using instead of running away. Touch the arrow keys and you're in control; let go and it takes over again.
 - **Between runs, in this order:**
   1. claims finished missions;
-  2. pulls the gacha with your tickets: during Halloween on the ghost banner, otherwise on the region with the fewest Pokémon missing (closer to the Iris charm, which doubles shiny odds), or, with the option "prioritize the region where you have the fewest Pokémon", on the banner with the best chance of a new Pokémon per pull (rarity counts);
+  2. pulls the gacha with your tickets: during Halloween on the ghost banner, otherwise on the region with the fewest Pokémon missing (closer to the Iris charm, which doubles shiny odds), or, with the option "prioritize the region where you have the fewest Pokémon", on the banner with the best chance of a new Pokémon per pull (rarity counts). Once every Pokémon is yours and the option *Gacha: hunt shinies* is on (it is by default), it keeps pulling for the shinies you're missing, on the banner with the most missing, until it has them all, until 3,000 pulls in a row bring no new shiny, or until the tickets run out (the panel shows *Shiny: X of Y*);
   3. switches your partner to **the strongest Pokémon you own that isn't at 100% yet**;
   4. buys that partner's upgrades, best value first, keeping a reserve of 10% of your coins (at most 1,500); if those upgrades take the partner to 100%, it switches to the next one right away (through the collection's own button) and buys for the new one too, instead of playing one more run with a finished Pokémon;
   5. saves to the cloud and starts the next run.
 - **Never on the leaderboard.** Farm runs are blocked from the game's leaderboard twice: the game's submit is skipped, and the request that seals a run on PokéSurvivor's server is blocked by the browser before it leaves.
-- **A panel that says what it's doing:** the current task or move, level and HP, your partner's upgrade progress, coins and tickets per hour, and the last things it did. During a run a small bar in the top-right corner (out of the way of the game) shows the same with **Stop**; with the farm off it stays there with **Start**, so you can open the menu or hand the run over to the farm at any moment. Every step can be turned off under *Options*.
+- **A panel that says what it's doing:** the current task or move, level and HP, your partner's upgrade progress, coins and tickets per hour, and the last things it did. During a run, a small **Auto** button in the top-right corner (out of the way of the game) turns the farm on and off: grey dot = off, green dot = on, amber with a short note when the farm can't play right now. The **⋯** next to it opens the menu, so you can open it or hand the run over to the farm at any moment. The earlier full bar (status plus Stop/Start) comes back if you pick **full** under *Farm bar during a run* in the menu. Every step can be turned off under *Options*.
 
 <img src="docs/sobrevida-farm-run.png" width="420" alt="A run in progress in a forest with the Sobrevida bar in the top-right corner: Farm, Picking up XP, 0:46, Lv 5, 147/147 HP and a Stop button">&nbsp;&nbsp;<img src="docs/sobrevida-farm-panel.png" width="420" alt="The Sobrevida panel open under the bar during a run: Stop, Picking up XP at 0:47 level 5, partner Slurpuff with Upgrades 35/92, collection 27 Pokémon, and the log: bought 35 upgrades, partner Psyduck to Slurpuff, Gacha Kalos x30 with 26 new">
 
@@ -85,19 +84,11 @@ Panels, buttons, the font and the sprites come from PokéSurvivor's own *Mystery
 
 Opera GX: if the extension disappears after you close the browser, load it again (a known Opera issue with unpacked extensions).
 
-### Firefox 140+
-
-1. Download **`sobrevida-vX.Y.Z.xpi`** from the [latest release](https://github.com/DredsGG/sobrevida/releases/latest) and confirm the install. If Firefox doesn't ask, use `about:addons` → gear icon → **Install Add-on From File**.
-2. It updates itself.
-
-No `.xpi` in the release yet? Use `about:debugging` → **This Firefox** → **Load Temporary Add-on** and pick `manifest.json` from the unzipped folder (it's removed when Firefox closes).
-
 ### Updating
 
 Sobrevida checks this repository's releases by itself: when the game opens, every 30 minutes, and whenever you come back to the game tab (at most once every 10 minutes). When there's a new version, a notice appears in the middle of the screen with what changed and an **Update** button, but never during a run: notices, What's new and the tutorial wait for the menu so they can't cost you a run.
 
 - **Chrome, Edge, Brave, Opera GX:** *Update* downloads the new zip. Unzip it **over the same folder**; the extension notices within a minute and reloads itself. Then reload the game tab (the panel shows a **Reload now** button), because the part that plays the game only starts with the page.
-- **Firefox:** *Update* opens the signed `.xpi`. Firefox also updates it on its own.
 - The **✕** only postpones the notice for an hour. A release marked **URGENTE** (a fix for a serious problem) shows the notice without ✕, and the farm stops until you update (a run already in progress finishes first).
 
 ## Languages
@@ -117,11 +108,12 @@ The game is never copied into this repository. The game's public repository is g
 
 - `tests/e2e.cjs`: Chromium with the real extension on a simulated quiz page with the game's IDs and rule: the picker, all 29 starters through the quiz (coin-flip pairs included), shuffled answers, *Stop*, *Answer it myself*, footer, languages, *What's new*, new-version and URGENTE notices.
 - `tests/e2e-farm.cjs`: Chromium on the **real game**: quiz to Psyduck, the farm section, the seal blocked before the network, a run started and played by itself, missions/gacha/upgrades logged, one tab at a time, `Alt+F`.
-- **Firefox** (GitHub Actions, `Test` workflow): `web-ext lint` with no errors, then real Firefox with the extension installed on the real game: tutorial, picker, quiz to Psyduck, the farm starting and playing a run, and no seal leaving.
+- `tests/lab-gacha.cjs`: the auto gacha: the usual region pick and, since 0.12.4, the shiny mode once the collection is complete (what it picks, what it counts, and each way it stops).
+- `tests/manifest.cjs`: the manifest is a valid Chromium MV3 one (service worker only, every file it names exists).
 - `tests/lab-mapa.cjs`: every module the pilot uses is found by its shape, exactly once, with no hard-coded game name in the sources; a module removed on purpose makes the pilot refuse to start and report it.
 - `tests/prints-github.cjs` makes the screenshots on this page (a fresh guest, no personal data).
 
-See [tests/README.md](tests/README.md) to run them.
+On GitHub, every push runs only `web-ext lint`, the manifest check and the Pix test; the full suite (it needs the local game copy) runs on demand and once a day. See [tests/README.md](tests/README.md) to run them.
 
 ## Support
 

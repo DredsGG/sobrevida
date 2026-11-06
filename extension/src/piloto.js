@@ -14,7 +14,7 @@
 //  - partida que o farm tocou NUNCA vai para o ranking (Ranking.submit* bloqueado + selo bloqueado pelo fundo).
 (() => {
   'use strict';
-  const VERSAO = '0.12.3';
+  const VERSAO = '0.12.4';
   // 0.12.2: marca de "já carregou" num Symbol (não aparece como nome no window)
   const MARCA = Symbol.for('sv.p');
   if (window[MARCA]) return;
@@ -95,6 +95,7 @@
     upgrades: true,     // comprar melhorias do parceiro
     gacha: true,        // tirar gacha com os tickets
     gachaMenos: false,  // 0.9.0: gacha na região onde você tem menos Pokémon (padrão: a mais perto de completar)
+    gachaShiny: true,   // 0.12.4: com a coleção completa, continua tirando gacha atrás dos shinies que faltam
     partner: true,      // trocar de parceiro sozinho: o melhor que ainda não está 100%
     skins: true,        // Halloween: comprar as skins de bruja com os doces
     cola: true,         // 0.7.0/0.8.0: colinha (coleção, cartas de nível, pausa e faixa no HUD)
@@ -112,8 +113,9 @@
   document.addEventListener('sobrevida:cfg', (e) => {
     try {
       const c = JSON.parse(e.detail || '{}');
-      const was = cfg.on;
-      for (const k of ['on', 'upgrades', 'gacha', 'partner', 'skins', 'missions', 'shop', 'hud', 'cola', 'gachaMenos']) if (typeof c[k] === 'boolean') cfg[k] = c[k];
+      const was = cfg.on, shinyWas = cfg.gachaShiny;
+      for (const k of ['on', 'upgrades', 'gacha', 'partner', 'skins', 'missions', 'shop', 'hud', 'cola', 'gachaMenos', 'gachaShiny']) if (typeof c[k] === 'boolean') cfg[k] = c[k];
+      if (shinyWas !== cfg.gachaShiny) M.shiny = null;   // ligar/desligar a opção recomeça a contagem do modo shiny
       if (typeof c.reserve === 'number' && c.reserve >= 0) cfg.reserve = c.reserve;
       if (c.modo === 'solo' || c.modo === 'grupo') cfg.modo = c.modo;
       if (c.lang === 'pt' || c.lang === 'en' || c.lang === 'es') cfg.lang = c.lang;
@@ -701,16 +703,51 @@
     }
     return best;
   }
+  // 0.12.4: modo shiny. Com todos os Pokémon obtidos (gachaGen devolve null) e a opção ligada, tira gacha atrás dos shinies
+  // que faltam: banner aberto com MAIS shinies faltando entre os obteníveis (empate: mais pity), em blocos ×100 pelos botões
+  // do jogo. Medido em 06/11: com a coleção completa o shiny é 2% por tiro, cada
+  // Pokémon está em um banner só, 958 de 966 têm shiny e, com o último chamado sendo lendário, o fim é lento.
+  // Para quando: todos pegos · SHINY_SEM_MAX tiros seguidos sem shiny novo · acabaram os tickets. Sem parada por tempo.
+  const SHINY_SEM_MAX = 3000;
+  const temShiny = (ns, d) => { try { if (ns.Sprites && typeof ns.Sprites.hasShiny === 'function') return !!ns.Sprites.hasShiny(d); } catch (_) {} const m = ns.SPRITE_META && ns.SPRITE_META[d]; return !!(m && m.sh); };
+  function shinyEstado(ns) {
+    const G = ns.Gacha, s = ns.DB.save, sh = s.shiny || {};
+    let faltam = 0, total = 0, gen = null, mais = -1, pity = -1;
+    for (const b of G.BANNERS) {
+      if (!G.isOpen(b.gen)) continue;
+      let f = 0;
+      for (const p of ns.DEX) if (p.gen === b.gen && temShiny(ns, p.dex)) { total++; if (!sh[p.dex]) f++; }
+      faltam += f;
+      const py = (s.pity || {})[b.gen] || 0;
+      if (f > mais || (f === mais && py > pity)) { mais = f; pity = py; gen = b.gen; }
+    }
+    return { faltam, total, gen: mais > 0 ? gen : null };
+  }
+  const ticketsOk = (ns) => { const t = (ns.DB.save && ns.DB.save.tickets) || {}; return (t.t10 || 0) >= 1 || (t.t1 || 0) >= 10; };
+  // resumo para o painel (M.shiny); 'parou' = todos | n | tickets | null
+  function shinyResumo(ns, parou) {
+    const e = shinyEstado(ns), r = M.shiny || (M.shiny = { desde: 0 });
+    r.tem = e.total - e.faltam; r.de = e.total; r.max = SHINY_SEM_MAX;
+    r.parou = !e.total ? null : !e.faltam ? 'todos' : (parou || (r.parouN ? 'n' : null) || (!ticketsOk(ns) ? 'tickets' : null));
+    return e;
+  }
   async function gacha(ns) {
     const s = ns.DB.save, t = () => (ns.DB.save && ns.DB.save.tickets) || {};
-    if (!s || ((t().t10 || 0) < 1 && (t().t1 || 0) < 10)) return;
-    const gen = gachaGen(ns);
-    if (gen == null) return;
+    if (!s) return;
+    let gen = gachaGen(ns), shiny = false;
+    if (gen == null) {
+      if (!cfg.gachaShiny) { M.shiny = null; return; }
+      const e = shinyResumo(ns);
+      if (!e.total || !e.faltam || M.shiny.parouN || e.gen == null || !ticketsOk(ns)) return;
+      gen = e.gen; shiny = true;
+    } else M.shiny = null;
+    if (!shiny && !ticketsOk(ns)) return;
     if (!await ir('gacha')) return;
     const tab = $(`#gacha-gens .gen-tab[data-gen="${gen}"]`); if (tab) { tab.click(); await sleep(300); }
     const before = new Set(Object.keys(ns.DB.save.owned || {}));
-    let pulls = 0, shiny = 0;
-    for (let i = 0; i < 40 && cfg.on; i++) {
+    let pulls = 0, shinyNovo = 0;
+    const gen0 = gen, gens = [gen];
+    for (let i = 0; i < 40 && cfg.on && (!shiny || cfg.gachaShiny); i++) {
       const tk = t();
       const id = (tk.t10 || 0) >= 10 ? 'pull-100b' : (tk.t1 || 0) >= 100 ? 'pull-100' : (tk.t10 || 0) >= 1 ? 'pull-10b' : (tk.t1 || 0) >= 10 ? 'pull-10' : null;
       const b = id && document.getElementById(id);
@@ -722,14 +759,25 @@
       const sk = $('#pull-skip'); if (sk && !sk.classList.contains('hidden')) sk.click();
       await waitFor(() => { const c = $('#pull-close'); return c && !c.classList.contains('hidden'); }, 20000);
       await sleep(500);
-      pulls += id.includes('100') ? 100 : 10;
-      shiny += Object.keys(ns.DB.save.shiny || {}).length - shBefore;
+      const n = id.includes('100') ? 100 : 10;
+      pulls += n;
+      const novoBloco = Object.keys(ns.DB.save.shiny || {}).length - shBefore;
+      shinyNovo += novoBloco;
       const c = $('#pull-close'); if (c) c.click();
       await waitFor(() => !open('pull-fx'), 3000);
       await sleep(250);
+      if (shiny) {
+        // contagem de tiros seguidos sem shiny novo e paradas (o laço já é limitado: no máximo 40 blocos por rotina)
+        const r = M.shiny || (M.shiny = { desde: 0 }); r.desde = novoBloco > 0 ? 0 : (r.desde || 0) + n;
+        if (r.desde >= SHINY_SEM_MAX) r.parouN = true;
+        const e = shinyResumo(ns);
+        if (!e.total || !e.faltam || r.parouN) break;
+        if (e.gen != null && e.gen !== gen) { gen = e.gen; gens.push(gen); const t2 = $(`#gacha-gens .gen-tab[data-gen="${gen}"]`); if (t2) { t2.click(); await sleep(300); } }
+      }
     }
     const novos = Object.keys(ns.DB.save.owned || {}).filter((d) => !before.has(d)).map(Number);
-    if (pulls) act('gacha', { gen, n: pulls, novos: novos.slice(0, 4).map((d) => nome(ns, d)), nn: novos.length, sh: shiny });
+    if (shiny) shinyResumo(ns);
+    if (pulls) act('gacha', { gen: gen0, n: pulls, novos: novos.slice(0, 4).map((d) => nome(ns, d)), nn: novos.length, sh: shinyNovo, modo: shiny ? 'shiny' : undefined, gens: shiny ? gens.slice(0, 12) : undefined, tem: shiny && M.shiny ? M.shiny.tem : undefined, de: shiny && M.shiny ? M.shiny.de : undefined });
     await voltar('gacha');
   }
 
@@ -1180,6 +1228,7 @@
       coins: s ? s.coins : null, t1: s && s.tickets ? s.tickets.t1 : null, t10: s && s.tickets ? s.tickets.t10 : null,
       candy: s && s.bag ? s.bag.candy || 0 : 0, hw: !!(ns.Halloween && ns.Halloween.on), guest: !!(ns.DB && ns.DB.guest),
       partner: tgt, owned, maxed, sess, acts, touched: M.touched,
+      shiny: cfg.gachaShiny && M.shiny ? { tem: M.shiny.tem, de: M.shiny.de, desde: M.shiny.desde || 0, max: M.shiny.max, parou: M.shiny.parou || null } : null,
     });
   }
 

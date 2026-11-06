@@ -45,7 +45,7 @@ const ok = (c, m) => { console.log((c ? '✅ ' : '❌ ') + m); if (!c) falhas++;
     ok(typeof r.state === 'string', 'Game.state = ' + r.state);
     ok(typeof r.s54 === 'string' && r.ch && r.s2 === null && r.tm, `funções soltas: startMoveOf(54)=${r.s54}, está em startChoices(54)=${r.ch}, startMove2Of(54)=${r.s2}, TM_OF(54) só golpes=${r.tm}`);
     ok(r.nat === 25 && r.natBy && r.revive > 0 && r.tick >= 2 && r.axis === 'function' && r.icons === 'function', 'NATURES, NATURE_BY, Player.REVIVE_TIME, Combat.tick, Input.axis, Icons.draw');
-    ok(r.nativo, 'Object.create voltou ao original');
+    ok(r.nativo, 'funções nativas da página restauradas depois da carga');
     // escrita pelo atalho vai para o objeto real pela chave real (e volta)
     const w = await p.evaluate(() => { const N = window.__NS, R = window.__NSRAW, k = window.__NSMAPA.chaves.Rift, antes = R[k], novo = { teste: 1 }; N.Rift = novo; const foi = R[k] === novo && N.Rift === novo; N.Rift = antes; return foi && R[k] === antes; });
     ok(w, 'atribuição ao topo (ns.X = …) escreve no objeto real pela chave real');

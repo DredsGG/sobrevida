@@ -16,7 +16,6 @@
   const alive = () => { try { return !dead && !!ext.runtime.id; } catch (_) { return false; } };
   const SYNC = ext.storage.sync || ext.storage.local; // Opera: sync pode não existir
   const VERSION = ext.runtime.getManifest().version;
-  const IS_FF = /Firefox\//.test(navigator.userAgent);
   let lang = I.detect();
   const L = () => I.T[lang] || I.T.en;
   const S = { auto: true };
@@ -184,6 +183,23 @@
   .pill svg { width: 22px; height: 22px; flex: none; }
   .pill span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .pill .btn { padding: 2px 8px; font-size: 13px; }
+  .barsel { display: flex; flex-direction: column; gap: 4px; }
+  .barsel .modos button { flex: 1; }
+  .barsel { display: flex; flex-direction: column; gap: 4px; }
+  .barsel .modos button { flex: 1; }
+  /* 0.12.4: na partida, só o botão Auto (ponto de estado) + "⋯" para o menu; mesma posição da barrinha; texto só no aviso âmbar */
+  .avb { position: fixed; right: 14px; top: 48px; display: flex; align-items: center; justify-content: flex-end; gap: 4px; max-width: calc(100vw - 28px); }
+  .avb .ab, .avb .am { appearance: none; min-height: 32px; border: 2px solid rgba(244,248,255,.55); border-radius: 9px; background: linear-gradient(180deg, rgba(44,81,159,.92), rgba(26,49,112,.92));
+    box-shadow: 0 0 0 2px var(--edge-out); color: #fff; font-size: 13px; font-weight: 700; text-shadow: 1px 1px 0 var(--shadow); line-height: 1; }
+  .avb .ab { display: inline-flex; align-items: center; gap: 5px; padding: 0 4px; justify-content: center; }
+  .avb .am { width: 32px; padding: 0; display: grid; place-items: center; font-size: 17px; }
+  .avb .ab:hover, .avb .am:hover { filter: brightness(1.18); }
+  .avb .ab:focus-visible, .avb .am:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+  .avb .dot2 { width: 10px; height: 10px; border-radius: 50%; background: #8794b3; border: 2px solid var(--edge-out); flex: none; }
+  .avb .ab[aria-pressed="true"] .dot2 { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .avb.w2 .ab { border-color: #ffb84d; }
+  .avb.w2 .ab .dot2 { background: #ffb84d; box-shadow: 0 0 6px #ffb84d; }
+  .avb .at { order: -1; max-width: min(40ch, calc(100vw - 170px)); padding: 6px 9px; border-radius: 9px; border: 2px solid #ffb84d; background: rgba(26,49,112,.94); color: #ffd6a0; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 1px 1px 0 var(--shadow); }
   /* faixa de status no topo (teste rodando) */
   .bar { position: fixed; left: 50%; top: 12px; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; padding: 8px 10px 8px 12px; max-width: calc(100vw - 24px); }
   .bar canvas { width: 40px; height: 40px; image-rendering: pixelated; flex: none; }
@@ -314,6 +330,7 @@
       <div class="toast box pop" hidden></div>
       <div class="menu box pop" hidden></div>
       <div class="pill box" hidden></div>
+      <div class="avb" hidden></div>
       <div class="pick box pop" hidden></div>
       <div class="card box pop" role="dialog" aria-modal="false" hidden></div></div>`;
     (document.body || document.documentElement).appendChild(host);
@@ -513,7 +530,7 @@
   }
   function placeMenu() {
     if (!root || !menuOpen) return;
-    const fb = root.querySelector('.fab'), m = root.querySelector('.menu'), f = (fb.hidden ? root.querySelector('.pill') : fb).getBoundingClientRect();
+    const fb = root.querySelector('.fab'), m = root.querySelector('.menu'), f = (fb.hidden ? ((root.querySelector('.avb').hidden ? root.querySelector('.pill') : root.querySelector('.avb'))) : fb).getBoundingClientRect();
     const w = m.offsetWidth || 340, h = m.offsetHeight || 300;
     let left = Math.min(Math.max(12, f.left), innerWidth - w - 12);
     let top = f.top - h - 12; if (top < 12) top = Math.min(f.bottom + 12, innerHeight - h - 12);
@@ -545,7 +562,7 @@
 
   // ───────────────────────── farm automático (v0.2.0) ─────────────────────────
   // O piloto (src/piloto.js, mundo da página) joga e cuida da rotina; aqui ficam a configuração, a ponte e o painel.
-  const FARM_DEF = { on: false, modo: 'solo', upgrades: true, gacha: true, partner: true, missions: true, skins: true, shop: true, hud: true, cola: true, gachaMenos: false };
+  const FARM_DEF = { on: false, modo: 'solo', upgrades: true, gacha: true, partner: true, missions: true, skins: true, shop: true, hud: true, cola: true, gachaMenos: false, gachaShiny: true, barra: 'botao' };
   let farm = Object.assign({}, FARM_DEF), pst = null, pstAt = 0, farmCanvas = null, farmSig = '';
   const mmss = I.mmss;
   // 0.4.0: o que o farm aprendeu nas partidas (acertos reais por golpe) fica guardado aqui e volta para o piloto
@@ -832,34 +849,36 @@
     try { await ext.storage.local.set({ 'sv.farm': farm }); } catch (_) {}
     if ('on' in patch) await vigiaDono();
     mandarCfg();
+    if ('on' in patch) usouFarm = true;
     if ('on' in patch) { registrar({ type: patch.on ? 'farm-on' : 'farm-off', ok: true }); toast(patch.on ? (farm.modo === 'grupo' ? L().f.onToastG : L().f.onToast) : L().f.offToast, patch.on); }
     farmSig = ''; renderFarm(); pill();
   }
+  let usouFarm = false;
   const pronto = () => pst && pst.ok && Date.now() - pstAt < 5000;
   function farmStatus() {
     const T = L().f;
-    if (semPiloto()) return { t: T.reload, w: true, reload: true };
+    if (semPiloto()) return { t: T.reload, w: true, reload: true, k: 'reload' };
     if (!pronto()) {
       // 0.12.3: 'mapa' = achou o jogo, mas não reconheceu alguns módulos (o jogo mudou por dentro): diz quais
       if (pst && pst.ok === false && pst.err === 'mapa') {
         const l = [].concat(pst.faltam || []).map(String).concat([].concat(pst.ambiguos || []).map((n) => String(n) + ' (?)'));   // (?) = mais de um candidato
-        return { t: T.mapa(l.slice(0, 6).join(', ') + (l.length > 6 ? '…' : '')), w: true };
+        return { t: T.mapa(l.slice(0, 6).join(', ') + (l.length > 6 ? '…' : '')), w: true, k: 'mapa' };
       }
-      return { t: pst && pst.ok === false && pst.err === 'namespace' ? T.broken : T.waiting, w: !!(pst && pst.ok === false) };
+      return { t: pst && pst.ok === false && pst.err === 'namespace' ? T.broken : T.waiting, w: !!(pst && pst.ok === false), k: pst && pst.ok === false ? (pst.err === 'namespace' ? 'broken' : 'erro') : undefined };
     }
     const G = farm.modo === 'grupo';
-    if (!farm.on) return { t: G ? (pst.party ? T.gOffRoom : T.gOff) : (pst.party ? T.sInRoom : T.off), w: !G && pst.party };
-    if (!dono) return { t: T.otherTab, w: true };
-    if (pausado()) return { t: L().pausedUrg, w: true };
+    if (!farm.on) return { t: G ? (pst.party ? T.gOffRoom : T.gOff) : (pst.party ? T.sInRoom : T.off), w: !G && pst.party, k: !G && pst.party ? 'sala' : undefined };
+    if (!dono) return { t: T.otherTab, w: true, k: 'outraAba' };
+    if (pausado()) return { t: L().pausedUrg, w: true, k: 'urgente' };
     // partida do tipo errado para o modo escolhido: o farm não toca em nada e diz por quê
-    if (pst.run && pst.coop && !G) return { t: T.sWrong, w: true };
-    if (pst.run && !pst.coop && G) return { t: T.gWrong, w: true };
-    if (pst.coop && !pst.coopOk) return { t: T.coopLate, w: true };
-    if (G && !pst.run) return { t: pst.party ? T.gReady : T.gNoRoom, w: !pst.party };
-    if (!G && pst.party && !pst.run) return { t: T.sInRoom, w: true };
-    if (pst.hidden) return { t: T.hidden, w: true };
-    if (pst.userPaused) return { t: T.userPaused, w: true };
-    if (pst.fps != null && pst.fps < 15) return { t: T.slow(pst.fps), w: true };
+    if (pst.run && pst.coop && !G) return { t: T.sWrong, w: true, k: 'modo' };
+    if (pst.run && !pst.coop && G) return { t: T.gWrong, w: true, k: 'modo' };
+    if (pst.coop && !pst.coopOk) return { t: T.coopLate, w: true, k: 'tarde' };
+    if (G && !pst.run) return { t: pst.party ? T.gReady : T.gNoRoom, w: !pst.party, k: pst.party ? undefined : 'semSala' };
+    if (!G && pst.party && !pst.run) return { t: T.sInRoom, w: true, k: 'sala' };
+    if (pst.hidden) return { t: T.hidden, w: true, k: 'escondida' };
+    if (pst.userPaused) return { t: T.userPaused, w: true, k: 'pausa' };
+    if (pst.fps != null && pst.fps < 15) return { t: T.slow(pst.fps), w: true, k: 'lento' };
     if (pst.task) return { t: T.task[pst.task] || pst.task };
     if (pst.run) return { t: `${T.mode[pst.mode] || T.mode.idle} · ${mmss(pst.run.t)} · ${T.lv} ${pst.run.lv} · ♥ ${pst.run.hp}/${pst.run.max}` };
     return { t: T.menu };
@@ -870,7 +889,7 @@
     switch (a.k) {
       case 'run': return T.aRun(mmss(x.t), x.lv, x.c, (x.t1 || 0) + (x.t10 || 0) * 10);
       case 'missions': return T.aMissions(x.n);
-      case 'gacha': return T.aGacha(nGen(x.gen), x.n, x.nn, x.sh, (x.novos || []).join(', '));
+      case 'gacha': return x.modo === 'shiny' ? T.aGachaS(nGen(x.gen), x.n, x.sh, x.tem, x.de) : T.aGacha(nGen(x.gen), x.n, x.nn, x.sh, (x.novos || []).join(', '));
       case 'partner': return T.aPartner(x.deN, x.paraN);
       case 'upgrades': return T.aUpgrades(x.n, x.nome);
       case 'moves': return T.aMoves(x.nome, x.start, x.start2, (x.bans || []).join(', '));
@@ -890,7 +909,7 @@
     const horas = ss && ss.start ? Math.max(1 / 60, (Date.now() - ss.start) / 3600000) : 0;
     const pr = p && p.partner;
     const pct = pr && pr.total ? Math.round((pr.have / pr.total) * 100) : 0;
-    const sig = JSON.stringify([lang, farm, st, pr, ss, p && p.acts && p.acts.map((a) => a.t), p && p.owned, p && p.maxed, p && p.guest, p && p.hw]);
+    const sig = JSON.stringify([lang, farm, st, pr, ss, p && p.acts && p.acts.map((a) => a.t), p && p.owned, p && p.maxed, p && p.guest, p && p.hw, p && p.shiny]);
     if (sig === farmSig) return;
     farmSig = sig;
     const G = farm.modo === 'grupo';
@@ -904,10 +923,12 @@
       ${pr ? `<div class="cur"><span class="cvf"></span><div class="nm"><b>${esc(pr.name)}</b>
         <div class="pbar"><i style="width:${pct}%"></i></div><small>${esc(F.prog(pr.have, pr.total, pct))}</small><br><small>${esc(F.col(p.owned, p.maxed))}</small>${pr.build && pr.build.a ? `<br><small class="bld" title="${esc(F.buildWhy)}">${esc(F.build([pr.build.a, pr.build.b].filter(Boolean).join(' + '), (pr.build.buffs || []).join(', '), pr.build.parceiro || '—'))}</small>` : ''}${pr.nat ? `<br><small class="bld">${esc(F.natAb(pr.nat, pr.abil || '—'))}</small>` : ''}</div></div>` : ''}
       ${ss && ss.start ? `<div class="kv">${esc(F.sess(ss.runs, fmt(ss.coins), fmt(Math.round(ss.coins / horas)), ss.t1 + ss.t10 * 10, ss.best ? mmss(ss.best) : '—'))}${p.hw ? ' · ' + esc(F.candy(ss.candy)) : ''}</div>` : ''}
+      ${p && p.shiny && !G ? `<div class="kv">${esc(F.shinyLn(p.shiny))}</div>` : ''}
       ${p && p.acts && p.acts.length ? `<div class="acts">${p.acts.slice(0, 4).map((a) => `<div>· ${esc(actTxt(a))}</div>`).join('')}</div>` : ''}
       ${G ? '' : `<details class="fopts"${farmOptsOpen ? ' open' : ''}><summary>${esc(F.opts)}</summary><div class="opts">
-        ${['upgrades', 'shop', 'gacha', 'gachaMenos', 'partner', 'missions', 'skins'].map((k) => `<label class="sw"><input type="checkbox" data-f="${k}"${farm[k] ? ' checked' : ''}> ${esc(F.opt[k])}</label>`).join('')}
+        ${['upgrades', 'shop', 'gacha', 'gachaMenos', 'gachaShiny', 'partner', 'missions', 'skins'].map((k) => `<label class="sw"><input type="checkbox" data-f="${k}"${farm[k] ? ' checked' : ''}> ${esc(F.opt[k])}</label>`).join('')}
       </div></details>`}
+      <div class="barsel"><span class="note">${esc(F.auto.barra)}</span><div class="modos" role="radiogroup" aria-label="${esc(F.auto.barra)}">${['botao', 'completa'].map((m) => `<button type="button" role="radio" data-barra="${m}" class="${farm.barra === m ? 'on' : ''}" aria-checked="${farm.barra === m}">${esc(m === 'botao' ? F.auto.soBotao : F.auto.completa)}</button>`).join('')}</div></div>
       <label class="sw hudsw"><input type="checkbox" data-f="hud"${farm.hud ? ' checked' : ''}> ${esc(F.hud)}</label>
       <label class="sw hudsw"><input type="checkbox" data-f="cola"${farm.cola ? ' checked' : ''}> ${esc(F.colaOpt)}</label>
       <p class="note">${esc(F.rank)}</p>`;
@@ -919,6 +940,7 @@
     const rl = box.querySelector('.frl'); if (rl) rl.addEventListener('click', () => location.reload());
     const fo = box.querySelector('.fopts'); if (fo) fo.addEventListener('toggle', (e) => { farmOptsOpen = e.target.open; placeMenu(); });
     for (const b of box.querySelectorAll('[data-modo]')) b.addEventListener('click', () => { if (farm.modo !== b.dataset.modo) setFarm({ modo: b.dataset.modo }); });
+    for (const b of box.querySelectorAll('[data-barra]')) b.addEventListener('click', () => { if (farm.barra !== b.dataset.barra) setFarm({ barra: b.dataset.barra }); });
     for (const i of box.querySelectorAll('[data-f]')) i.addEventListener('change', () => setFarm({ [i.dataset.f]: i.checked }));
     placeMenu();
   }
@@ -926,11 +948,14 @@
   // pílula no canto quando o farm está ligado e o botão de coração não aparece (partida, gacha, melhorias...)
   function pill() {
     if (!root) return;
-    const el = root.querySelector('.pill'), fab = root.querySelector('.fab');
+    const el = root.querySelector('.pill'), au = root.querySelector('.avb'), fab = root.querySelector('.fab');
     // 0.2.5: na partida a pílula aparece sempre (o coração some): com o farm desligado ela é o jeito de abrir o menu
     // e de ligar o farm no meio da partida
     const show = fab.hidden;
-    if (!show) { if (!el.hidden) el.hidden = true; return; }
+    if (!show) { if (!el.hidden) el.hidden = true; if (!au.hidden) au.hidden = true; return; }
+    // 0.12.4: padrão = só o botão Auto; "completa" (opção do menu) traz a barrinha de antes
+    if (farm.barra !== 'completa') { if (!el.hidden) el.hidden = true; autoBtn(au); return; }
+    if (!au.hidden) au.hidden = true;
     const st = farm.on ? farmStatus() : { t: L().f.offShort };
     const pre = farm.modo === 'grupo' ? L().f.shortG : L().f.short;
     // monta uma vez (por idioma) e depois só troca o texto: o clique não pode cair num elemento que acabou de ser trocado
@@ -949,6 +974,50 @@
     const txt = `${pre} · ${st.t}`;
     if (el._txt !== txt) { el._txt = txt; el.querySelector('span').textContent = txt; }
     if (el.hidden) el.hidden = false;
+  }
+  // 0.12.4: aviso âmbar do botão Auto: o mesmo texto que a barrinha mostrava, em versão curta (uma linha, ~40 caracteres)
+  // com o texto inteiro no title. Só nos casos em que o farm não joga ou não pode ligar agora; fora deles, sem texto.
+  function avisoAuto() {
+    const T = L().f, A = T.auto;
+    let st = farmStatus();
+    // avisos de "não é o seu caso" (sala, modo) só depois de a pessoa já ter usado o farm nesta página: quem joga com amigos
+    // sem usar o farm não vê aviso de erro
+    if (!farm.on && !usouFarm && ['sala', 'modo', 'tarde', 'semSala'].includes(st.k)) st = { t: st.t, w: false };
+    // desligado, mas o farm não poderia jogar a partida atual se fosse ligado agora: avisa antes do clique
+    if (!farm.on && usouFarm && pronto() && pst.run) {
+      const G = farm.modo === 'grupo';
+      if (pst.coop && !G) st = { t: T.sWrong, w: true, k: 'modo' };
+      else if (!pst.coop && G) st = { t: T.gWrong, w: true, k: 'modo' };
+      else if (pst.coop && !pst.coopOk) st = { t: T.coopLate, w: true, k: 'tarde' };
+    }
+    if (pausado()) st = { t: L().pausedUrg, w: true, k: 'urgente' };
+    if (!st.w) return null;
+    // nunca esconde um aviso: sem texto curto conhecido, usa o começo do texto completo
+    const curto = A.s[st.k] || (st.t.length > 38 ? st.t.slice(0, 37) + '…' : st.t);
+    return { s: curto, full: st.t };
+  }
+  function autoBtn(au) {
+    const A = L().f.auto;
+    if (au._lang !== lang) {
+      au._lang = lang; au._k = null;
+      au.innerHTML = `<span class="at" role="status" hidden></span><button class="ab" type="button" aria-pressed="false"><i class="dot2" aria-hidden="true"></i><span>${esc(A.name)}</span></button><button class="am" type="button" aria-haspopup="true"><span aria-hidden="true">⋯</span></button>`;
+      // o botão faz o mesmo que o botão do menu e o Alt+F (setFarm); a atualização urgente segura o farm como no resto
+      au.querySelector('.ab').addEventListener('click', (e) => { e.stopPropagation(); if (!pausado()) setFarm({ on: !farm.on }); });
+      au.querySelector('.am').addEventListener('click', (e) => { e.stopPropagation(); if (menuOpen) fecharMenu(); else abrirMenu(); });
+      au.querySelector('.am').setAttribute('aria-label', A.menu); au.querySelector('.am').title = A.menu;
+    }
+    const w = avisoAuto(), ab = au.querySelector('.ab'), at = au.querySelector('.at');
+    const key = JSON.stringify([farm.on, w && w.s, w && w.full, lang]);
+    if (au._k !== key) {
+      au._k = key;
+      ab.setAttribute('aria-pressed', farm.on ? 'true' : 'false');
+      const estado = farm.on ? A.on : A.off;
+      ab.title = w ? `${A.name}: ${estado}. ${w.full}` : `${A.name}: ${estado} (Alt+F)`;
+      ab.setAttribute('aria-label', `${A.name}: ${estado}${w ? '. ' + w.s : ''}`);
+      au.classList.toggle('w2', !!w);
+      at.hidden = !w; at.textContent = w ? w.s : ''; at.title = w ? w.full : '';
+    }
+    if (au.hidden) au.hidden = false;
   }
 
   // ───────────────────────── status e avisos ─────────────────────────
@@ -1156,7 +1225,7 @@
   function updateCard() {
     open = 'update';
     const T = L(), c = card(), items = noteItems(upd.notas), urg = urgente();
-    const note = updDone === 'xpi' || (updDone && IS_FF) ? T.updXpi : updDone === 'loja' ? T.updStore : updDone ? T.updZip : '';
+    const note = updDone === 'loja' ? T.updStore : updDone ? T.updZip : '';
     c.setAttribute('aria-label', urg ? T.urgTitle(upd.ultima) : T.updTitle(upd.ultima));
     c.innerHTML = `${head(urg ? ICO.alert : ICO.gift, urg ? T.urgKick : 'Sobrevida', urg ? T.urgTitle(upd.ultima) : T.updTitle(upd.ultima), `v${VERSION} → v${upd.ultima}`, urg)}
       <div class="bd">${urg ? `<span class="warnb">${esc(T.urgPaused)}</span><p>${esc(T.urgSub)}</p>` : ''}

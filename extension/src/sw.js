@@ -1,8 +1,6 @@
 // Sobrevida — fundo da extensão: procura versão nova, se recarrega quando a pasta muda e põe a versão nova nas abas abertas.
-// O mesmo arquivo roda como service worker nos Chromium (Chrome, Edge, Brave, Opera GX) e como event page no Firefox
-// (manifest com "service_worker" e "scripts"). Por isso nada de window/DOM aqui.
+// Roda como service worker nos Chromium (Chrome, Edge, Brave, Opera GX): nada de window/DOM aqui.
 const ext = (globalThis.browser && globalThis.browser.runtime) ? globalThis.browser : globalThis.chrome;
-const IS_FF = !!(ext.runtime && ext.runtime.getBrowserInfo); // só o Firefox tem
 const REPO = 'DredsGG/sobrevida';
 const UPD_KEY = 'sv.update';
 const SITE = 'https://pokesurvivor.com/';
@@ -37,8 +35,8 @@ async function procurar() {
     const ultima = String(j.tag_name || '').replace(/^v/i, '');
     const asset = (re) => ((j.assets || []).find((a) => re.test(a.name)) || {}).browser_download_url || null;
     const urgente = /urgent/i.test(String(j.name || '') + ' ' + String(j.tag_name || ''));
-    return salvarUpd(Object.assign(base, { ultima, urgente, titulo: String(j.name || '').slice(0, 120), notas: String(j.body || '').slice(0, 4000), pagina: j.html_url || null, zip: asset(/\.zip$/i), xpi: asset(/\.xpi$/i),
-      firefox: IS_FF, disponivel: !!ultima && cmpVer(ultima, versaoAtual()) > 0, erro: null, semRelease: false }));
+    return salvarUpd(Object.assign(base, { ultima, urgente, titulo: String(j.name || '').slice(0, 120), notas: String(j.body || '').slice(0, 4000), pagina: j.html_url || null, zip: asset(/\.zip$/i),
+      disponivel: !!ultima && cmpVer(ultima, versaoAtual()) > 0, erro: null, semRelease: false }));
   } catch (e) {
     return salvarUpd(Object.assign(base, { erro: String((e && e.message) || e) }));
   }
@@ -47,11 +45,6 @@ async function procurar() {
 async function aplicar() {
   const st = (await ext.storage.local.get(UPD_KEY))[UPD_KEY] || {};
   const pagina = st.pagina || `https://github.com/${REPO}/releases/latest`;
-  if (IS_FF) { // abrir o .xpi assinado faz o Firefox perguntar se instala (ele também se atualiza pelo update_url)
-    await ext.tabs.create({ url: st.xpi && /^https:\/\/github\.com\//.test(st.xpi) ? st.xpi : pagina });
-    await salvarUpd({ baixadoEm: Date.now() });
-    return { modo: st.xpi ? 'xpi' : 'pagina' };
-  }
   if (await tipoInstalacao() === 'normal' && ext.runtime.requestUpdateCheck) {
     const res = await ext.runtime.requestUpdateCheck().then((r) => (r && r.status) || r).catch(() => 'no_update');
     if (res === 'update_available') { setTimeout(() => ext.runtime.reload(), 1500); return { modo: 'loja' }; }
@@ -79,7 +72,7 @@ function abrirGuia(ancora) {
 ext.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg || msg.type !== 'sobrevida:update') return;
   const run = msg.cmd === 'check' ? procurar() : msg.cmd === 'check-soft' ? procurarSeVelho() : msg.cmd === 'apply' ? aplicar() : msg.cmd === 'guide' ? abrirGuia(msg.data)
-    : msg.cmd === 'diag' ? tipoInstalacao().then((instalacao) => ({ instalacao, firefox: IS_FF }))
+    : msg.cmd === 'diag' ? tipoInstalacao().then((instalacao) => ({ instalacao }))
     : Promise.resolve({});
   run.then((r) => sendResponse(r || {}), (e) => sendResponse({ erro: String((e && e.message) || e) }));
   return true;
@@ -90,7 +83,7 @@ ext.action.onClicked.addListener(async (tab) => {
   const noJogo = tab && /^https:\/\/pokesurvivor\.com\//.test(tab.url || '');
   if (noJogo) {
     try { await ext.tabs.sendMessage(tab.id, { type: 'sobrevida:menu' }); return; } catch (_) {}
-    if (!IS_FF && ext.scripting) {
+    if (ext.scripting) {
       try { await ext.scripting.executeScript({ target: { tabId: tab.id }, files: CONTENT }); await ext.tabs.sendMessage(tab.id, { type: 'sobrevida:menu' }); return; } catch (_) {}
     }
   }
@@ -128,7 +121,7 @@ async function conferirDisco() {
 }
 
 async function injetarNasAbas() {
-  if (IS_FF || !ext.scripting) return; // o Firefox já injeta sozinho nas abas abertas
+  if (!ext.scripting) return;
   try {
     for (const t of await ext.tabs.query({ url: PS_TABS })) {
       if (t.discarded) continue;

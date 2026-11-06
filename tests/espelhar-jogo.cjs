@@ -7,9 +7,9 @@
 // ⚠️ testes/.game é cópia SÓ PARA TESTE LOCAL. O jogo é PolyForm Noncommercial e os sprites são CC BY-NC:
 //    nunca commitar, nunca publicar, nunca pôr no zip. (.gitignore cobre testes/.game e tests/.game.)
 //
-// Também exporta nsInit(): script de página que acha o objeto interno do jogo do mesmo jeito que o piloto
-// (Object.create embrulhado só no carregamento, devolvido logo depois) e expõe, SÓ NO NAVEGADOR DE TESTE,
-// window.__NS (módulos pelos nomes lógicos, via fonte-piloto/mapa.js) e window.__NSRAW (o objeto real).
+// Também exporta nsInit(): script de página que acha o objeto interno do jogo do mesmo jeito que o piloto e expõe,
+// SÓ NO NAVEGADOR DE TESTE, window.__NS (módulos pelos nomes lógicos, via fonte-piloto/mapa.js) e window.__NSRAW
+// (o objeto real).
 const path = require('path'), fs = require('fs');
 
 const ORIGEM = 'https://pokesurvivor.com';
@@ -26,7 +26,7 @@ async function baixar(GAME, rel) {
   if (emVoo.has(rel)) return emVoo.get(rel);
   const pr = (async () => {
     const url = ORIGEM + '/' + rel.split(path.sep).join('/');
-    const r = await fetch(url, { method: 'GET', redirect: 'follow', headers: { 'user-agent': 'sobrevida-testes/0.12.3', accept: '*/*' }, credentials: 'omit' });
+    const r = await fetch(url, { method: 'GET', redirect: 'follow', headers: { 'user-agent': 'sobrevida-testes', accept: '*/*' }, credentials: 'omit' });
     if (!r.ok) return null;
     const buf = Buffer.from(await r.arrayBuffer());
     const f = path.join(GAME, rel);
@@ -105,7 +105,7 @@ function nsInit() {
   })();`;
 }
 
-// quadro da Sobrevida: o id é sorteado a cada página (0.12.2); acha pelo conteúdo (shadow root com .fab)
+// quadro da Sobrevida: o id muda a cada página; acha pelo conteúdo (shadow root com .fab)
 async function marcarHost(page) {
   return page.evaluate(() => {
     const h = [...document.querySelectorAll('body > *, html > *')].find((e) => e.shadowRoot && e.shadowRoot.querySelector('.fab, .card, .menu, .pick'));
