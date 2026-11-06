@@ -909,7 +909,7 @@
     const horas = ss && ss.start ? Math.max(1 / 60, (Date.now() - ss.start) / 3600000) : 0;
     const pr = p && p.partner;
     const pct = pr && pr.total ? Math.round((pr.have / pr.total) * 100) : 0;
-    const sig = JSON.stringify([lang, farm, st, pr, ss, p && p.acts && p.acts.map((a) => a.t), p && p.owned, p && p.maxed, p && p.guest, p && p.hw, p && p.shiny]);
+    const sig = JSON.stringify([lang, farm, st, pr, ss, p && p.acts && p.acts.map((a) => a.t), p && p.owned, p && p.maxed, p && p.guest, p && p.hw, p && p.shiny, p && p.gachaUlt]);
     if (sig === farmSig) return;
     farmSig = sig;
     const G = farm.modo === 'grupo';
@@ -924,6 +924,7 @@
         <div class="pbar"><i style="width:${pct}%"></i></div><small>${esc(F.prog(pr.have, pr.total, pct))}</small><br><small>${esc(F.col(p.owned, p.maxed))}</small>${pr.build && pr.build.a ? `<br><small class="bld" title="${esc(F.buildWhy)}">${esc(F.build([pr.build.a, pr.build.b].filter(Boolean).join(' + '), (pr.build.buffs || []).join(', '), pr.build.parceiro || '—'))}</small>` : ''}${pr.nat ? `<br><small class="bld">${esc(F.natAb(pr.nat, pr.abil || '—'))}</small>` : ''}</div></div>` : ''}
       ${ss && ss.start ? `<div class="kv">${esc(F.sess(ss.runs, fmt(ss.coins), fmt(Math.round(ss.coins / horas)), ss.t1 + ss.t10 * 10, ss.best ? mmss(ss.best) : '—'))}${p.hw ? ' · ' + esc(F.candy(ss.candy)) : ''}</div>` : ''}
       ${p && p.shiny && !G ? `<div class="kv">${esc(F.shinyLn(p.shiny))}</div>` : ''}
+      ${p && p.gachaUlt && !G ? `<div class="kv">${esc(F.gachaLn(p.gachaUlt, p.shiny ? p.shiny.max : 3000))}</div>` : ''}
       ${p && p.acts && p.acts.length ? `<div class="acts">${p.acts.slice(0, 4).map((a) => `<div>· ${esc(actTxt(a))}</div>`).join('')}</div>` : ''}
       ${G ? '' : `<details class="fopts"${farmOptsOpen ? ' open' : ''}><summary>${esc(F.opts)}</summary><div class="opts">
         ${['upgrades', 'shop', 'gacha', 'gachaMenos', 'gachaShiny', 'partner', 'missions', 'skins'].map((k) => `<label class="sw"><input type="checkbox" data-f="${k}"${farm[k] ? ' checked' : ''}> ${esc(F.opt[k])}</label>`).join('')}

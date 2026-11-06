@@ -14,7 +14,7 @@
 //  - partida que o farm tocou NUNCA vai para o ranking (Ranking.submit* bloqueado + selo bloqueado pelo fundo).
 (() => {
   'use strict';
-  const VERSAO = '0.12.4';
+  const VERSAO = '0.12.5';
   // 0.12.2: marca de "já carregou" num Symbol (não aparece como nome no window)
   const MARCA = Symbol.for('sv.p');
   if (window[MARCA]) return;
@@ -731,6 +731,10 @@
     r.parou = !e.total ? null : !e.faltam ? 'todos' : (parou || (r.parouN ? 'n' : null) || (!ticketsOk(ns) ? 'tickets' : null));
     return e;
   }
+  // 0.12.5: sem teto de blocos. O laço roda enquanto houver tickets para um bloco, o farm estiver ligado e nenhuma parada
+  // tiver disparado; sem teto de tempo. Contra laço sem fim (o jogo muda a tela do gacha): bloco que não abre a animação,
+  // não mostra o botão de fechar ou não tira tiro nenhum conta uma falha; 2 seguidas encerram com o motivo.
+  // Paradas (act 'gacha' .parou e painel): tickets · shiny-todos · sem-shiny-n · desligado · colecao · falha:<qual>
   async function gacha(ns) {
     const s = ns.DB.save, t = () => (ns.DB.save && ns.DB.save.tickets) || {};
     if (!s) return;
@@ -745,39 +749,74 @@
     if (!await ir('gacha')) return;
     const tab = $(`#gacha-gens .gen-tab[data-gen="${gen}"]`); if (tab) { tab.click(); await sleep(300); }
     const before = new Set(Object.keys(ns.DB.save.owned || {}));
-    let pulls = 0, shinyNovo = 0;
+    let pulls = 0, shinyNovo = 0, falhas = 0, parou = null;
     const gen0 = gen, gens = [gen];
-    for (let i = 0; i < 40 && cfg.on && (!shiny || cfg.gachaShiny); i++) {
+    M.gachaUlt = null;
+    const ult = M.gachaUlt = { n: 0, parou: null };
+    const nPulls = () => (ns.DB.save.stats && ns.DB.save.stats.pulls) || 0;
+    // fecha a animação do gacha se ficou aberta (skip, depois close) e espera sumir; usado depois de todo bloco e ao parar
+    const limparFx = async () => {
+      for (let k = 0; k < 3 && open('pull-fx'); k++) {
+        const sk = $('#pull-skip'); if (sk && !sk.classList.contains('hidden')) sk.click();
+        const c = $('#pull-close'); if (c && !c.classList.contains('hidden')) c.click();
+        await waitFor(() => !open('pull-fx'), 3000);
+      }
+      await sleep(250);
+    };
+    const trocaBanner = async (g) => { if (g == null || g === gen) return; gen = g; gens.push(g); const t2 = $(`#gacha-gens .gen-tab[data-gen="${g}"]`); if (t2) { t2.click(); await sleep(300); } };
+    try { for (;;) {
+      if (!cfg.on || !cfg.gacha || grupo() || naSala(ns) || (shiny && !cfg.gachaShiny)) { parou = 'desligado'; break; }
+      if (document.visibilityState !== 'visible') { parou = 'escondida'; break; }   // aba escondida: o navegador freia os tempos e o bloco falharia à toa
+      if (!shiny) {
+        // coleção do modo normal: o banner pode mudar (outra região passa a ser a mais perto) ou a coleção fechar
+        const g = gachaGen(ns);
+        if (g == null) { if (cfg.gachaShiny && shinyResumo(ns).total) { shiny = true; } else { parou = 'colecao'; break; } }
+        else await trocaBanner(g);
+      }
+      if (shiny) { const e = shinyResumo(ns); if (!e.total || !e.faltam) { parou = 'shiny-todos'; break; } if (M.shiny.parouN) { parou = 'sem-shiny-n'; break; } await trocaBanner(e.gen); }
       const tk = t();
       const id = (tk.t10 || 0) >= 10 ? 'pull-100b' : (tk.t1 || 0) >= 100 ? 'pull-100' : (tk.t10 || 0) >= 1 ? 'pull-10b' : (tk.t1 || 0) >= 10 ? 'pull-10' : null;
-      const b = id && document.getElementById(id);
-      if (!b || b.disabled) break;
-      const shBefore = Object.keys(ns.DB.save.shiny || {}).length;
-      b.click();
-      if (!await waitFor(() => open('pull-fx'), 3000)) break;
-      await sleep(250);
-      const sk = $('#pull-skip'); if (sk && !sk.classList.contains('hidden')) sk.click();
-      await waitFor(() => { const c = $('#pull-close'); return c && !c.classList.contains('hidden'); }, 20000);
-      await sleep(500);
-      const n = id.includes('100') ? 100 : 10;
-      pulls += n;
+      if (!id) { parou = 'tickets'; break; }
+      const b = document.getElementById(id);
+      const shBefore = Object.keys(ns.DB.save.shiny || {}).length, p0 = nPulls();
+      let falha = null;
+      if (!b || b.disabled) falha = 'botao';
+      else {
+        b.click();
+        if (!await waitFor(() => open('pull-fx') || nPulls() > p0, 30000)) falha = 'animacao';
+        else {
+          await sleep(250);
+          const sk = $('#pull-skip'); if (sk && !sk.classList.contains('hidden')) sk.click();
+          const fechou = await waitFor(() => { const c = $('#pull-close'); return c && !c.classList.contains('hidden'); }, 20000);
+          await sleep(500);
+          if (!fechou) falha = 'fechar';
+        }
+      }
+      await limparFx();
+      // o que o jogo registrou de verdade (em vez do tamanho nominal do botão)
+      const feitos = ns.DB.save.stats ? nPulls() - p0 : (id.includes('100') ? 100 : 10), n = feitos > 0 ? feitos : 0;
+      // o bloco só conta se o jogo registrou os tiros (tickets podem subir por missão ou baú no meio: por isso o contador do jogo)
+      if (!falha && ns.DB.save.stats && feitos <= 0) falha = 'tiros';
+      if (falha) {
+        if (++falhas >= 2) { parou = 'falha:' + falha; break; }
+        continue;
+      }
+      falhas = 0;
+      pulls += n; ult.n = pulls;
       const novoBloco = Object.keys(ns.DB.save.shiny || {}).length - shBefore;
       shinyNovo += novoBloco;
-      const c = $('#pull-close'); if (c) c.click();
-      await waitFor(() => !open('pull-fx'), 3000);
-      await sleep(250);
       if (shiny) {
-        // contagem de tiros seguidos sem shiny novo e paradas (o laço já é limitado: no máximo 40 blocos por rotina)
         const r = M.shiny || (M.shiny = { desde: 0 }); r.desde = novoBloco > 0 ? 0 : (r.desde || 0) + n;
         if (r.desde >= SHINY_SEM_MAX) r.parouN = true;
-        const e = shinyResumo(ns);
-        if (!e.total || !e.faltam || r.parouN) break;
-        if (e.gen != null && e.gen !== gen) { gen = e.gen; gens.push(gen); const t2 = $(`#gacha-gens .gen-tab[data-gen="${gen}"]`); if (t2) { t2.click(); await sleep(300); } }
+        shinyResumo(ns);
       }
     }
+    } catch (e) { parou = 'falha:erro'; log('gacha', e); }
     const novos = Object.keys(ns.DB.save.owned || {}).filter((d) => !before.has(d)).map(Number);
     if (shiny) shinyResumo(ns);
-    if (pulls) act('gacha', { gen: gen0, n: pulls, novos: novos.slice(0, 4).map((d) => nome(ns, d)), nn: novos.length, sh: shinyNovo, modo: shiny ? 'shiny' : undefined, gens: shiny ? gens.slice(0, 12) : undefined, tem: shiny && M.shiny ? M.shiny.tem : undefined, de: shiny && M.shiny ? M.shiny.de : undefined });
+    ult.parou = parou;
+    if (parou && /^falha/.test(parou)) await limparFx();
+    if (pulls || (parou && /^falha/.test(parou))) act('gacha', { gen: gen0, n: pulls, novos: novos.slice(0, 4).map((d) => nome(ns, d)), nn: novos.length, sh: shinyNovo, modo: shiny ? 'shiny' : undefined, gens: shiny ? gens.slice(0, 12) : undefined, tem: shiny && M.shiny ? M.shiny.tem : undefined, de: shiny && M.shiny ? M.shiny.de : undefined, parou });
     await voltar('gacha');
   }
 
@@ -1228,6 +1267,7 @@
       coins: s ? s.coins : null, t1: s && s.tickets ? s.tickets.t1 : null, t10: s && s.tickets ? s.tickets.t10 : null,
       candy: s && s.bag ? s.bag.candy || 0 : 0, hw: !!(ns.Halloween && ns.Halloween.on), guest: !!(ns.DB && ns.DB.guest),
       partner: tgt, owned, maxed, sess, acts, touched: M.touched,
+      gachaUlt: M.gachaUlt ? { n: M.gachaUlt.n, parou: M.gachaUlt.parou } : null,
       shiny: cfg.gachaShiny && M.shiny ? { tem: M.shiny.tem, de: M.shiny.de, desde: M.shiny.desde || 0, max: M.shiny.max, parou: M.shiny.parou || null } : null,
     });
   }

@@ -39,7 +39,7 @@ async function cena(b, piloto, montar, cfg, espera) {
   await p.evaluate((c) => document.dispatchEvent(new CustomEvent('sobrevida:cfg', { detail: JSON.stringify(c) })), Object.assign({}, BASE, cfg));
   const r = await espera(p);
   await p.evaluate(() => document.dispatchEvent(new CustomEvent('sobrevida:cfg', { detail: JSON.stringify({ on: false }) })));
-  const fim = await p.evaluate(() => { const s = window.__NS.DB.save; return { t1: s.tickets.t1, t10: s.tickets.t10, shiny: Object.keys(s.shiny || {}).length, st: window.__st && { shiny: window.__st.shiny, acts: window.__st.acts, task: window.__st.task } }; });
+  const fim = await p.evaluate(() => { const s = window.__NS.DB.save; return { t1: s.tickets.t1, t10: s.tickets.t10, shiny: Object.keys(s.shiny || {}).length, st: window.__st && { shiny: window.__st.shiny, acts: window.__st.acts, task: window.__st.task, gachaUlt: window.__st.gachaUlt } }; });
   await ctx.close();
   return { antes, fim, r };
 }
@@ -102,6 +102,7 @@ const roda = (k) => !SO || SO.includes(k);
     const ac = (r.fim.st.acts || []).find((x) => x.k === 'gacha'), gastos = ac ? ac.a.n : 0;
     if (process.env.DEBUG) console.log('   painel final:', JSON.stringify(r.fim.st));
     ok(!!r.r && r.r.parou === 'n', `c. parou por "N tiros seguidos sem shiny novo": parou=${r.r && r.r.parou}, desde=${r.r && r.r.desde}, max=${r.r && r.r.max}`);
+    ok(!!ac && ac.a.parou === 'sem-shiny-n' && !!r.fim.st.gachaUlt && r.fim.st.gachaUlt.parou === 'sem-shiny-n' && r.fim.st.gachaUlt.n === gastos, `c. motivo "sem-shiny-n" no registro e no painel (Tiros desta rotina: ${r.fim.st.gachaUlt && r.fim.st.gachaUlt.n})`);
     ok(gastos >= 300 && gastos <= 450, `c. tirou só o necessário: ${gastos} tiros (N = 300, blocos de 100) e sobrou ticket (t1 ${r.fim.t1})`);
   }
 
@@ -121,6 +122,53 @@ const roda = (k) => !SO || SO.includes(k);
   if (roda('f')) {
     r = await cena(b, PIL, eval(COMPLETA(false).replace('s.tickets.t1 = 1000;', 's.tickets.t1 = 100; Math.random = () => 0.5;')), {}, esperarAte(() => { const s = window.__st && window.__st.shiny; return s && s.parou === 'tickets' ? s : null; }, 80000));
     ok(!!r.r && r.r.parou === 'tickets' && r.fim.t1 < 10, `f. sem tickets: parou="${r.r && r.r.parou}" (t1 ${r.fim.t1})`);
+  }
+
+  // h. o jogo muda a tela do gacha: botões que não respondem / somem → 2 falhas seguidas e para, com o motivo (sem laço sem fim)
+  const FALHA = (como) => `() => { const N = window.__NS; const m = (${COMPLETA(false)})(); for (const id of ['pull-100', 'pull-100b', 'pull-10', 'pull-10b']) { const e = document.getElementById(id); if (!e) continue; ${como} } return m; }`;
+  if (roda('h')) {
+    r = await cena(b, PIL, eval(FALHA("e.replaceWith(e.cloneNode(true));")), {}, esperarAte(() => { const u = window.__st && window.__st.gachaUlt; return u && u.parou ? u : null; }, 120000));
+    const ac = (r.fim.st.acts || []).find((x) => x.k === 'gacha');
+    ok(!!r.r && r.r.parou === 'falha:animacao' && r.r.n === 0 && !!ac && ac.a.parou === 'falha:animacao', `h. botões que não respondem: parou="${r.r && r.r.parou}" depois de 2 falhas seguidas, 0 tiros, t1 ${r.fim.t1}`);
+    r = await cena(b, PIL, eval(FALHA("e.id = 'x-' + id;")), {}, esperarAte(() => { const u = window.__st && window.__st.gachaUlt; return u && u.parou ? u : null; }, 60000));
+    ok(!!r.r && r.r.parou === 'falha:botao', `h. botão que sumiu: parou="${r.r && r.r.parou}"`);
+  }
+
+  // i. Parar (farm desligado) interrompe o laço no bloco seguinte
+  if (roda('i')) {
+    r = await cena(b, PIL, eval(COMPLETA(false).replace('s.tickets.t1 = 1000;', 's.tickets.t1 = 5000;')), {}, async (p) => {
+      const t0 = Date.now();
+      while (Date.now() - t0 < 120000) { await sleep(500); if (await p.evaluate(() => window.__st && window.__st.gachaUlt && window.__st.gachaUlt.n >= 100)) break; }
+      await p.evaluate(() => document.dispatchEvent(new CustomEvent('sobrevida:cfg', { detail: JSON.stringify({ on: false }) })));
+      const t1 = Date.now();
+      while (Date.now() - t1 < 60000) { await sleep(500); const a = await p.evaluate(() => (window.__st.acts || []).find((x) => x.k === 'gacha')); if (a) return a; }
+      return null;
+    });
+    ok(!!r.r && r.r.a.parou === 'desligado' && r.r.a.n >= 100 && r.r.a.n <= 300, `i. Parar interrompe no bloco seguinte: parou="${r.r && r.r.a.parou}", ${r.r && r.r.a.n} tiros (sobraram t1=${r.fim.t1})`);
+  }
+
+  // g. tickets MUITO acima do teto antigo (40 blocos): todos gastos numa rotina só e a partida só começa depois
+  //    (0.12.5; reproduzido antes da correção na 0.12.4: parava em 4.000 tiros e ia para a partida com ticket sobrando)
+  if (roda('g')) {
+    const mg = eval(COMPLETA(false).replace('s.tickets.t1 = 1000; s.tickets.t10 = 0;', 's.tickets.t1 = 4000; s.tickets.t10 = 500;'));
+    const espera = async (p) => {
+      const t0 = Date.now(); let primeira = null; const vistos = [];
+      while (Date.now() - t0 < 25 * 60000) {
+        await sleep(1000);
+        const st = await p.evaluate(() => window.__st && { run: !!window.__st.run, task: window.__st.task, t1: window.__st.t1, t10: window.__st.t10, ac: (window.__st.acts || []).filter((x) => x.k === 'gacha').map((x) => ({ n: x.a.n, t: x.t, parou: x.a.parou, modo: x.a.modo })), ul: window.__st.gachaUlt });
+        if (!st) continue;
+        for (const x of st.ac) if (!vistos.some((v) => v.t === x.t)) vistos.push(x);
+        if (st.run && !primeira) { primeira = { t1: st.t1, t10: st.t10, ac: vistos.slice(), ul: st.ul }; break; }
+      }
+      return primeira;
+    };
+    r = await cena(b, PIL, mg, {}, espera);
+    const pr = r.r;
+    const rot = pr ? pr.ac.length : 0, tiros = pr ? pr.ac.reduce((x, y) => x + y.n, 0) : 0;
+    const sobra = pr ? (pr.t10 >= 1 || pr.t1 >= 10) : null;
+    console.log(`   rotinas de gacha antes da 1ª partida: ${rot} | tiros por rotina: ${pr && pr.ac.map((x) => x.n).join(' + ')} | total ${tiros} | tickets que sobraram quando a partida começou: t10=${pr && pr.t10} t1=${pr && pr.t1} | motivos: ${pr && pr.ac.map((x) => x.parou).join(',')}`);
+    ok(!!pr && !sobra, `g. tickets acima do teto: gastou todos antes da partida (sobraram t10=${pr && pr.t10}, t1=${pr && pr.t1}; ${rot} rotina(s), ${tiros} tiros)`);
+    ok(!!pr && rot === 1 && pr.ac[0].parou === 'tickets', `g. numa rotina só e com o motivo "tickets" (${pr && pr.ac.map((x) => x.parou).join(',')})`);
   }
 
   await b.close();

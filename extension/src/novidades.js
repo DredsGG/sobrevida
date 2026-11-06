@@ -2,6 +2,9 @@
 // Frases curtas, do ponto de vista de quem usa. Aparece uma vez, na primeira abertura depois da atualização.
 globalThis.SV_NOVIDADES = {
   pt: {
+    '0.12.5': [
+      "Gacha: o farm agora gasta todos os tickets numa rotina só (antes parava em 4.000 tiros e ia para a partida com ticket sobrando). O painel mostra \"Gacha parou: …\" e os tiros da rotina.",
+    ],
     '0.12.4': [
       "Botão Auto na partida: no lugar da barrinha do farm, só um botão com um ponto (cinza = desligado, verde = ligado) e um \"⋯\" para abrir o menu. Clicar faz o mesmo que Alt+F. Quando o farm não pode jogar, o botão fica âmbar com um aviso curto. Quem prefere a barra de antes escolhe \"completa\" no menu.",
       "Gacha de shiny: com a coleção completa, o farm continua tirando gacha atrás dos shinies que faltam, no banner com mais shinies faltando. Para quando pega todos, depois de 3.000 tiros seguidos sem shiny novo ou quando os tickets acabam. O painel mostra \"Shiny: X de Y\". É uma opção do menu (ligada).",
@@ -127,6 +130,9 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   en: {
+    '0.12.5': [
+      "Gacha: the farm now spends every ticket in a single round (before, it stopped at 4,000 pulls and went to a run with tickets left). The panel shows \"Gacha stopped: …\" and the pulls of the round.",
+    ],
     '0.12.4': [
       "Auto button during a run: instead of the farm bar, just one button with a dot (grey = off, green = on) and a \"⋯\" that opens the menu. Clicking does the same as Alt+F. When the farm can't play, the button turns amber with a short note. If you prefer the old bar, pick \"full\" in the menu.",
       "Shiny gacha: once the collection is complete, the farm keeps pulling for the shinies you're missing, on the banner with the most missing. It stops when it has them all, after 3,000 pulls in a row without a new shiny, or when tickets run out. The panel shows \"Shiny: X of Y\". It's a menu option (on).",
@@ -252,6 +258,9 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   es: {
+    '0.12.5': [
+      "Gacha: el farm ahora gasta todos los tickets en una sola ronda (antes paraba en 4.000 tiradas y pasaba a la partida con tickets sobrando). El panel muestra \"Gacha paró: …\" y las tiradas de la ronda.",
+    ],
     '0.12.4': [
       "Botón Auto en la partida: en lugar de la barrita del farm, solo un botón con un punto (gris = apagado, verde = activado) y un \"⋯\" que abre el menú. Hacer clic equivale a Alt+F. Cuando el farm no puede jugar, el botón se pone ámbar con un aviso corto. Si prefieres la barra de antes, elige \"completa\" en el menú.",
       "Gacha de shiny: con la colección completa, el farm sigue tirando gacha por los shinies que faltan, en el banner con más shinies pendientes. Para al conseguirlos todos, tras 3.000 tiradas seguidas sin shiny nuevo o cuando se acaban los tickets. El panel muestra \"Shiny: X de Y\". Es una opción del menú (activada).",
