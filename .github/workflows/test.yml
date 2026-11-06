@@ -1,10 +1,14 @@
 name: Test
 
-# Runs on every push. The game is never copied into this repo: each job clones the public PokéSurvivor repository
-# (github.com/JPTER78/pokesurvivor, the same build that pokesurvivor.com serves) and serves it locally as
-# https://pokesurvivor.com. Firebase and the leaderboard seal are faked, so nothing reaches the real servers.
-#  - chromium: tests/e2e.cjs (starter picker + quiz on a simulated quiz page) and tests/e2e-farm.cjs (real game, auto farm)
-#  - firefox:  web-ext lint + real Firefox (Selenium) on the real game: picker, quiz, farm starting a run, seal blocked
+# Runs on every push. The game is never copied into this repository. Its public repository is gone (2026-11-05), so
+# the job keeps a throwaway copy in tests/.game, fetched file by file from pokesurvivor.com by tests/espelhar-jogo.cjs
+# (static files only, plain GET, no cookies, no login), and serves it locally as https://pokesurvivor.com.
+# Firebase and the leaderboard seal are faked, so nothing reaches the real servers. The copy is only used inside the
+# job: it is never committed, cached or uploaded as an artifact (the game is PolyForm Noncommercial, sprites CC BY-NC).
+#  - chromium: tests/e2e.cjs (starter picker + quiz on a simulated quiz page), tests/e2e-farm.cjs (real game, auto
+#    farm) and tests/lab-mapa.cjs (every game module found by its shape); then real Firefox (Selenium) on the same
+#    copy of the game: picker, quiz, farm starting a run, seal blocked
+#  - lint: web-ext lint
 on:
   push:
   workflow_dispatch:
@@ -12,21 +16,25 @@ on:
 jobs:
   chromium:
     runs-on: ubuntu-latest
+    env:
+      ESPELHAR: '1'
     steps:
       - uses: actions/checkout@v4
-
-      - name: Game build (public repo)
-        run: |
-          git clone -q --depth 1 https://github.com/JPTER78/pokesurvivor tests/.game
-          echo "game commit: $(git -C tests/.game rev-parse --short HEAD)" | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Playwright
         run: |
           npm i --no-save --silent playwright@1
           npx playwright install --with-deps chromium
 
+      - name: Game build (local copy from pokesurvivor.com)
+        run: |
+          node tests/espelhar-jogo.cjs tests/.game | tee -a "$GITHUB_STEP_SUMMARY"
+
       - name: Pix codes
         run: node tests/pix.cjs
+
+      - name: Game modules found by shape
+        run: node tests/lab-mapa.cjs
 
       - name: Starter picker and quiz
         run: node tests/e2e.cjs extension out/e2e
@@ -34,13 +42,36 @@ jobs:
       - name: Auto farm on the real game
         run: node tests/e2e-farm.cjs extension tests/.game out/farm 2
 
+      - name: Certificate and hosts (Firefox)
+        run: |
+          H="pokesurvivor.com ice.pokesurvivor.com www.gstatic.com apis.google.com firestore.googleapis.com pokesurvivor-free-default-rtdb.europe-west1.firebasedatabase.app"
+          SAN="$(for h in $H; do printf 'DNS:%s,' "$h"; done | sed 's/,$//')"
+          openssl req -x509 -newkey rsa:2048 -nodes -keyout key.pem -out cert.pem -days 2 -subj "/CN=pokesurvivor.com" -addext "subjectAltName=$SAN"
+          echo "127.0.0.1 $H" | sudo tee -a /etc/hosts
+          firefox --version
+          pip install -q selenium
+
+      - name: Firefox end-to-end
+        run: |
+          sudo node tests/firefox/server.mjs "$PWD/cert.pem" "$PWD/key.pem" "$PWD/tests/.game" > server.log 2>&1 &
+          sleep 2
+          mkdir -p out/ff
+          python tests/firefox/run_firefox.py "$PWD/extension" "$PWD/out/ff" 120 2>&1 | tee out/ff/log.txt
+          test "${PIPESTATUS[0]}" = "0"
+
+      - name: Summary
+        if: always()
+        run: |
+          { echo '### Firefox'; echo '```json'; cat out/ff/resultado.json 2>/dev/null || tail -40 out/ff/log.txt 2>/dev/null; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          cp server.log out/ff/ 2>/dev/null || true
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: chromium
+          name: results
           path: out/
 
-  firefox:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -51,36 +82,3 @@ jobs:
           jq '.summary' lint.json
           jq -r '.errors[] | "ERROR \(.code) \(.file // "") \(.message)"' lint.json
           test "$(jq '.summary.errors' lint.json)" = "0"
-
-      - name: Game build, certificate and hosts
-        run: |
-          git clone -q --depth 1 https://github.com/JPTER78/pokesurvivor game
-          H="pokesurvivor.com ice.pokesurvivor.com www.gstatic.com apis.google.com firestore.googleapis.com pokesurvivor-free-default-rtdb.europe-west1.firebasedatabase.app"
-          SAN="$(for h in $H; do printf 'DNS:%s,' "$h"; done | sed 's/,$//')"
-          openssl req -x509 -newkey rsa:2048 -nodes -keyout key.pem -out cert.pem -days 2 -subj "/CN=pokesurvivor.com" -addext "subjectAltName=$SAN"
-          echo "127.0.0.1 $H" | sudo tee -a /etc/hosts
-          firefox --version
-          pip install -q selenium
-
-      - name: Firefox end-to-end
-        run: |
-          sudo node tests/firefox/server.mjs "$PWD/cert.pem" "$PWD/key.pem" "$PWD/game" > server.log 2>&1 &
-          sleep 2
-          mkdir -p out
-          python tests/firefox/run_firefox.py "$PWD/extension" "$PWD/out" 120 2>&1 | tee out/log.txt
-          test "${PIPESTATUS[0]}" = "0"
-
-      - name: Summary
-        if: always()
-        run: |
-          { echo '### Firefox'; echo '```json'; cat out/resultado.json 2>/dev/null || tail -40 out/log.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
-
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: firefox
-          path: |
-            out/*.png
-            out/resultado.json
-            out/log.txt
-            server.log
