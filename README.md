@@ -8,7 +8,7 @@
 Choose your partner Pokémon before the 8-question personality quiz and get exactly that one. Then let the auto farm play runs, claim missions, pull the gacha and buy upgrades while you watch.
 
 ![Manifest V3](https://img.shields.io/badge/Manifest-V3-4285F4?logo=googlechrome&logoColor=white)
-![Version](https://img.shields.io/badge/version-0.12.5-f4b400)
+![Version](https://img.shields.io/badge/version-0.12.6-f4b400)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 **Works on:** Chrome · Edge · Brave · Opera GX

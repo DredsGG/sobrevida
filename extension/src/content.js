@@ -562,7 +562,7 @@
 
   // ───────────────────────── farm automático (v0.2.0) ─────────────────────────
   // O piloto (src/piloto.js, mundo da página) joga e cuida da rotina; aqui ficam a configuração, a ponte e o painel.
-  const FARM_DEF = { on: false, modo: 'solo', upgrades: true, gacha: true, partner: true, missions: true, skins: true, shop: true, hud: true, cola: true, gachaMenos: false, gachaShiny: true, barra: 'botao' };
+  const FARM_DEF = { on: false, modo: 'solo', upgrades: true, gacha: true, partner: true, missions: true, skins: true, shop: true, hud: true, cola: true, gachaMenos: false, gachaShiny: true, shinyParceiro: true, barra: 'botao' };
   let farm = Object.assign({}, FARM_DEF), pst = null, pstAt = 0, farmCanvas = null, farmSig = '';
   const mmss = I.mmss;
   // 0.4.0: o que o farm aprendeu nas partidas (acertos reais por golpe) fica guardado aqui e volta para o piloto
@@ -895,6 +895,8 @@
       case 'moves': return T.aMoves(x.nome, x.start, x.start2, (x.bans || []).join(', '));
       case 'shop': return T.aShop(x.nome, x.tipo, x.alvo, x.ganho, x.preco);
       case 'skins': return T.aSkins(x.n);
+      case 'rotina': return T.rotinaLn(x);   // 0.12.6
+      case 'shiny': return T.aShiny(x.nome, x.ok);   // 0.12.6
       case 'video': return T.aVideo;
       case 'save': return T.aSave;
       default: return a.k;
@@ -909,7 +911,7 @@
     const horas = ss && ss.start ? Math.max(1 / 60, (Date.now() - ss.start) / 3600000) : 0;
     const pr = p && p.partner;
     const pct = pr && pr.total ? Math.round((pr.have / pr.total) * 100) : 0;
-    const sig = JSON.stringify([lang, farm, st, pr, ss, p && p.acts && p.acts.map((a) => a.t), p && p.owned, p && p.maxed, p && p.guest, p && p.hw, p && p.shiny, p && p.gachaUlt]);
+    const sig = JSON.stringify([lang, farm, st, pr, ss, p && p.acts && p.acts.map((a) => a.t), p && p.owned, p && p.maxed, p && p.guest, p && p.hw, p && p.shiny, p && p.gachaUlt, p && p.rotinaUlt]);
     if (sig === farmSig) return;
     farmSig = sig;
     const G = farm.modo === 'grupo';
@@ -925,9 +927,10 @@
       ${ss && ss.start ? `<div class="kv">${esc(F.sess(ss.runs, fmt(ss.coins), fmt(Math.round(ss.coins / horas)), ss.t1 + ss.t10 * 10, ss.best ? mmss(ss.best) : '—'))}${p.hw ? ' · ' + esc(F.candy(ss.candy)) : ''}</div>` : ''}
       ${p && p.shiny && !G ? `<div class="kv">${esc(F.shinyLn(p.shiny))}</div>` : ''}
       ${p && p.gachaUlt && !G ? `<div class="kv">${esc(F.gachaLn(p.gachaUlt, p.shiny ? p.shiny.max : 3000))}</div>` : ''}
+      ${p && p.rotinaUlt && !G ? `<div class="kv">${esc(F.rotinaLn(p.rotinaUlt))}</div>` : ''}
       ${p && p.acts && p.acts.length ? `<div class="acts">${p.acts.slice(0, 4).map((a) => `<div>· ${esc(actTxt(a))}</div>`).join('')}</div>` : ''}
       ${G ? '' : `<details class="fopts"${farmOptsOpen ? ' open' : ''}><summary>${esc(F.opts)}</summary><div class="opts">
-        ${['upgrades', 'shop', 'gacha', 'gachaMenos', 'gachaShiny', 'partner', 'missions', 'skins'].map((k) => `<label class="sw"><input type="checkbox" data-f="${k}"${farm[k] ? ' checked' : ''}> ${esc(F.opt[k])}</label>`).join('')}
+        ${['upgrades', 'shop', 'gacha', 'gachaMenos', 'gachaShiny', 'partner', 'shinyParceiro', 'missions', 'skins'].map((k) => `<label class="sw"><input type="checkbox" data-f="${k}"${farm[k] ? ' checked' : ''}> ${esc(F.opt[k])}</label>`).join('')}
       </div></details>`}
       <div class="barsel"><span class="note">${esc(F.auto.barra)}</span><div class="modos" role="radiogroup" aria-label="${esc(F.auto.barra)}">${['botao', 'completa'].map((m) => `<button type="button" role="radio" data-barra="${m}" class="${farm.barra === m ? 'on' : ''}" aria-checked="${farm.barra === m}">${esc(m === 'botao' ? F.auto.soBotao : F.auto.completa)}</button>`).join('')}</div></div>
       <label class="sw hudsw"><input type="checkbox" data-f="hud"${farm.hud ? ' checked' : ''}> ${esc(F.hud)}</label>

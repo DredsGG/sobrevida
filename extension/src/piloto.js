@@ -14,7 +14,7 @@
 //  - partida que o farm tocou NUNCA vai para o ranking (Ranking.submit* bloqueado + selo bloqueado pelo fundo).
 (() => {
   'use strict';
-  const VERSAO = '0.12.5';
+  const VERSAO = '0.12.6';
   // 0.12.2: marca de "já carregou" num Symbol (não aparece como nome no window)
   const MARCA = Symbol.for('sv.p');
   if (window[MARCA]) return;
@@ -96,6 +96,7 @@
     gacha: true,        // tirar gacha com os tickets
     gachaMenos: false,  // 0.9.0: gacha na região onde você tem menos Pokémon (padrão: a mais perto de completar)
     gachaShiny: true,   // 0.12.4: com a coleção completa, continua tirando gacha atrás dos shinies que faltam
+    shinyParceiro: true, // 0.12.6: o parceiro usa a versão shiny quando a pessoa tem o shiny dele
     partner: true,      // trocar de parceiro sozinho: o melhor que ainda não está 100%
     skins: true,        // Halloween: comprar as skins de bruja com os doces
     cola: true,         // 0.7.0/0.8.0: colinha (coleção, cartas de nível, pausa e faixa no HUD)
@@ -114,7 +115,7 @@
     try {
       const c = JSON.parse(e.detail || '{}');
       const was = cfg.on, shinyWas = cfg.gachaShiny;
-      for (const k of ['on', 'upgrades', 'gacha', 'partner', 'skins', 'missions', 'shop', 'hud', 'cola', 'gachaMenos', 'gachaShiny']) if (typeof c[k] === 'boolean') cfg[k] = c[k];
+      for (const k of ['on', 'upgrades', 'gacha', 'partner', 'skins', 'missions', 'shop', 'hud', 'cola', 'gachaMenos', 'gachaShiny', 'shinyParceiro']) if (typeof c[k] === 'boolean') cfg[k] = c[k];
       if (shinyWas !== cfg.gachaShiny) M.shiny = null;   // ligar/desligar a opção recomeça a contagem do modo shiny
       if (typeof c.reserve === 'number' && c.reserve >= 0) cfg.reserve = c.reserve;
       if (c.modo === 'solo' || c.modo === 'grupo') cfg.modo = c.modo;
@@ -294,8 +295,16 @@
     // 3) funções soltas, pela forma do código (precisa dos nomes da etapa 2)
     const nomeDe = {};
     for (const [n, k] of Object.entries(chaves)) if (k !== n) nomeDe[k] = n;
+    // 0.12.6: o nome do decodificador é procurado em todo código do jogo no topo — funções soltas, classes e métodos
+    // dos módulos. No build 31fb6167ae (06/11) ele não aparecia em nenhuma função solta, só nas classes: sem ele,
+    // ".DB.save" ficava codificado e startMoveOf não era reconhecido (o piloto não ligava: err 'mapa').
     const brutas = [];
-    for (const k of ks) { const v = val(k); if (ehFuncaoSolta(v)) try { brutas.push(Function.prototype.toString.call(v)); } catch (_) {} }
+    const fonteDe = (f) => { try { const s = Function.prototype.toString.call(f); if (s.length <= 60000) brutas.push(s); } catch (_) {} };
+    for (const k of ks) {
+      const v = val(k);
+      if (typeof v === 'function') fonteDe(v);
+      else if (svObj(v)) { let kks; try { kks = Object.keys(v); } catch (_) { continue; } let n = 0; for (const kk of kks) { if (++n > 80) break; let f; try { f = Object.getOwnPropertyDescriptor(v, kk); } catch (_) { continue; } if (f && typeof f.value === 'function') fonteDe(f.value); } }
+    }
     const dec = svDecodificador(brutas);
     const fontes = {};
     for (const k of ks) { const v = val(k); if (ehFuncaoSolta(v) && !Object.prototype.hasOwnProperty.call(nomeDe, k) && k !== 'T') fontes[k] = svFonte(v, dec, nomeDe); }
@@ -619,15 +628,12 @@
       if (cfg.gacha) { M.task = 'gacha'; await gacha(ns); }
       // 0.11.1: se as melhorias desta rotina deixam o parceiro em 100%, troca na hora e já cuida do novo (antes,
       // ainda jogava uma partida inteira com o 100% — com um Pokémon forte, isso podia ser meia hora)
-      for (let volta = 0; volta < 3 && cfg.on; volta++) {
-        const antes = ns.DB.save && ns.DB.save.partner;
-        if (cfg.partner) { M.task = 'partner'; await parceiro(ns); }
-        if (volta > 0 && (ns.DB.save && ns.DB.save.partner) === antes) break;
-        if (cfg.shop) { M.task = 'shop'; await loja(ns); }
-        if (cfg.upgrades) { M.task = 'upgrades'; await melhorias(ns); }
-        if (cfg.upgrades) { M.task = 'moves'; await golpes(ns); }
-        if (!cfg.partner) break;
-      }
+      // 0.12.6 (pedido do André): sem o teto de 3 voltas — gasta TODAS as moedas antes de jogar. A volta (parceiro →
+      // loja → melhorias → golpes) se repete enquanto a anterior gastou moedas; para na primeira volta que não gasta
+      // nada (inclusive quando a troca de parceiro não acontece na tela). O teto (Pokémon obtidos + 5) é só contra bug.
+      await gastarTudo(ns);
+      // 0.12.6: o parceiro usa a versão shiny quando a pessoa tem o shiny dele (opção, ligada por padrão)
+      if (cfg.shinyParceiro && cfg.on) { M.task = 'shiny'; await shinyParceiro(ns); }
       if (cfg.skins && ns.Halloween && ns.Halloween.on) { M.task = 'skins'; await skins(ns); }
       M.task = 'save'; await guardar(ns);
       if (!cfg.on) return;
@@ -641,6 +647,99 @@
       if (b) { b.click(); M.touched = true; }
       await sleep(600);
     }
+  }
+
+  // ---------- 4a. rotina (0.12.6): gastar tudo antes de jogar ----------
+  // Motivos de parada: 'sem-moedas' (a melhoria mais barata do alvo não cabe em moedas − reserva) · 'tudo-100' (todo
+  // Pokémon obtido está 100%) · 'nada-a-comprar' (sobra moeda mas a volta não comprou: botão que não responde, troca de
+  // parceiro que não aconteceu, opção desligada) · 'desligado' (Parar/Auto/Alt+F) · 'teto' (contra bug).
+  const moedas = (ns) => (ns.DB.save && ns.DB.save.coins) || 0;
+  function menorPreco(ns, dex) {
+    const U = ns.Upgrades, lv = ns.DB.upgradesOf(dex) || {};
+    let m = Infinity;
+    for (const u of U.LIST) { const l = lv[u.id] || 0; if (l >= u.max || (u.needs && !lv[u.needs])) continue; try { m = Math.min(m, U.cost(u.id, l)); } catch (_) {} }
+    return m;
+  }
+  const tudo100 = (ns) => { const s = ns.DB.save; const own = Object.keys((s && s.owned) || {}).map(Number).filter((d) => ns.DEX_BY[d]); return own.length > 0 && own.every((d) => progresso(ns, d).maxed); };
+  function motivoParada(ns) {
+    if (!cfg.on) return 'desligado';
+    try {
+      if (tudo100(ns)) return 'tudo-100';
+      const t = alvo(ns);
+      if (t && menorPreco(ns, t) > moedas(ns) - reserva(ns)) return 'sem-moedas';
+    } catch (e) { log('motivoParada', e); }
+    return 'nada-a-comprar';
+  }
+  async function gastarTudo(ns) {
+    const s = ns.DB.save;
+    if (!s || !s.owned) return null;
+    const teto = Object.keys(s.owned).length + 5;
+    const R = { gasto: 0, n: 0, parou: '', voltas: 0 };
+    const trabalhados = new Set();
+    let jaTentouTroca = false;
+    M.pisoRotina = reserva(ns);   // a reserva da rotina inteira: 10% do saldo do começo (no máximo 1.500)
+    try {
+      for (let volta = 0; ; volta++) {
+        if (!cfg.on) { R.parou = 'desligado'; break; }
+        if (volta >= teto) { R.parou = 'teto'; break; }
+        const c0 = moedas(ns);
+        if (cfg.partner) { M.task = 'partner'; await parceiro(ns); }
+        // tentou trocar e a tela não trocou: tenta mais uma vez sem comprar; na 2ª falha para (nada de laço infinito)
+        let trocaFalhou = false;
+        try { trocaFalhou = !!cfg.partner && alvo(ns) !== (ns.DB.save && ns.DB.save.partner); } catch (e) { log('troca', e); }
+        if (trocaFalhou) {
+          R.voltas = volta + 1;
+          if (!jaTentouTroca) { jaTentouTroca = true; continue; }
+          R.parou = 'nada-a-comprar'; break;
+        }
+        const dex = ns.DB.save && ns.DB.save.partner;
+        if (cfg.on && cfg.shop) { M.task = 'shop'; await loja(ns); }
+        if (cfg.on && cfg.upgrades) { M.task = 'upgrades'; await melhorias(ns); }
+        if (cfg.on && cfg.upgrades) { M.task = 'moves'; await golpes(ns); }
+        R.voltas = volta + 1;
+        const gastou = c0 - moedas(ns);
+        if (gastou > 0) { R.gasto += gastou; trabalhados.add(dex); }
+        if (!cfg.on) { R.parou = 'desligado'; break; }
+        if (gastou <= 0) { R.parou = motivoParada(ns); break; }
+        // todos 100%: a loja ainda pode comprar para o mais forte, mas não fica trocando de um para outro
+        let todos = false;
+        try { todos = tudo100(ns); } catch (_) {}
+        if (todos) { R.parou = 'tudo-100'; break; }
+      }
+    } finally { M.pisoRotina = null; }
+    R.n = trabalhados.size;
+    M.rotinaUlt = R;
+    if (R.gasto > 0) act('rotina', { gasto: R.gasto, n: R.n, parou: R.parou });   // o resumo fica sempre na linha do painel
+    log('rotina', R);
+    return R;
+  }
+
+  // ---------- 4b. rotina (0.12.6): versão shiny do parceiro ----------
+  // Medido (06/11, build 31fb6167ae): o shiny é só visual (mesmos atributos). O menu do jogo tem #menu-shiny com
+  // button[data-v="0"] (Normal) e [data-v="1"] (Shiny); só aparece quando o parceiro tem o shiny. O clique grava
+  // save.partnerShiny pelo próprio jogo. Aqui: só no menu, só se o parceiro tem o shiny e ele não está escolhido;
+  // um clique, confere, e se não pegou registra e segue (sem laço).
+  async function shinyParceiro(ns) {
+    const s = ns.DB.save;
+    if (!s || !s.partner) return;
+    const dex = s.partner;
+    let tem = false;
+    try { tem = typeof ns.DB.ownsShiny === 'function' ? !!ns.DB.ownsShiny(dex) : !!(s.shiny && s.shiny[dex]); } catch (_) { tem = !!(s.shiny && s.shiny[dex]); }
+    if (!tem) { M.shinyUlt = { dex, tem: false }; return; }   // sem o shiny: não mexe
+    if (s.partnerShiny) { M.shinyUlt = { dex, tem: true, ok: true }; M.shinyFeito = dex; return; }
+    // já cuidou deste parceiro (escolheu ou falhou): não repete a cada rotina — se você voltou para "Normal" no menu,
+    // fica Normal; a troca de parceiro faz a conta de novo
+    if (M.shinyFeito === dex) return;
+    M.shinyFeito = dex;
+    if (!open('scr-menu')) { M.shinyUlt = { dex, tem: true, ok: false, falha: 'fora-do-menu' }; return; }
+    const b = document.querySelector('#scr-menu #menu-shiny button[data-v="1"]');
+    if (!b || !(b.offsetWidth || b.offsetHeight) || b.disabled) { M.shinyUlt = { dex, tem: true, ok: false, falha: 'botao' }; act('shiny', { dex, nome: nome(ns, dex), ok: false }); return; }
+    b.click();
+    await waitFor(() => ns.DB.save && ns.DB.save.partnerShiny === true, 2000);
+    const ok = !!(ns.DB.save && ns.DB.save.partnerShiny);
+    M.shinyUlt = ok ? { dex, tem: true, ok: true } : { dex, tem: true, ok: false, falha: 'nao-mudou' };
+    act('shiny', { dex, nome: nome(ns, dex), ok });
+    await sleep(300);
   }
 
   // ---------- 5. rotina: missões ----------
@@ -890,7 +989,9 @@
   // 0.4.0: Golpe inicial, Segundo golpe inicial e Veto agora são configurados pela base de cálculo → valem mais
   const UPG_VALUE = { def: 1.2, xp: 1.15, atk: 1.1, cd: 1.1, coins: 1.1, reroll: 1.0, moves: 1.0, hp: 0.9, magnet: 0.9, crit: 0.8, regen: 0.8, spd: 0.5, start: 1.2, start2: 0.9, ban: 0.8 };
   // reserva calculada sozinha: 10% das moedas, no máximo o preço de uma Menta (1.500). Conta nova não fica travada.
-  const reserva = (ns) => (M.manual ? (M.pisoManual | 0) : Math.min(cfg.reserve, Math.floor(((ns.DB.save && ns.DB.save.coins) || 0) * 0.1)));
+  // 0.12.6 (revisão): durante gastarTudo vale a reserva fixada no começo da rotina (M.pisoRotina); antes, a cada volta
+  // ela era recalculada sobre o saldo menor e derretia até quase zero
+  const reserva = (ns) => (M.manual ? (M.pisoManual | 0) : M.pisoRotina != null ? M.pisoRotina : Math.min(cfg.reserve, Math.floor(((ns.DB.save && ns.DB.save.coins) || 0) * 0.1)));
   // 0.11.3: as compras seguem com o farm ligado OU num "Aplicar tudo" pedido pela pessoa (M.manual)
   const segue = () => (M.manual ? !M.cancel : cfg.on);
   // 0.12.1: progresso do "Aplicar tudo" (a extensão desenha a barra por cima do jogo enquanto ele usa os botões)
@@ -1268,6 +1369,8 @@
       candy: s && s.bag ? s.bag.candy || 0 : 0, hw: !!(ns.Halloween && ns.Halloween.on), guest: !!(ns.DB && ns.DB.guest),
       partner: tgt, owned, maxed, sess, acts, touched: M.touched,
       gachaUlt: M.gachaUlt ? { n: M.gachaUlt.n, parou: M.gachaUlt.parou } : null,
+      rotinaUlt: M.rotinaUlt ? { gasto: M.rotinaUlt.gasto, n: M.rotinaUlt.n, parou: M.rotinaUlt.parou } : null,   // 0.12.6
+      shinyUlt: M.shinyUlt || null,   // 0.12.6
       shiny: cfg.gachaShiny && M.shiny ? { tem: M.shiny.tem, de: M.shiny.de, desde: M.shiny.desde || 0, max: M.shiny.max, parou: M.shiny.parou || null } : null,
     });
   }

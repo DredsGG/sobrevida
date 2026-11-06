@@ -2,6 +2,11 @@
 // Frases curtas, do ponto de vista de quem usa. Aparece uma vez, na primeira abertura depois da atualização.
 globalThis.SV_NOVIDADES = {
   pt: {
+    '0.12.6': [
+      "O farm gasta todas as moedas antes de começar a partida: trabalha um parceiro depois do outro até não sobrar o que comprar (fica só a reserva). O painel mostra quanto gastou e em quantos parceiros.",
+      "Se você tem o shiny do parceiro, o farm escolhe a versão shiny pelo botão do jogo (é só visual; dá para desligar nas opções).",
+      "Volta a funcionar com o jogo de 06/11 (a Sobrevida não reconhecia uma parte do jogo e o farm ficava parado com \"O jogo mudou\").",
+    ],
     '0.12.5': [
       "Gacha: o farm agora gasta todos os tickets numa rotina só (antes parava em 4.000 tiros e ia para a partida com ticket sobrando). O painel mostra \"Gacha parou: …\" e os tiros da rotina.",
     ],
@@ -130,6 +135,11 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   en: {
+    '0.12.6': [
+      "The farm spends all your coins before starting a run: it works on one partner after another until there's nothing left to buy (only the reserve stays). The panel shows how much it spent and on how many partners.",
+      "If you have your partner's shiny, the farm picks the shiny version through the game's button (it's only visual; you can turn it off in the options).",
+      "Works again with the 11/06 game update (Sobrevida didn't recognize one part of the game and the farm stood still with \"The game changed\").",
+    ],
     '0.12.5': [
       "Gacha: the farm now spends every ticket in a single round (before, it stopped at 4,000 pulls and went to a run with tickets left). The panel shows \"Gacha stopped: …\" and the pulls of the round.",
     ],
@@ -258,6 +268,11 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   es: {
+    '0.12.6': [
+      "El farm gasta todas las monedas antes de empezar la partida: trabaja un compañero tras otro hasta que no quede nada que comprar (solo queda la reserva). El panel muestra cuánto gastó y en cuántos compañeros.",
+      "Si tienes el shiny de tu compañero, el farm elige la versión shiny con el botón del juego (es solo visual; se puede apagar en las opciones).",
+      "Vuelve a funcionar con el juego del 06/11 (Sobrevida no reconocía una parte del juego y el farm se quedaba parado con \"El juego cambió\").",
+    ],
     '0.12.5': [
       "Gacha: el farm ahora gasta todos los tickets en una sola ronda (antes paraba en 4.000 tiradas y pasaba a la partida con tickets sobrando). El panel muestra \"Gacha paró: …\" y las tiradas de la ronda.",
     ],
