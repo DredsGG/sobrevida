@@ -9,7 +9,7 @@ Choose your partner Pokémon before the 8-question personality quiz and get exac
 
 ![Manifest V3](https://img.shields.io/badge/Manifest-V3-4285F4?logo=googlechrome&logoColor=white)
 ![Firefox](https://img.shields.io/badge/Firefox-140%2B-FF7139?logo=firefoxbrowser&logoColor=white)
-![Version](https://img.shields.io/badge/version-0.12.2-f4b400)
+![Version](https://img.shields.io/badge/version-0.12.3-f4b400)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 **Works on:** Chrome · Edge · Brave · Opera GX · Firefox 140+
@@ -106,18 +106,19 @@ Everything is in **Portuguese, English and Spanish**: menus, the farm panel, not
 
 ## How it works
 
-- **Two content scripts on `pokesurvivor.com`.** `src/content.js` draws the interface in a shadow DOM and answers the quiz by clicking the game's own buttons. `src/piloto.js` runs in the page (`"world": "MAIN"`, `document_start`) and reads the game's internal modules, the same way the existing community tools do, to play runs and to read your coins, tickets, Pokémon and upgrades. They talk through DOM events.
+- **Two content scripts on `pokesurvivor.com`.** `src/content.js` draws the interface in a shadow DOM and answers the quiz by clicking the game's own buttons. `src/piloto.js` runs in the page (`"world": "MAIN"`, `document_start`) and reads the game's internal modules, the same way the existing community tools do, to play runs and to read your coins, tickets, Pokémon and upgrades. They talk through DOM events. Since 0.12.3 the game hides most of its internal names, so the pilot recognizes each module by what it contains (never by a hard-coded name) and checks all of them before starting: if the game changes and a part is missing, the farm stays off and the panel says which part.
 - **The quiz** follows the game's own rule (each answer adds points to two traits, the top pair decides the starter), so the answers are computed, not guessed.
 - **It never edits your save.** Coins, tickets and Pokémon only change through the game's own buttons and screens (missions, gacha, upgrades, choose partner, save). It doesn't speed up the game or touch drop rates.
 - **Permissions:** `storage` (settings, chosen partner, farm options), `alarms` (update checks), `downloads` (the update zip), `scripting` (to put a new version into tabs that are already open) and `declarativeNetRequest` (one rule, only while the farm is on, that blocks `ice.pokesurvivor.com/v1/seal`, so farm runs never reach the leaderboard). Host access to `pokesurvivor.com`, `ice.pokesurvivor.com` and `api.github.com` (latest release). **Nothing about you is collected or sent anywhere.**
 
 ## Tests
 
-The game is never copied into this repository: the tests clone the public [PokéSurvivor repository](https://github.com/JPTER78/pokesurvivor) (the same build pokesurvivor.com serves) and serve it locally as `https://pokesurvivor.com`, with Firebase and the leaderboard seal faked.
+The game is never copied into this repository. The game's public repository is gone since 2026-11-05, so the tests keep a local, git-ignored copy in `tests/.game`, fetched file by file from pokesurvivor.com (static files only, plain GET) by `tests/espelhar-jogo.cjs`, and serve it locally as `https://pokesurvivor.com`, with Firebase and the leaderboard seal faked. That copy is for local testing only and is never committed or published.
 
 - `tests/e2e.cjs`: Chromium with the real extension on a simulated quiz page with the game's IDs and rule: the picker, all 29 starters through the quiz (coin-flip pairs included), shuffled answers, *Stop*, *Answer it myself*, footer, languages, *What's new*, new-version and URGENTE notices.
 - `tests/e2e-farm.cjs`: Chromium on the **real game**: quiz to Psyduck, the farm section, the seal blocked before the network, a run started and played by itself, missions/gacha/upgrades logged, one tab at a time, `Alt+F`.
 - **Firefox** (GitHub Actions, `Test` workflow): `web-ext lint` with no errors, then real Firefox with the extension installed on the real game: tutorial, picker, quiz to Psyduck, the farm starting and playing a run, and no seal leaving.
+- `tests/lab-mapa.cjs`: every module the pilot uses is found by its shape, exactly once, with no hard-coded game name in the sources; a module removed on purpose makes the pilot refuse to start and report it.
 - `tests/prints-github.cjs` makes the screenshots on this page (a fresh guest, no personal data).
 
 See [tests/README.md](tests/README.md) to run them.

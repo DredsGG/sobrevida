@@ -2,6 +2,10 @@
 // Frases curtas, do ponto de vista de quem usa. Aparece uma vez, na primeira abertura depois da atualização.
 globalThis.SV_NOVIDADES = {
   pt: {
+    '0.12.3': [
+      "Volta a funcionar com o jogo de 05/11: o jogo passou a esconder os nomes por dentro, e a Sobrevida agora reconhece cada parte pelo que ela tem.",
+      "Se o jogo mudar de novo e a Sobrevida não reconhecer alguma parte, o farm não liga e o painel diz qual parte faltou.",
+    ],
     '0.12.2': [
       "O jogo passou a fechar o acesso interno e a trancar a tela com \"extensão não compatível\" quando acha a Sobrevida. Voltou a funcionar.",
       "A troca de parceiro agora é só pelo botão do jogo (sem o caminho de reserva que mexia no save).",
@@ -118,6 +122,10 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   en: {
+    '0.12.3': [
+      "Works again with the 11/05 game update: the game started hiding its internal names, and Sobrevida now recognizes each part by what it contains.",
+      "If the game changes again and Sobrevida can't recognize a part, the farm stays off and the panel says which part is missing.",
+    ],
     '0.12.2': [
       "The game started closing its internal access and locking the screen with \"extension not compatible\" when it finds Sobrevida. It works again.",
       "Switching partner now only goes through the game's button (no more fallback that wrote to the save).",
@@ -234,6 +242,10 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   es: {
+    '0.12.3': [
+      "Vuelve a funcionar con el juego del 05/11: el juego empezó a esconder sus nombres internos y Sobrevida ahora reconoce cada parte por lo que contiene.",
+      "Si el juego vuelve a cambiar y Sobrevida no reconoce alguna parte, el farm no se enciende y el panel dice qué parte falta.",
+    ],
     '0.12.2': [
       "El juego empezó a cerrar su acceso interno y a bloquear la pantalla con \"extensión no compatible\" cuando encuentra Sobrevida. Vuelve a funcionar.",
       "El cambio de compañero ahora es solo con el botón del juego (sin el camino de reserva que tocaba la partida guardada).",

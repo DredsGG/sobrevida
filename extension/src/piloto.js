@@ -14,7 +14,7 @@
 //  - partida que o farm tocou NUNCA vai para o ranking (Ranking.submit* bloqueado + selo bloqueado pelo fundo).
 (() => {
   'use strict';
-  const VERSAO = '0.12.2';
+  const VERSAO = '0.12.3';
   // 0.12.2: marca de "já carregou" num Symbol (não aparece como nome no window)
   const MARCA = Symbol.for('sv.p');
   if (window[MARCA]) return;
@@ -23,34 +23,69 @@
   const log = (...a) => { if (DEBUG) console.log('%c[Sobrevida]', 'color:#ffd23f', ...a); };
 
   // ---------- 1. pega o namespace do jogo ----------
-  // O jogo guarda tudo num objeto interno (ns = {BUILT:true, LIFT:18, Game, UI, …}) que não vai para o window.
+  // O jogo guarda tudo num objeto interno (Game, UI, DB, …) que não vai para o window.
   // Desde 31/10 (jogo e5997d5) esse objeto nasce com Object.create(null), e o jogo passou a recusar a página quando
   // Object.prototype tem algo a mais (era assim que a Sobrevida pegava o objeto até a 0.12.1). Agora: Object.create
-  // fica embrulhado só durante o carregamento, guardando os objetos sem protótipo; o que tiver BUILT/LIFT é o do jogo.
-  // Achou (ou 20 s), o Object.create original volta. Nada fica em Object.prototype nem no window.
+  // fica embrulhado só durante o carregamento, guardando os objetos sem protótipo.
+  // 0.12.3: desde 05/11 (build 89c8696cee) quase todas as chaves do topo têm nome sorteado (BUILT/LIFT sumiram como nome).
+  // O objeto é reconhecido pelas chaves que seguem em claro (svAcharObjeto, em mapa.js; reserva: o antigo BUILT/LIFT)
+  // e cada módulo pela forma (svMapear). Achou (ou 20 s), o Object.create original volta. Nada fica em
+  // Object.prototype nem no window.
+  let NS = null;       // os módulos pelos nomes lógicos (atalhos do mapa.js para o objeto real)
+  let RAW = null;      // o objeto real do jogo
+  let MAPA_OK = false;
+  let FALHA = null;    // {ok:false, err:'namespace'|'mapa', …}: reemitido a cada 2 s enquanto o piloto não liga
   const createOrig = Object.create;
   const semProto = [];
+  let devolvido = false;   // 0.12.3: se outro script embrulhar por cima e o nosso não puder sair da cadeia, ele só repassa
   const createEmbrulhado = { create(proto, props) {
     const o = props === undefined ? createOrig(proto) : createOrig(proto, props);
-    if (proto === null && !NS && semProto.length < 500) semProto.push(o);
+    if (proto === null && !devolvido && !RAW && semProto.length < 500) semProto.push(o);
     return o;
   } }.create;
   try { Object.defineProperty(Object, 'create', { value: createEmbrulhado, writable: true, configurable: true, enumerable: false }); } catch (_) { Object.create = createEmbrulhado; }
   const devolverCreate = () => {
+    devolvido = true;
     if (Object.create === createEmbrulhado) { try { Object.defineProperty(Object, 'create', { value: createOrig, writable: true, configurable: true, enumerable: false }); } catch (_) { Object.create = createOrig; } }
     semProto.length = 0;
   };
   const achar = () => {
-    if (NS) return true;
-    const ns = semProto.find((o) => o && o.BUILT === true && 'LIFT' in o);
-    if (!ns) return false;
+    if (RAW) return true;
+    const raw = svAcharObjeto(semProto);
+    if (!raw) return false;
+    RAW = raw;
     devolverCreate();
-    try { boot(ns); } catch (e) { console.error('[Sobrevida] boot', e); }
+    ligarMapa(raw);
     return true;
   };
+  // 0.12.3: autoteste ao ligar — todo nome lógico tem que achar exatamente 1 chave. Senão NÃO liga e diz o que faltou.
+  // Tenta de 200 em 200 ms por 4 s; depois avisa (FALHA, reemitida a cada 2 s para o painel que abrir depois) e segue
+  // tentando a cada 2 s até 60 s, caso algum módulo do jogo nasça depois do objeto. Ligou: a FALHA some.
+  function ligarMapa(raw) {
+    const t0 = Date.now();
+    const tenta = () => {
+      let m;
+      try { m = svMapear(raw); } catch (e) { m = { ok: false, faltam: ['(erro: ' + String(e && e.message || e).slice(0, 60) + ')'], ambiguos: [], decodificador: false }; }
+      if (m.ok) { FALHA = null; MAPA_OK = true; log('mapa ok', Object.keys(m.chaves).length); try { boot(m.mods); } catch (e) { log('boot', e); } return; }
+      const dt = Date.now() - t0;
+      if (dt >= 4000) {
+        FALHA = { ok: false, err: 'mapa', v: VERSAO, faltam: m.faltam, ambiguos: m.ambiguos, dec: !!m.decodificador };
+        log('mapa falhou', FALHA);
+        emit(FALHA);
+      }
+      if (dt < 60000) setTimeout(tenta, dt < 4000 ? 200 : 2000);
+    };
+    tenta();
+  }
   const procura = setInterval(() => { if (achar()) { clearInterval(procura); devolverCreate(); } }, 15);
   // se nada pegar em 20 s (jogo mudou), devolve tudo e avisa a extensão
-  setTimeout(() => { clearInterval(procura); devolverCreate(); if (!NS) emit({ ok: false, err: 'namespace' }); }, 20000);
+  setTimeout(() => {
+    clearInterval(procura); devolverCreate();
+    if (RAW) return;
+    FALHA = { ok: false, err: 'namespace', v: VERSAO }; emit(FALHA);
+    const rep = setInterval(() => { if (FALHA && FALHA.err === 'namespace') emit(FALHA); else clearInterval(rep); }, 2000);
+    setTimeout(() => clearInterval(rep), 60000);
+  }, 20000);
 
   // ---------- 2. configuração (vem da extensão) e ponte ----------
   // A extensão (mundo isolado) manda 'sobrevida:cfg' com JSON; o piloto responde 'sobrevida:st' com JSON a cada 500 ms.
@@ -73,7 +108,6 @@
     passiveFirst: true, profiles: {},
     weave: true,        // 0.3.0: rotação de ataques (troca de espaço quando o outro golpe fica pronto antes; mantém os buffs)
   };
-  let NS = null;
   const emit = (o) => { try { document.dispatchEvent(new CustomEvent('sobrevida:st', { detail: JSON.stringify(o) })); } catch (_) {} };
   document.addEventListener('sobrevida:cfg', (e) => {
     try {
@@ -98,6 +132,182 @@
   // estado do motor da partida (PSBot)
   const S = { pickTimer: null, lastPos: null, stuckT: 0, unstickT: 0, unstickDir: null, wanderA: Math.random() * 6.28, lastSlotCheck: 0, lastOrb: 0, lastT: performance.now(), lastDir: null, lastOffer: null, orbGoal: null, plan: null, seen: {}, ban: {}, noGo: {}, jCenter: null, holding: false, holdKey: null, holdSince: 0, wd: null, losBadT: 0, spin: 1, spinBlockT: 0, loopC: null, dirIdx: -1, holdT: 0, out: [1, 0], mode: '' };
   const act = (k, a) => { acts.unshift({ k, a: a || null, t: Date.now() }); acts.length = Math.min(acts.length, 8); };
+
+  // ---------- 1b. mapa dos módulos por FORMA (0.12.3) ----------
+  // Desde o build 89c8696cee (2026-11-05) o jogo sorteia o nome de quase todas as chaves do objeto interno
+  // (BUILT, LIFT, Game, DB… viram "_" + 7 hex; só 15 ficaram em claro). Dentro de cada módulo os nomes seguem em claro.
+  // Então cada módulo é reconhecido pelo que tem dentro (as chaves internas que só ele tem) e o piloto continua usando
+  // os nomes lógicos de sempre (ns.Game, ns.DB…) num objeto de atalhos: cada atalho é um getter/setter que lê e escreve
+  // no objeto real, pela chave real — valor vivo, e atribuição ao topo vai para o lugar certo.
+  // NUNCA escrever aqui um nome sorteado: eles podem mudar a cada build. Se o jogo voltar a usar nomes em claro,
+  // o nome em claro vale (mesmo resultado).
+  // Este trecho é autossuficiente (só usa window/Object/Function): os testes injetam o mesmo arquivo na página.
+  function svAcharObjeto(lista) {
+    const claro = (o) => { try { return Object.keys(o).length >= 60 && ['UI', 'HUD', 'Gacha', 'Settings'].every((k) => k in o); } catch (_) { return false; } };
+    const antigo = (o) => { try { return o.BUILT === true && 'LIFT' in o; } catch (_) { return false; } };
+    return lista.find((o) => o && claro(o)) || lista.find((o) => o && antigo(o)) || null;
+  }
+
+  // predicados de forma. o: objeto/array com TODAS as chaves; f: função (não classe) com a fonte normalizada
+  const svTem = (v, ...ks) => { if (!v || (typeof v !== 'object' && typeof v !== 'function')) return false; try { return ks.every((k) => k in v); } catch (_) { return false; } };
+  const svObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
+  const svDic = (v, min, item) => { // dicionário grande com chaves numéricas (por dex)
+    if (!svObj(v)) return false;
+    let ks; try { ks = Object.keys(v); } catch (_) { return false; }
+    if (ks.length < min || !/^\d+$/.test(ks[0])) return false;
+    try { return item(v[ks[0]]); } catch (_) { return false; }
+  };
+  const SV_FORMA = {
+    // módulos de objeto: as menores combinações de chaves internas que só aquele módulo tem (conferido no dump de 2026-11-05)
+    U: (v) => svObj(v) && svTem(v, 'TYPE_COLOR', 'mmss', 'clamp', 'pickN'),
+    I18n: (v) => svObj(v) && svTem(v, 'rawCanvas', 'lang', 'locale'),
+    DB: (v) => svObj(v) && svTem(v, 'save', 'upgradesOf', 'playAsGuest', 'commit'),
+    Mons: (v) => svObj(v) && svTem(v, 'monFor', 'natureOf', 'abilityChoices'),
+    Moves: (v) => svObj(v) && svTem(v, 'BY_ID', 'poolFor', 'instance'),
+    Game: (v) => svObj(v) && svTem(v, 'state', 'player', 'togglePause', 'startRun'),
+    Rift: (v) => svObj(v) && svTem(v, 'inArena', 'timeLeft', 'enterRequest'),
+    Icons: (v) => svObj(v) && svTem(v, 'RARITY_BALL', 'TYPE_GLYPH', 'draw'),
+    EnemyMgr: (v) => svObj(v) && svTem(v, 'bossAlive', 'queryCircle', 'all'),
+    Coop: (v) => svObj(v) && svTem(v, 'mates', 'scaleHp', 'puppets'),
+    World: (v) => svObj(v) && svTem(v, 'TS', 'biomeName', 'projectileBlock'),
+    Shop: (v) => svObj(v) && svTem(v, 'dailyTms', 'tmPrice', 'buySkin'),
+    Types: (v) => svObj(v) && svTem(v, 'CHART', 'mult', 'label'),
+    Touch: (v) => svObj(v) && svTem(v, 'safeArea', 'spot', 'stick'),
+    RunUI: (v) => svObj(v) && svTem(v, 'pick', 'pickBond', 'reroll', 'showLevelUp'),
+    Hazards: (v) => svObj(v) && svTem(v, 'inside', 'add', 'clear'),
+    Orbs: (v) => svObj(v) && svTem(v, 'useSelected', 'SLOTS', 'use'),
+    Social: (v) => svObj(v) && svTem(v, 'room', 'createRoom', 'friends'),
+    Input: (v) => svObj(v) && svTem(v, 'axis', 'mouseWorld', 'held'),
+    Combat: (v) => svObj(v) && svTem(v, 'tick', 'ghostCast', 'resolve'),
+    Enemies: (v) => svObj(v) && svTem(v, 'BOSSES', 'TIERS', 'cast'),
+    Events: (v) => svObj(v) && svTem(v, 'drawHud', 'golden', 'bag'),
+    AbilityFX: (v) => svObj(v) && svTem(v, 'of', 'FX') && Object.keys(v).length <= 4,
+    LevelUp: (v) => svObj(v) && svTem(v, 'offer', 'STATS'),
+    Tiles: (v) => svObj(v) && svTem(v, 'paintChunk', 'runBiome', 'T'),
+    Projectiles: (v) => svObj(v) && svTem(v, 'spawnOrb', 'clearOrbs', 'all'),
+    Progress: (v) => svObj(v) && svTem(v, 'claim', 'done', 'checkAch'),
+    Pickups: (v) => svObj(v) && svTem(v, 'dropXp', 'pullAll', 'all'),
+    // a classe do jogador (constantes estáticas)
+    Player: (v) => typeof v === 'function' && svTem(v, 'REVIVE_TIME', 'BOND_MAX'),
+    // dados
+    DEX: (v) => Array.isArray(v) && v.length >= 100 && svTem(v[0], 'dex', 'bst', 'types', 'gen'),
+    DEX_BY: (v) => svDic(v, 100, (x) => svObj(x) && svTem(x, 'dex', 'bst', 'types')),
+    SPRITE_META: (v) => svDic(v, 100, (x) => svObj(x) && svTem(x, 'a', 'sh')),
+    DEX_ABIL: (v) => svDic(v, 100, (x) => Array.isArray(x) && x.length <= 4 && x.every((y) => !y || typeof y === 'string') && x.some((y) => typeof y === 'string')),
+    NATURES: (v) => Array.isArray(v) && v.length >= 10 && svTem(v[0], 'id', 'up', 'down', 'n'),
+    NATURE_BY: (v) => svObj(v) && svTem(v, 'adamant', 'timid') && svTem(v.adamant, 'up', 'down'),
+    // os 15 que seguem em claro entram pelo nome; a forma abaixo só vale se um dia o nome sumir
+    T: null,
+    Settings: (v) => svObj(v) && svTem(v, 'DEF', 'autoLevel', 'sample'),
+    Skins: (v) => svObj(v) && svTem(v, 'SKINS', 'wear', 'worn'),
+    Upgrades: (v) => svObj(v) && svTem(v, 'LIST', 'cost', 'perks'),
+    UI: (v) => svObj(v) && svTem(v, 'refreshCoins', 'toast', 'hideAll'),
+    Ranking: (v) => svObj(v) && svTem(v, 'submitSolo', 'submitGroup'),
+    Audio: (v) => svObj(v) && svTem(v, 'sfx', 'toggleMute', 'setVolume'),
+    Halloween: (v) => svObj(v) && svTem(v, 'SKIN_PRICE', 'takeCandy'),
+    Sprites: (v) => svObj(v) && svTem(v, 'Animator', 'PX', 'bodyHeight'),
+    Items: (v) => svObj(v) && svTem(v, 'BY', 'LIST', 'roll') && !('SLOTS' in v),
+    FX: (v) => svObj(v) && svTem(v, 'dmgText', 'burst', 'slash'),
+    Judgment: (v) => svObj(v) && svTem(v, 'hitArceus', 'cinematic'),
+    Stats: (v) => svObj(v) && svTem(v, 'fit', 'sideOf', 'taken'),
+    Gacha: (v) => svObj(v) && svTem(v, 'BANNERS', 'pull', 'isOpen'),
+    HUD: (v) => svObj(v) && svTem(v, 'bar', 'draw', 'roundRect') && Object.keys(v).length <= 5,
+  };
+  // funções soltas no topo: sem chaves internas, então vale a forma do CÓDIGO delas (lido, nunca chamado — uma função
+  // desconhecida pode mexer no save). A fonte é normalizada: textos do ofuscador decodificados pelo próprio
+  // decodificador do jogo, chaves reais trocadas pelos nomes lógicos já achados, identificadores _0x… viram "$".
+  // 0.12.3 (revisão): o piloto CHAMA estas 4 depois, então só valem funções que só leem — nada de gravar/commit/
+  // conceder, nem escrever em membro (x.y = …, x[y] = …, ++, +=).
+  const svSoLe = (s) => !/\.(commit|grant\w*|saveNow|flush|merge|set[A-Z]\w*|take\w*|buy\w*|claim\w*)\(/.test(s) &&
+    !/[\w$\]]\s*\.[\w$]+\s*(=(?![=>])|\+=|-=|\+\+|--)|\]\s*(=(?![=>])|\+=|-=|\+\+|--)/.test(s) && !/'(rescue|wild)'/.test(s);
+  const SV_FUNCAO = {
+    startChoices: (f, s) => svSoLe(s) && f.length === 1 && /\.Moves\.poolFor\(/.test(s) && /'buff'/.test(s) && /\.push\(/.test(s),
+    startMoveOf: (f, s) => svSoLe(s) && f.length === 1 && /\.DB\.save\b/.test(s) && /\.pstart\b/.test(s) && /\.pupg\b/.test(s) && !/pstart2/.test(s),
+    startMove2Of: (f, s) => svSoLe(s) && f.length === 1 && /\.pstart2\b/.test(s) && /\.start2\b/.test(s),
+    TM_OF: (f, s) => svSoLe(s) && f.length === 1 && /^\(?\$\)?=>\$\[\$\]\|\|\[\]$/.test(s.replace(/\s+/g, '')),
+  };
+  // primitivos, pela posição entre os valores primitivos do topo (na ordem em que o jogo cria) e validados pelo valor
+  const SV_PRIM = { LIFT: { pos: 2, ok: (v) => v === 18 } };
+
+  // o decodificador de textos do ofuscador: função global de 2 argumentos cujo código começa com "índice − base".
+  // 0.12.3 (revisão): só vale a que o PRÓPRIO código do jogo usa (o nome aparece nas funções do topo); assim um
+  // decodificador de outro script na página nunca é chamado.
+  function svDecodificador(fontesJogo) {
+    let achou = null;
+    const usados = new Set();
+    for (const t of fontesJogo) for (const m of t.matchAll(/[A-Za-z_$][\w$]*/g)) usados.add(m[0]);
+    try {
+      for (const k of Object.getOwnPropertyNames(window)) {
+        if (!usados.has(k)) continue;
+        let d; try { d = Object.getOwnPropertyDescriptor(window, k); } catch (_) { continue; }
+        const f = d && d.value;
+        if (typeof f !== 'function' || f.length !== 2) continue;
+        let s; try { s = Function.prototype.toString.call(f); } catch (_) { continue; }
+        if (s.length > 6000 || !/\(\s*(_0x\w+)\s*,\s*_0x\w+\s*\)\s*\{\s*\1\s*=\s*\1\s*-\s*0x[0-9a-f]+/.test(s)) continue;
+        if (achou) return null;   // dois candidatos: não arrisca
+        achou = f;
+      }
+    } catch (_) {}
+    return achou;
+  }
+  function svFonte(f, dec, nomeDe) {
+    let s = '';
+    try { s = Function.prototype.toString.call(f); } catch (_) { return ''; }
+    if (s.length > 20000) return '';
+    if (dec) s = s.replace(/\b_0x[0-9a-f]+\((0x[0-9a-f]+)(?:\s*,\s*'([^'\\]*)')?\)/g, (m, n, chave) => {
+      try { const r = chave == null ? dec(parseInt(n, 16)) : dec(parseInt(n, 16), chave); return typeof r === 'string' && !/['\\\n]/.test(r) ? "'" + r + "'" : m; } catch (_) { return m; }
+    });
+    s = s.replace(/'([^'\\]*)'/g, (m, k) => (Object.prototype.hasOwnProperty.call(nomeDe, k) ? "'" + nomeDe[k] + "'" : m));
+    return s.replace(/\[\s*'([A-Za-z_$][\w$]*)'\s*\]/g, '.$1').replace(/\b_0x[0-9a-f]+\b/g, '$');
+  }
+
+  // monta o mapa: todo nome lógico tem que cair em exatamente 1 chave real (e cada chave real em 1 nome só)
+  function svMapear(raw) {
+    const chaves = {}, faltam = [], ambiguos = [];
+    let ks = [];
+    try { ks = Object.keys(raw); } catch (_) {}
+    const val = (k) => { try { return raw[k]; } catch (_) { return undefined; } };
+    const ehFuncaoSolta = (v) => { if (typeof v !== 'function') return false; try { return !/^class\b/.test(Function.prototype.toString.call(v)); } catch (_) { return false; } };
+    const resolver = (nome, pred) => {
+      if (ks.includes(nome)) {   // em claro (como antes de 05/11)
+        // 0.12.3 (revisão): se a forma casa com OUTRA chave (ex.: um "Ranking" de isca e o de verdade sorteado), fica
+        // ambíguo. Forma que não casa com nada = o módulo mudou por dentro: vale o nome.
+        const c = pred ? ks.filter((k) => { try { return pred(val(k), k); } catch (_) { return false; } }) : [];
+        if (!c.length || (c.length === 1 && c[0] === nome)) chaves[nome] = nome; else ambiguos.push(nome);
+        return;
+      }
+      if (!pred) { faltam.push(nome); return; }
+      const c = ks.filter((k) => { try { return pred(val(k), k); } catch (_) { return false; } });
+      if (c.length === 1) chaves[nome] = c[0]; else (c.length ? ambiguos : faltam).push(nome);
+    };
+    // 1) primitivos pela posição
+    const prims = ks.filter((k) => { const v = val(k); return v === null || (typeof v !== 'object' && typeof v !== 'function'); });
+    for (const [nome, p] of Object.entries(SV_PRIM)) {
+      if (ks.includes(nome)) { chaves[nome] = nome; continue; }
+      const k = prims[p.pos - 1];
+      if (k !== undefined && p.ok(val(k))) chaves[nome] = k; else faltam.push(nome);
+    }
+    // 2) objetos, arrays e classes
+    for (const [nome, pred] of Object.entries(SV_FORMA)) resolver(nome, pred);
+    // 3) funções soltas, pela forma do código (precisa dos nomes da etapa 2)
+    const nomeDe = {};
+    for (const [n, k] of Object.entries(chaves)) if (k !== n) nomeDe[k] = n;
+    const brutas = [];
+    for (const k of ks) { const v = val(k); if (ehFuncaoSolta(v)) try { brutas.push(Function.prototype.toString.call(v)); } catch (_) {} }
+    const dec = svDecodificador(brutas);
+    const fontes = {};
+    for (const k of ks) { const v = val(k); if (ehFuncaoSolta(v) && !Object.prototype.hasOwnProperty.call(nomeDe, k) && k !== 'T') fontes[k] = svFonte(v, dec, nomeDe); }
+    for (const [nome, pred] of Object.entries(SV_FUNCAO)) resolver(nome, (v, k) => Object.prototype.hasOwnProperty.call(fontes, k) && pred(v, fontes[k]));
+    // 4) uma chave real para dois nomes = os dois ficam ambíguos
+    const dono = {};
+    for (const [n, k] of Object.entries(chaves)) (dono[k] = dono[k] || []).push(n);
+    for (const ns of Object.values(dono)) if (ns.length > 1) for (const n of ns) { delete chaves[n]; if (!ambiguos.includes(n)) ambiguos.push(n); }
+    // 5) objeto de atalhos: getter/setter para a chave real (valor vivo; atribuição vai para o objeto do jogo)
+    const mods = {};
+    for (const [n, k] of Object.entries(chaves)) Object.defineProperty(mods, n, { enumerable: true, get: () => raw[k], set: (v) => { raw[k] = v; } });
+    return { ok: !faltam.length && !ambiguos.length, mods, chaves, faltam, ambiguos, decodificador: !!dec };
+  }
+  // ---------- fim do mapa dos módulos ----------
   // Calibração dos golpes (gerada por testes/lab-banco-golpes.cjs + gen-cal.py, 92 golpes): dano/s MEDIDO no motor do
   // jogo, com o golpe sozinho, atk = 1 e tipos neutros: [alvo nível 1, horda nível 1, alvo nível máx., horda nível máx.],
   // na unidade da conta (÷ 0.844). Alvo = boneco a 150 px ou vindo até você (o melhor dos dois); horda = alvo + metade do
@@ -939,7 +1149,7 @@
   // ---------- 11. status para a extensão ----------
   function status(force) {
     const ns = NS;
-    if (!ns || !ns.Game) return emit({ ok: false });
+    if (!ns || !ns.Game) return emit(FALHA || { ok: false });
     const p = ns.Game.player, s = ns.DB && ns.DB.save, st = ns.Game.state;
     const inRun = !!p && st !== 'ui';
     let tgt = null, owned = 0, maxed = 0;
@@ -964,7 +1174,7 @@
     } catch (_) {}
     const scr = document.querySelector('#app > .scr:not(.hidden), body > .scr:not(.hidden), .scr:not(.hidden)');
     emit({
-      ok: true, v: VERSAO, on: cfg.on, st, fps: FPS.v, scr: scr ? scr.id : null, mode: inRun ? (S.mode || '') : '', task: M.task, err: M.err,
+      ok: true, mapaOk: MAPA_OK, v: VERSAO, on: cfg.on, st, fps: FPS.v, scr: scr ? scr.id : null, mode: inRun ? (S.mode || '') : '', task: M.task, err: M.err,
       modo: cfg.modo, coop: emGrupo(ns), coopOk: !!M.coopOk || anfitriao(ns), coopHost: !!(ns.Coop && ns.Coop.active && ns.Coop.isHost), party: naSala(ns), hidden: document.visibilityState !== 'visible', userPaused: M.userPausedAt > 0 && st === 'paused',
       run: inRun ? { hp: Math.round(p.hp), max: Math.round(p.maxHp), lv: p.level, t: Math.round((ns.Game.st && ns.Game.st.time) || 0), k: p.kills, dex: p.dex } : null,
       coins: s ? s.coins : null, t1: s && s.tickets ? s.tickets.t1 : null, t10: s && s.tickets ? s.tickets.t10 : null,

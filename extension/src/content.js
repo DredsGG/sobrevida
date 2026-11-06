@@ -839,7 +839,14 @@
   function farmStatus() {
     const T = L().f;
     if (semPiloto()) return { t: T.reload, w: true, reload: true };
-    if (!pronto()) return { t: pst && pst.ok === false && pst.err === 'namespace' ? T.broken : T.waiting, w: !!(pst && pst.ok === false) };
+    if (!pronto()) {
+      // 0.12.3: 'mapa' = achou o jogo, mas não reconheceu alguns módulos (o jogo mudou por dentro): diz quais
+      if (pst && pst.ok === false && pst.err === 'mapa') {
+        const l = [].concat(pst.faltam || []).map(String).concat([].concat(pst.ambiguos || []).map((n) => String(n) + ' (?)'));   // (?) = mais de um candidato
+        return { t: T.mapa(l.slice(0, 6).join(', ') + (l.length > 6 ? '…' : '')), w: true };
+      }
+      return { t: pst && pst.ok === false && pst.err === 'namespace' ? T.broken : T.waiting, w: !!(pst && pst.ok === false) };
+    }
     const G = farm.modo === 'grupo';
     if (!farm.on) return { t: G ? (pst.party ? T.gOffRoom : T.gOff) : (pst.party ? T.sInRoom : T.off), w: !G && pst.party };
     if (!dono) return { t: T.otherTab, w: true };
@@ -1196,6 +1203,8 @@
     const txt = [`Sobrevida v${VERSION}`, `Browser: ${navegador()}`, `Install: ${diag.instalacao || '?'}`, `UI: ${lang} / ${navigator.language}`,
       `Settings: auto=${S.auto ? 1 : 0} target=${alvo || '-'}`, `Game: screen=${tela() || '-'} quizDom=${testeOk ? 'ok' : 'MISSING'} path=${location.pathname}`,
       `Update check: latest=${u.ultima || '-'} err=${u.erro || '-'}`,
+      // 0.12.3: o que o piloto disse por último (err 'mapa' traz os módulos que o jogo mudou)
+      pst ? `Farm: ok=${pst.ok ? 1 : 0} err=${pst.err || '-'} v=${pst.v || '-'} mapaOk=${pst.mapaOk ? 1 : 0}${pst.faltam ? ' faltam=' + [].concat(pst.faltam).join(',') : ''}${pst.ambiguos && [].concat(pst.ambiguos).length ? ' ambiguos=' + [].concat(pst.ambiguos).join(',') : ''}${'dec' in pst ? ' dec=' + (pst.dec ? 1 : 0) : ''}` : 'Farm: no status',
       loc['sv.disco'] ? `Disk: ${loc['sv.disco'].estado || '-'} (${loc['sv.disco'].noDisco || '-'})` : null, '', 'Last events:', log].filter((x) => x !== null).join('\n');
     const body = `${T.bugBody}\n---\n\`\`\`\n${txt}\n\`\`\``;
     window.open(`https://github.com/DredsGG/sobrevida/issues/new?title=${encodeURIComponent(T.bugTitle)}&body=${encodeURIComponent(body)}&labels=bug`, '_blank', 'noopener');

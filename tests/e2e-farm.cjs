@@ -1,8 +1,12 @@
 // Sobrevida — E2E do farm (v0.2.0): extensão carregada de verdade + o PokéSurvivor REAL (build publicado do repo
 // público do jogo) servido no endereço https://pokesurvivor.com por interceptação. Firebase e GitHub simulados (sem rede).
-// Uso: node tests/e2e-farm.cjs <pasta-da-extensao> <clone de JPTER78/pokesurvivor> <pasta-de-prints> [minutos]
+// Uso: node tests/e2e-farm.cjs <pasta-da-extensao> <pasta do jogo (testes/.game)> <pasta-de-prints> [minutos]
+// 0.12.3: o repo do jogo sumiu (05/11); o jogo vem da cópia local testes/.game (ESPELHAR=1 busca o que faltar em
+// pokesurvivor.com, só GET de arquivo estático; ver espelhar-jogo.cjs). O objeto do jogo é achado como o piloto acha
+// (sem tocar em Object.prototype) e os módulos pelos nomes lógicos do mapa.js.
 const path = require('path'), fs = require('fs'), os = require('os');
 const { chromium } = require('playwright');
+const jl = require('./espelhar-jogo.cjs');
 const EXT = path.resolve(process.argv[2]), GAME = path.resolve(process.argv[3]), SHOTS = path.resolve(process.argv[4]);
 const MIN = +(process.argv[5] || 2);
 fs.mkdirSync(SHOTS, { recursive: true });
@@ -16,16 +20,7 @@ const CT = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
     args: [`--disable-extensions-except=${EXT}`, `--load-extension=${EXT}`, '--lang=pt-BR', '--disable-background-timer-throttling', '--disable-renderer-backgrounding'] });
   let selos = 0;
   await ctx.route('https://ice.pokesurvivor.com/**', (r) => { selos++; r.fulfill({ status: 200, contentType: 'application/json', body: '{"s":1,"g":"0"}' }); });
-  await ctx.route('https://api.github.com/**', (r) => r.fulfill({ status: 404, body: '{}' }));
-  await ctx.route('https://www.gstatic.com/**', (r) => r.fulfill({ status: 404, body: '' }));
-  await ctx.route('https://raw.githubusercontent.com/**', (r) => r.fulfill({ status: 404, body: '' }));
-  await ctx.route('https://pokesurvivor.com/**', (r) => {
-    const u = new URL(r.request().url());
-    let f = path.join(GAME, decodeURIComponent(u.pathname));
-    if (u.pathname.endsWith('/')) f = path.join(f, 'index.html');
-    if (!f.startsWith(GAME) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) return r.fulfill({ status: 404, body: '' });
-    r.fulfill({ status: 200, contentType: CT[path.extname(f)] || 'application/octet-stream', body: fs.readFileSync(f) });
-  });
+  await jl.servirJogo(ctx, GAME, { semIce: true });
   const sw = ctx.serviceWorkers()[0] || await ctx.waitForEvent('serviceworker');
   await sw.evaluate(() => chrome.storage.local.set({ 'sv.onboard': { tutorial: 'visto', visto: '0.2.0', novLidas: '0.2.0' }, 'sv.alvo': 54 }));
   await sleep(1500);
@@ -34,15 +29,24 @@ const CT = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
   await page.bringToFront();
   page.on('pageerror', (e) => console.log('pageerror', String(e).slice(0, 160)));
   page.on('console', (m) => { if (m.type() === 'error') console.log('console.error', m.text().slice(0, 200)); });
-  await page.addInitScript(() => {
-    window.__st = null; document.addEventListener('sobrevida:st', (e) => { window.__st = JSON.parse(e.detail); });
-     (() => { const co = Object.create, lista = []; Object.create = function create(p, d) { const o = d === undefined ? co(p) : co(p, d); if (p === null && !window.__NS && lista.length < 500) lista.push(o); return o; }; const t = setInterval(() => { const n = lista.find((o) => o && o.BUILT === true && 'LIFT' in o); if (n || window.__NS) { if (n && !window.__NS) window.__NS = n; clearInterval(t); lista.length = 0; } }, 20); })(); (() => { setInterval(() => { const h = [...document.querySelectorAll('body > div, html > div')].find((e) => e.shadowRoot && e.shadowRoot.querySelector('.fab')); if (h && h.id !== 'teste-host') { h.dataset.idReal = h.id; h.id = 'teste-host'; } }, 100); })();
-  });
-  const shadow = (sel) => page.locator(`#teste-host >> css=${sel}`);
+  await page.addInitScript(() => { window.__st = null; document.addEventListener('sobrevida:st', (e) => { window.__st = JSON.parse(e.detail); }); });
+  await page.addInitScript(jl.nsInit());
+  const shadow = (sel) => page.locator(`${jl.HOST} >> css=${sel}`);
+  // detector do jogo (G.Hz, nome sorteado): objeto do topo com exatamente {boot, v}; v conta as detecções
+  const hz = () => page.evaluate(() => { const R = window.__NSRAW; if (!R) return null; for (const k of Object.keys(R)) { const o = R[k]; if (o && typeof o === 'object' && Object.keys(o).sort().join() === 'boot,v') return o.v; } return null; });
+  const bloqueio = () => page.evaluate(() => /no es compatible|not compatible|não é compatível/i.test(document.body.innerText) || [...document.querySelectorAll('body *')].some((e) => getComputedStyle(e).zIndex === '2147483647' && e.offsetWidth > innerWidth * 0.8));
   const vis = () => page.evaluate(() => [...document.querySelectorAll('.scr')].filter((e) => !e.classList.contains('hidden')).map((e) => e.id));
   await page.goto('https://pokesurvivor.com/');
   await sleep(3500);
-  ok(await page.evaluate(() => !!window.__st && window.__st.ok), 'piloto pegou o jogo (namespace) e manda status');
+  for (let i = 0; i < 20 && !(await page.evaluate(() => window.__st && window.__st.ok)); i++) await sleep(500);
+  const st0 = await page.evaluate(() => window.__st);
+  ok(!!st0 && st0.ok === true, 'piloto pegou o jogo (namespace) e manda status: ' + JSON.stringify(st0 && { ok: st0.ok, err: st0.err, v: st0.v, mapaOk: st0.mapaOk, faltam: st0.faltam }));
+  ok(!!st0 && st0.mapaOk === true, 'status com mapaOk:true (todos os módulos reconhecidos pela forma)');
+  ok(await page.evaluate(() => window.__NSMAPA && !window.__NSMAPA.faltam.length && !window.__NSMAPA.ambiguos.length), 'mapa do teste (mesmo mapa.js) sem faltas nem ambíguos');
+  ok(await page.evaluate(() => /[native code]/.test(Function.prototype.toString.call(Object.create))), 'Object.create voltou ao original');
+  ok(await page.evaluate(() => Object.getOwnPropertyNames(Object.prototype).length) === 12, 'Object.prototype só com os 12 nativos');
+  ok(await page.evaluate(() => !window.__psmod && !window.__psmodNS && !window.__sobrevidaPiloto && !document.querySelector('#sobrevida-host,#sv-cola-css,#sv-cola-jogo,[id^="psmod-"],[class*="psmod-"]')), 'nada do que o detector do jogo procura (globais, ids, classes)');
+  ok(await jl.marcarHost(page), 'quadro da Sobrevida achado pelo conteúdo (id sorteado)');
   if (await shadow('.card.on').count()) { await page.keyboard.press('Escape'); await sleep(400); }   // tutorial da instalação nova
   // abertura "toque para começar": clica até aparecer o login (o jogo pode demorar a carregar)
   for (let i = 0; i < 10 && !(await vis()).some((v) => v === 'scr-login' || v === 'scr-menu' || v === 'scr-test'); i++) { await page.mouse.click(683, 450); await sleep(1500); }
@@ -97,7 +101,7 @@ const CT = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
       await page.screenshot({ path: path.join(SHOTS, '12-farm-pilula.png') });
       ok(await shadow('.menu.on').count() === 0, 'menu da Sobrevida fecha sozinho quando o farm começa a partida (não cobre o jogo)');
       await shadow('.pill span').click(); await sleep(800);
-      console.log('  menu depois do clique na pílula:', await page.evaluate(() => { const r = document.querySelector('#teste-host').shadowRoot; const m = r.querySelector('.menu'); return { hidden: m.hidden, on: m.classList.contains('on'), txt: m.innerText.slice(0, 160) }; }));
+      console.log('  menu depois do clique na pílula:', await page.evaluate(() => { const r = document.querySelector('[data-teste-host="1"]').shadowRoot; const m = r.querySelector('.menu'); return { hidden: m.hidden, on: m.classList.contains('on'), txt: m.innerText.slice(0, 160) }; }));
       await page.screenshot({ path: path.join(SHOTS, '13-farm-menu-partida.png') });
       ok(await shadow('.menu.on').count() === 1 && /Nv \d+/.test(await shadow('.menu .farm').innerText()), 'menu aberto na partida mostra o que o farm está fazendo');
       await page.keyboard.press('Escape'); await sleep(400);
@@ -105,6 +109,10 @@ const CT = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
     console.log(`  ${Math.round((Date.now() - t0) / 1000)}s ${s.st} task=${s.task} mode=${s.mode} run=${s.run ? s.run.t + 's' : '-'} coins=${s.coins} t1=${s.t1} t10=${s.t10} parceiro=${s.partner && s.partner.name} ${s.partner && s.partner.have}/${s.partner && s.partner.total}`);
   }
   const s = await page.evaluate(() => window.__st);
+  ok(s.ok === true && s.mapaOk === true, 'no fim do farm o status segue ok:true e mapaOk:true');
+  const hzv = await hz();
+  ok(hzv === 0, 'detector do jogo (Hz.v) ficou em 0: ' + hzv);
+  ok(!(await bloqueio()), 'a tela "no es compatible" do jogo não apareceu');
   ok(await page.evaluate(() => window.__NS.Game.state) !== 'paused', 'Esc que fechou o menu da Sobrevida não pausou o jogo');
   ok(runSeen, 'começou partida sozinho');
   ok(s.touched === true, 'partida marcada como do farm (não sobe ao ranking)');
@@ -131,6 +139,8 @@ const CT = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
     await shadow('.pill button').click(); await sleep(1200);
     ok((await sw.evaluate(() => chrome.storage.local.get('sv.farm')))['sv.farm'].on === true, '"Ligar" da pílula liga o farm no meio da partida');
   } else console.log('  (a partida tinha acabado: pulei o teste da pílula com o farm desligado)');
+  ok((await hz()) === 0 && !(await bloqueio()), 'no fim: Hz.v = 0 e sem tela de bloqueio');
+  console.log('  arquivos do jogo baixados nesta rodada:', jl.baixados.length, '| fora da lista do espelho:', [...jl.negados].join(', ') || '-');
   await ctx.close();
   console.log(falhas ? `\n${falhas} FALHA(S)` : '\nTUDO PASSOU');
   process.exit(falhas ? 1 : 0);

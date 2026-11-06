@@ -1,11 +1,24 @@
 # Tests
 
-The game is not in this repository. Clone the public PokéSurvivor repository first (it's the build pokesurvivor.com serves):
+The game is not in this repository. Since 2026-11-05 the game's public repository is gone (404), so the tests use a
+local copy in `tests/.game`, filled on demand by `espelhar-jogo.cjs`: with `ESPELHAR=1`, every static game file that
+is missing (html, js, css, fonts, images, `version.json`) is fetched with a plain GET from https://pokesurvivor.com
+(no cookies, no login, no POST) and saved under the same path. Firebase, `ice.pokesurvivor.com`, the GitHub API and
+raw.githubusercontent.com stay faked.
+
+**`tests/.game` is a copy for local testing only.** The game is PolyForm Noncommercial and the sprites are CC BY-NC:
+never commit it, never publish it, never put it in a zip (`.gitignore` covers it).
 
 ```
-git clone --depth 1 https://github.com/JPTER78/pokesurvivor tests/.game
 npm i --no-save playwright@1 && npx playwright install chromium
+node tests/espelhar-jogo.cjs tests/.game        # index.html, version.json, app.min.js (prints the build hash)
+ESPELHAR=1 node tests/e2e-farm.cjs extension tests/.game out/farm 2   # the first run also fetches sprites as the game asks
 ```
+
+Since 0.12.3 the game's internal object is found the same way the pilot finds it (no `Object.prototype` hook) and the
+tests read its modules by their logical names through `mapa.js` (`nsInit()` in `espelhar-jogo.cjs`). Extra checks:
+`node tests/lab-mapa.cjs` (every logical name maps to exactly one key, no hard-coded random name in the sources) and
+`node tests/lab-mapa.cjs <piloto.js> Moves` (a module removed on purpose → the pilot reports `err:'mapa'`).
 
 | Command | What it checks |
 |---|---|

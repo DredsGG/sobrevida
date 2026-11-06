@@ -5,6 +5,7 @@
 // Uso: node tests/e2e.cjs [pasta-da-extensao] [pasta-de-prints]   (GAME_DIR=<clone de JPTER78/pokesurvivor>)
 const path = require('path'), fs = require('fs'), os = require('os');
 const { chromium } = require('playwright');
+const jl = require('./espelhar-jogo.cjs');   // 0.12.3: jogo local (testes/.game) + objeto do jogo pelo mapa.js
 const EXT = path.resolve(process.argv[2] || path.join(__dirname, '..', 'extension'));
 const SHOTS = path.resolve(process.argv[3] || path.join(__dirname, 'prints'));
 const SITE = path.join(__dirname, 'site');
@@ -24,12 +25,13 @@ const ate = async (fn, ms = 6000) => { const t0 = Date.now(); while (Date.now() 
     args: [`--disable-extensions-except=${EXT}`, `--load-extension=${EXT}`, '--lang=pt-BR'],
   });
   await ctx.route('https://api.github.com/**', (r) => r.fulfill({ status: release.status, contentType: 'application/json', body: release.body }));
-  await ctx.route('https://pokesurvivor.com/**', (r) => {
+  await ctx.route('https://pokesurvivor.com/**', async (r) => {
     const u = new URL(r.request().url());
     let f = path.join(SITE, decodeURIComponent(u.pathname));
     if (u.pathname.endsWith('/')) f = path.join(f, 'index.html');
-    if (!/\/index\.html$/.test(f)) f = path.join(GAME, decodeURIComponent(u.pathname));   // CSS, fonte e sprites do jogo
-    if (!(f.startsWith(SITE) || f.startsWith(GAME)) || !fs.existsSync(f)) return r.fulfill({ status: 404, body: '' });
+    // CSS, fonte e sprites do jogo (testes/.game; ESPELHAR=1 busca o que faltar). 0.12.3: [\\/] para valer também no Windows
+    if (!/[\\/]index\.html$/.test(f)) f = await jl.arquivo(GAME, u.pathname, process.env.ESPELHAR === '1');
+    if (!f || !(f.startsWith(SITE) || f.startsWith(GAME)) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) return r.fulfill({ status: 404, body: '' });
     const ct = f.endsWith('.html') ? 'text/html' : f.endsWith('.css') ? 'text/css' : f.endsWith('.png') ? 'image/png' : f.endsWith('.ttf') ? 'font/ttf' : 'application/octet-stream';
     r.fulfill({ status: 200, contentType: ct, body: fs.readFileSync(f) });
   });
@@ -38,10 +40,9 @@ const ate = async (fn, ms = 6000) => { const t0 = Date.now(); while (Date.now() 
   const sync = (o) => sw.evaluate((o) => chrome.storage.sync.set(o), o);
   for (const p of ctx.pages()) if (/COMO-INSTALAR/.test(p.url())) { await sleep(500); await p.screenshot({ path: path.join(SHOTS, '00-guia.png') }); }
   const page = ctx.pages().find((p) => !/COMO-INSTALAR|chrome-extension/.test(p.url())) || await ctx.newPage();
-  // a extensão sorteia o id do próprio quadro a cada página (0.12.2); o teste o marca como #teste-host para achar
-  await page.addInitScript(() => { setInterval(() => { const h = [...document.querySelectorAll('body > div, html > div')].find((e) => e.shadowRoot && e.shadowRoot.querySelector('.fab')); if (h && h.id !== 'teste-host') { h.dataset.idReal = h.id; h.id = 'teste-host'; } }, 100); });
-  const shadow = (sel) => page.locator(`#teste-host >> css=${sel}`);
-  const abrir = async (hash) => { await page.goto('about:blank'); await page.goto('https://pokesurvivor.com/' + (hash || '')); await page.waitForSelector('#teste-host', { state: 'attached', timeout: 8000 }); await sleep(1700); };
+  await page.addInitScript(jl.marcadorHost());
+  const shadow = (sel) => page.locator(`[data-teste-host="1"] >> css=${sel}`);
+  const abrir = async (hash) => { await page.goto('about:blank'); await page.goto('https://pokesurvivor.com/' + (hash || '')); await page.waitForSelector(jl.HOST, { state: 'attached', timeout: 8000 }); await sleep(1700); };
 
   // 1. instalação nova: tutorial no meio da tela
   await abrir();
@@ -56,7 +57,7 @@ const ate = async (fn, ms = 6000) => { const t0 = Date.now(); while (Date.now() 
   ok(await ate(async () => await shadow('.pick.side.on').count() === 1), 'menu "Escolha seu parceiro" abre do lado na aba Criar conta');
   ok(await shadow('.pick .cell').count() === 29, '29 parceiros no menu');
   await sleep(600);
-  const spriteOk = await page.evaluate(() => { const c = document.querySelector('#teste-host').shadowRoot.querySelector('.pick .cell canvas'); const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i]) n++; return n; });
+  const spriteOk = await page.evaluate(() => { const c = document.querySelector('[data-teste-host="1"]').shadowRoot.querySelector('.pick .cell canvas'); const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i]) n++; return n; });
   ok(spriteOk > 50, `sprite do jogo desenhado no menu (${spriteOk} px)`);
   await page.screenshot({ path: path.join(SHOTS, '02-escolha-lado.png') });
   await shadow('.pick .cell[title="Charmander"]').click(); await sleep(300);
