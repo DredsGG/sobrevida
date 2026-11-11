@@ -562,7 +562,7 @@
 
   // ───────────────────────── farm automático (v0.2.0) ─────────────────────────
   // O piloto (src/piloto.js, mundo da página) joga e cuida da rotina; aqui ficam a configuração, a ponte e o painel.
-  const FARM_DEF = { on: false, modo: 'solo', upgrades: true, gacha: true, partner: true, missions: true, skins: true, shop: true, hud: true, cola: true, gachaMenos: false, gachaShiny: true, shinyParceiro: true, barra: 'botao' };
+  const FARM_DEF = { on: false, modo: 'solo', upgrades: true, gacha: true, partner: true, missions: true, skins: true, shop: true, hud: true, cola: true, gachaMenos: false, gachaShiny: true, shinyParceiro: true, segundoPlano: false, barra: 'botao' };
   let farm = Object.assign({}, FARM_DEF), pst = null, pstAt = 0, farmCanvas = null, farmSig = '';
   const mmss = I.mmss;
   // 0.4.0: o que o farm aprendeu nas partidas (acertos reais por golpe) fica guardado aqui e volta para o piloto
@@ -596,8 +596,14 @@
   // a parte que joga (src/piloto.js) só entra quando a página carrega: depois de atualizar a Sobrevida com a aba aberta,
   // ela não está aqui e é preciso recarregar a página
   const semPiloto = () => !pst && Date.now() - INICIO > 8000 && !!document.getElementById('scr-menu');
+  let donoRenovadoEm = 0;
   const onSt = (e) => {
-    try { pst = JSON.parse(e.detail); pstAt = Date.now(); if (pst && pst.partner && pst.partner.meta) metaExtra[pst.partner.dex] = pst.partner.meta; } catch (_) {}
+    try {
+      pst = JSON.parse(e.detail); pstAt = Date.now(); if (pst && pst.partner && pst.partner.meta) metaExtra[pst.partner.dex] = pst.partner.meta;
+      // 0.13.0: com a partida seguindo em segundo plano, os timers desta aba ficam freados (1 por minuto depois de 5 min
+      // escondida); o status do piloto chega pelo relógio da partida e renova a posse, para outra aba não assumir o save
+      if (dono && farm.on && pst && pst.ok && pst.run && Date.now() - donoRenovadoEm > 3000) { donoRenovadoEm = Date.now(); Promise.resolve(ext.storage.local.set({ 'sv.dono': { id: PAGE_ID, at: Date.now() } })).catch(() => {}); }
+    } catch (_) {}
   };
   document.addEventListener('sobrevida:st', onSt);
   // ---------- 0.7.0: colinha na ficha do Pokémon (coleção do jogo) ----------
@@ -930,7 +936,7 @@
       ${p && p.rotinaUlt && !G ? `<div class="kv">${esc(F.rotinaLn(p.rotinaUlt))}</div>` : ''}
       ${p && p.acts && p.acts.length ? `<div class="acts">${p.acts.slice(0, 4).map((a) => `<div>· ${esc(actTxt(a))}</div>`).join('')}</div>` : ''}
       ${G ? '' : `<details class="fopts"${farmOptsOpen ? ' open' : ''}><summary>${esc(F.opts)}</summary><div class="opts">
-        ${['upgrades', 'shop', 'gacha', 'gachaMenos', 'gachaShiny', 'partner', 'shinyParceiro', 'missions', 'skins'].map((k) => `<label class="sw"><input type="checkbox" data-f="${k}"${farm[k] ? ' checked' : ''}> ${esc(F.opt[k])}</label>`).join('')}
+        ${['upgrades', 'shop', 'gacha', 'gachaMenos', 'gachaShiny', 'partner', 'shinyParceiro', 'segundoPlano', 'missions', 'skins'].map((k) => `<label class="sw"><input type="checkbox" data-f="${k}"${farm[k] ? ' checked' : ''}> ${esc(F.opt[k])}</label>`).join('')}
       </div></details>`}
       <div class="barsel"><span class="note">${esc(F.auto.barra)}</span><div class="modos" role="radiogroup" aria-label="${esc(F.auto.barra)}">${['botao', 'completa'].map((m) => `<button type="button" role="radio" data-barra="${m}" class="${farm.barra === m ? 'on' : ''}" aria-checked="${farm.barra === m}">${esc(m === 'botao' ? F.auto.soBotao : F.auto.completa)}</button>`).join('')}</div></div>
       <label class="sw hudsw"><input type="checkbox" data-f="hud"${farm.hud ? ' checked' : ''}> ${esc(F.hud)}</label>

@@ -14,7 +14,7 @@
 //  - partida que o farm tocou NUNCA vai para o ranking (Ranking.submit* bloqueado + selo bloqueado pelo fundo).
 (() => {
   'use strict';
-  const VERSAO = '0.12.6';
+  const VERSAO = '0.13.0';
   // 0.12.2: marca de "já carregou" num Symbol (não aparece como nome no window)
   const MARCA = Symbol.for('sv.p');
   if (window[MARCA]) return;
@@ -97,6 +97,7 @@
     gachaMenos: false,  // 0.9.0: gacha na região onde você tem menos Pokémon (padrão: a mais perto de completar)
     gachaShiny: true,   // 0.12.4: com a coleção completa, continua tirando gacha atrás dos shinies que faltam
     shinyParceiro: true, // 0.12.6: o parceiro usa a versão shiny quando a pessoa tem o shiny dele
+    segundoPlano: false, // 0.13.0: a partida continua com a aba escondida (gasta ~1 núcleo de CPU enquanto escondida)
     partner: true,      // trocar de parceiro sozinho: o melhor que ainda não está 100%
     skins: true,        // Halloween: comprar as skins de bruja com os doces
     cola: true,         // 0.7.0/0.8.0: colinha (coleção, cartas de nível, pausa e faixa no HUD)
@@ -115,7 +116,7 @@
     try {
       const c = JSON.parse(e.detail || '{}');
       const was = cfg.on, shinyWas = cfg.gachaShiny;
-      for (const k of ['on', 'upgrades', 'gacha', 'partner', 'skins', 'missions', 'shop', 'hud', 'cola', 'gachaMenos', 'gachaShiny', 'shinyParceiro']) if (typeof c[k] === 'boolean') cfg[k] = c[k];
+      for (const k of ['on', 'upgrades', 'gacha', 'partner', 'skins', 'missions', 'shop', 'hud', 'cola', 'gachaMenos', 'gachaShiny', 'shinyParceiro', 'segundoPlano']) if (typeof c[k] === 'boolean') cfg[k] = c[k];
       if (shinyWas !== cfg.gachaShiny) M.shiny = null;   // ligar/desligar a opção recomeça a contagem do modo shiny
       if (typeof c.reserve === 'number' && c.reserve >= 0) cfg.reserve = c.reserve;
       if (c.modo === 'solo' || c.modo === 'grupo') cfg.modo = c.modo;
@@ -3313,4 +3314,127 @@
     if (!isFinite(S.out[0]) || !isFinite(S.out[1])) { S.out = escape(); S.loopC = null; S.plan = null; }
     return S.out;
   }
+  // ---------- 9. (0.13.0) "Continuar em segundo plano": a partida segue com a aba escondida (opção, desligada por padrão) ----------
+  // Com a aba escondida o navegador para o requestAnimationFrame e o relógio da partida para junto. Aqui, SÓ quando o
+  // farm está de fato jogando a partida (sozinho, nunca em grupo) e a opção está ligada, os quadros do jogo passam a vir
+  // de um relógio alternativo enquanto a aba está escondida (visível: sempre o rAF nativo). O timestamp é performance.now()
+  // (tempo real), sempre crescente, um quadro por tique: o jogo nunca anda mais rápido que o relógio de parede (o próprio
+  // jogo limita dt a 1/30 s por quadro). O autoPause do jogo não é bloqueado (o evento chega a todos: jogo, content.js);
+  // o piloto só retoma a partida que o jogo pausou por esconder a aba — nunca uma pausa da pessoa — e devolve a pausa se o
+  // recurso parar com a aba ainda escondida.
+  // Medido e revisado no spike de 2026-11-11 (testes/spike): sem Worker (a CSP do jogo recusa e avisa a página por
+  // securitypolicyviolation); relógio = cadeia de MessageChannel (~55–60 quadros/s escondida, ~1 núcleo de CPU).
+  // Revisão da 0.13.0: o embrulho só entra com a partida do farm em curso; o relógio também roda o tique e o status do
+  // piloto (depois de 5 min escondida o Chrome freia os timers a 1 por minuto).
+  const SP = { on: false, inst: false, pausaAuto: false, retomei: false, n: 0 };
+  const rafN = window.requestAnimationFrame, cafN = window.cancelAnimationFrame;
+  const agora = performance.now.bind(performance);
+  let spVisivel = document.visibilityState === 'visible';
+  let spFila = new Map(), spLote = null, spSeq = 1e9, spGen = 0, spPend = false, spEsperando = null, spUltTs = 0;
+  let spRafAntes = null, spCafAntes = null, spUltTick = 0, spUltSt = 0;
+  // o farm está jogando esta partida? (sozinho, opção ligada; no menu e no fim de partida não há o que manter)
+  const spJogando = () => {
+    if (!(cfg.segundoPlano && cfg.on && NS)) return false;
+    try { const st = NS.Game.state; return ativo(NS) && !emGrupo(NS) && !naSala(NS) && st !== 'ui' && st !== 'over'; } catch (_) { return false; }
+  };
+  // o relógio alternativo deve girar? em 'paused' só para entregar a única retomada da pausa automática do jogo
+  const spAtivo = () => {
+    if (!spJogando()) return false;
+    try { if (NS.Game.state === 'paused') return SP.pausaAuto && !(M.userPausedAt > 0); } catch (_) { return false; }
+    return true;
+  };
+  const tique = () => { const f = spEsperando; if (f) { spEsperando = null; f(); } };
+  const canal = (() => {
+    let ch = null, rodando = false, ult = 0;
+    const gira = () => {
+      if (!rodando || !spEsperando || spVisivel || !spAtivo()) { rodando = false; spParou(); return; }
+      const t = agora(); if (t - ult >= 16) { ult = t; tique(); }
+      if (rodando && spEsperando) ch.port2.postMessage(0); else rodando = false;
+    };
+    return {
+      liga() { if (!ch) { ch = new MessageChannel(); ch.port1.onmessage = gira; } if (!rodando) { rodando = true; ch.port2.postMessage(0); } },
+      desliga() { rodando = false; },
+    };
+  })();
+  // o recurso parou com a aba ainda escondida (farm/opção desligados, outra aba assumiu, urgente…): se tínhamos
+  // retomado a partida, devolve a pausa automática do jogo (senão ela andaria sozinha quando a pessoa voltasse)
+  function spParou() {
+    SP.pausaAuto = false;
+    if (!SP.retomei || spVisivel) return;
+    SP.retomei = false;
+    try { if (NS && NS.Game && NS.Game.state === 'playing') NS.Game.togglePause(); } catch (_) {}
+  }
+  function spPump(tk, ts) {
+    if (tk !== spGen) return;
+    spPend = false; SP.n++;
+    ts = Math.max(ts, spUltTs); spUltTs = ts;   // nunca para trás (na volta escondida → visível)
+    if (!spVisivel) {
+      if (SP.pausaAuto) {
+        SP.pausaAuto = false;
+        try { if (NS.Game.state === 'paused' && !(M.userPausedAt > 0)) { NS.Game.togglePause(); SP.retomei = true; } } catch (_) {}
+      }
+      // escondida: o tique e o status do piloto também andam por aqui (os timers do Chrome ficam freados)
+      const t = agora();
+      if (t - spUltTick >= 250) { spUltTick = t; try { tick(NS); } catch (_) {} }
+      if (t - spUltSt >= 1000) { spUltSt = t; try { status(false); } catch (_) {} }
+    }
+    const lote = spLote = spFila; spFila = new Map();
+    for (const [id, cb] of lote) { if (!lote.has(id)) continue; lote.delete(id); try { cb(ts); } catch (e) { try { reportError(e); } catch (_) {} } }
+    spLote = null;
+    if (spFila.size) spAgenda();
+  }
+  function spAgenda() {
+    if (spPend) return;
+    spPend = true;
+    const tk = ++spGen;
+    if (spVisivel || !spAtivo()) rafN.call(window, (ts) => spPump(tk, ts));
+    else { spEsperando = () => spPump(tk, agora()); canal.liga(); }
+  }
+  const spRaf = { requestAnimationFrame(cb) { if (typeof cb !== 'function') return rafN.call(window, cb); const id = ++spSeq; spFila.set(id, cb); spAgenda(); return id; } }.requestAnimationFrame;
+  const spCaf = { cancelAnimationFrame(id) { if (spFila.has(id)) spFila.delete(id); else if (spLote && spLote.has(id)) spLote.delete(id); else cafN.call(window, id); } }.cancelAnimationFrame;
+  function spInstala() {
+    if (SP.inst) return;
+    SP.inst = true;
+    spRafAntes = window.requestAnimationFrame; spCafAntes = window.cancelAnimationFrame;
+    window.requestAnimationFrame = spRaf; window.cancelAnimationFrame = spCaf;
+  }
+  // devolve os originais; o que estava na fila roda num quadro nativo só, e os cancelamentos do jogo seguem valendo
+  function spDesinstala() {
+    if (!SP.inst) return;
+    SP.inst = false; canal.desliga(); spEsperando = null; spPend = false; spGen++; SP.pausaAuto = false;
+    if (window.requestAnimationFrame === spRaf) window.requestAnimationFrame = spRafAntes || rafN;
+    const fila = spFila; spFila = new Map();
+    const devolveCancel = () => { if (window.cancelAnimationFrame === spCaf) window.cancelAnimationFrame = spCafAntes || cafN; };
+    if (!fila.size) return devolveCancel();
+    rafN.call(window, (ts) => {
+      ts = Math.max(ts, spUltTs); spUltTs = ts;
+      spLote = fila;
+      for (const [id, cb] of fila) { if (!fila.has(id)) continue; fila.delete(id); try { cb(ts); } catch (e) { try { reportError(e); } catch (_) {} } }
+      spLote = null;
+      devolveCancel();
+    });
+  }
+  // liga/desliga conforme o farm e a partida: instala só com a partida do farm em curso e a aba visível (a próxima
+  // chamada do jogo já passa pelo embrulho); com a aba visível e fora disso, devolve os originais
+  function spSincroniza() {
+    SP.on = !!cfg.segundoPlano;
+    if (!spAtivo()) { canal.desliga(); spEsperando = null; if (!spVisivel) spParou(); }
+    if (spVisivel) { if (SP.on && spJogando()) spInstala(); else spDesinstala(); }
+    else if (SP.inst && spAtivo()) { spPend = false; spAgenda(); }   // escondida e valendo: reagenda pelo relógio certo
+  }
+  setInterval(spSincroniza, 1000);
+  document.addEventListener('sobrevida:cfg', () => setTimeout(spSincroniza, 0));
+  // o estado de antes da pausa automática: só o blur DA JANELA (não de um campo) e a troca de visibilidade, em captura
+  // no window (rodam antes do ouvinte do jogo no document, qualquer que seja a ordem de registro)
+  const marcaPausa = () => { try { if (NS && NS.Game && NS.Game.state === 'playing' && spJogando()) SP.pausaAuto = true; } catch (_) {} };
+  window.addEventListener('blur', (e) => { if (e.target === window) marcaPausa(); }, true);
+  window.addEventListener('focus', (e) => { if (e.target === window && spVisivel) SP.pausaAuto = false; }, true);
+  window.addEventListener('visibilitychange', () => {
+    spVisivel = document.visibilityState === 'visible';
+    if (spVisivel) { SP.pausaAuto = false; SP.retomei = false; canal.desliga(); }
+    else marcaPausa();
+    if (!SP.inst) return;
+    spEsperando = null; spPend = false; spAgenda();   // o quadro que esperava o outro relógio passa para o certo
+    if (spVisivel) spSincroniza();
+  }, true);
 })();
