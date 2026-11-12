@@ -14,7 +14,7 @@
 //  - partida que o farm tocou NUNCA vai para o ranking (Ranking.submit* bloqueado + selo bloqueado pelo fundo).
 (() => {
   'use strict';
-  const VERSAO = '0.13.0';
+  const VERSAO = '0.13.1';
   // 0.12.2: marca de "já carregou" num Symbol (não aparece como nome no window)
   const MARCA = Symbol.for('sv.p');
   if (window[MARCA]) return;
@@ -527,7 +527,10 @@
     }, true);
   }
 
-  function schedule(fn, ms) { setTimeout(() => { try { fn(); } catch (e) { log(e); } }, ms); }
+  // 0.13.1: as esperas do piloto passam por dormir(): com a aba escondida e o segundo plano valendo, quem acorda é o
+  // relógio da partida (segundo-plano.js), não o setTimeout que o Chrome freia (1/s; 1/min depois de 5 min escondida)
+  let dormir = (ms, r) => setTimeout(r, ms);
+  function schedule(fn, ms) { dormir(ms, () => { try { fn(); } catch (e) { log(e); } }); }
   // cooperativo (0.2.4): cada um pilota o próprio Pokémon, então o farm joga em grupo como anfitrião ou convidado.
   // Só joga partida em grupo que JÁ COMEÇOU com o farm ligado: o selo do ranking de cada membro é pedido no começo;
   // bloqueado o nosso, o anfitrião não consegue subir a partida do grupo (ranking.js exige o selo de todos).
@@ -543,7 +546,7 @@
   const jogaAgora = (ns) => cfg.on && (emGrupo(ns) ? grupo() && !bloqueadoGrupo(ns) : !grupo());
   const ativo = jogaAgora;
   const now = () => performance.now();
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const sleep = (ms) => new Promise((r) => dormir(ms, r));
   const $ = (s) => document.querySelector(s);
   const open = (id) => { const e = document.getElementById(id); return !!e && !e.classList.contains('hidden'); };
   async function waitFor(fn, ms) { const t0 = now(); while (now() - t0 < ms) { try { if (fn()) return true; } catch (_) {} await sleep(80); } return false; }
@@ -571,7 +574,7 @@
       if (closePopups()) return;
       if (naSala(ns)) return;                  // numa sala com amigos: nada de menu (parceiro, gacha, partida solo)
       if (!open('scr-menu')) return;            // outra tela aberta (a pessoa mexendo ou o jogo trocando): espera
-      if (document.visibilityState !== 'visible') return;
+      if (document.visibilityState !== 'visible' && !spRotinaEscondida()) return;   // 0.13.1: com o segundo plano, a rotina roda escondida
       M.busy = true;
       routine(ns).catch((e) => { M.err = String(e && e.message || e).slice(0, 80); log('rotina', e); })
         .finally(() => { M.busy = false; M.task = ''; });
@@ -859,14 +862,14 @@
       for (let k = 0; k < 3 && open('pull-fx'); k++) {
         const sk = $('#pull-skip'); if (sk && !sk.classList.contains('hidden')) sk.click();
         const c = $('#pull-close'); if (c && !c.classList.contains('hidden')) c.click();
-        await waitFor(() => !open('pull-fx'), 3000);
+        await waitFor(() => !open('pull-fx'), spRotinaEscondida() ? 20000 : 3000);
       }
       await sleep(250);
     };
     const trocaBanner = async (g) => { if (g == null || g === gen) return; gen = g; gens.push(g); const t2 = $(`#gacha-gens .gen-tab[data-gen="${g}"]`); if (t2) { t2.click(); await sleep(300); } };
     try { for (;;) {
       if (!cfg.on || !cfg.gacha || grupo() || naSala(ns) || (shiny && !cfg.gachaShiny)) { parou = 'desligado'; break; }
-      if (document.visibilityState !== 'visible') { parou = 'escondida'; break; }   // aba escondida: o navegador freia os tempos e o bloco falharia à toa
+      if (document.visibilityState !== 'visible' && !spRotinaEscondida()) { parou = 'escondida'; break; }   // aba escondida: o navegador freia os tempos e o bloco falharia à toa
       if (!shiny) {
         // coleção do modo normal: o banner pode mudar (outra região passa a ser a mais perto) ou a coleção fechar
         const g = gachaGen(ns);
@@ -883,28 +886,32 @@
       if (!b || b.disabled) falha = 'botao';
       else {
         b.click();
-        if (!await waitFor(() => open('pull-fx') || nPulls() > p0, 30000)) falha = 'animacao';
+        if (!await waitFor(() => open('pull-fx') || nPulls() > p0, spRotinaEscondida() ? 75000 : 30000)) falha = 'animacao';
         else {
           await sleep(250);
           const sk = $('#pull-skip'); if (sk && !sk.classList.contains('hidden')) sk.click();
-          const fechou = await waitFor(() => { const c = $('#pull-close'); return c && !c.classList.contains('hidden'); }, 20000);
+          // 0.13.1: com a rotina escondida, a animação do jogo anda nos timers dele (freados a 1/min depois de 5 min): mais prazo
+          const fechou = await waitFor(() => { const c = $('#pull-close'); return c && !c.classList.contains('hidden'); }, spRotinaEscondida() ? 75000 : 20000);
           await sleep(500);
           if (!fechou) falha = 'fechar';
         }
       }
       await limparFx();
       // o que o jogo registrou de verdade (em vez do tamanho nominal do botão)
-      const feitos = ns.DB.save.stats ? nPulls() - p0 : (id.includes('100') ? 100 : 10), n = feitos > 0 ? feitos : 0;
+      const feitos = ns.DB.save.stats ? nPulls() - p0 : (id.includes('100') ? 100 : 10);
+      const n = falha && !ns.DB.save.stats ? 0 : (feitos > 0 ? feitos : 0);   // sem o contador do jogo, bloco que falhou não conta (revisão)
       // o bloco só conta se o jogo registrou os tiros (tickets podem subir por missão ou baú no meio: por isso o contador do jogo)
       if (!falha && ns.DB.save.stats && feitos <= 0) falha = 'tiros';
+      // 0.13.1 (revisão): tiros que o jogo registrou contam mesmo num bloco que falhou (o teto de tiros sem shiny não é subcontado)
+      pulls += n; ult.n = pulls;
+      const novoBloco = Object.keys(ns.DB.save.shiny || {}).length - shBefore;
+      shinyNovo += novoBloco;
       if (falha) {
+        if (shiny && n > 0) { const r = M.shiny || (M.shiny = { desde: 0 }); r.desde = novoBloco > 0 ? 0 : (r.desde || 0) + n; if (r.desde >= SHINY_SEM_MAX) r.parouN = true; }
         if (++falhas >= 2) { parou = 'falha:' + falha; break; }
         continue;
       }
       falhas = 0;
-      pulls += n; ult.n = pulls;
-      const novoBloco = Object.keys(ns.DB.save.shiny || {}).length - shBefore;
-      shinyNovo += novoBloco;
       if (shiny) {
         const r = M.shiny || (M.shiny = { desde: 0 }); r.desde = novoBloco > 0 ? 0 : (r.desde || 0) + n;
         if (r.desde >= SHINY_SEM_MAX) r.parouN = true;
@@ -3324,7 +3331,10 @@
   // recurso parar com a aba ainda escondida.
   // Medido e revisado no spike de 2026-11-11 (testes/spike): sem Worker (a CSP do jogo recusa e avisa a página por
   // securitypolicyviolation); relógio = cadeia de MessageChannel (~55–60 quadros/s escondida, ~1 núcleo de CPU).
-  // Revisão da 0.13.0: o embrulho só entra com a partida do farm em curso; o relógio também roda o tique e o status do
+  // 0.13.1: vale também entre partidas (menu): a rotina roda escondida e as esperas do piloto são acordadas por aqui.
+  // Com isso o embrulho fica instalado sempre que o farm (sozinho) e a opção estão ligados, também no menu: a superfície
+  // observável cresceu em relação à 0.13.0 (requestAnimationFrame não nativo nesse tempo todo).
+  // Revisão da 0.13.0: o relógio também roda o tique e o status do
   // piloto (depois de 5 min escondida o Chrome freia os timers a 1 por minuto).
   const SP = { on: false, inst: false, pausaAuto: false, retomei: false, n: 0 };
   const rafN = window.requestAnimationFrame, cafN = window.cancelAnimationFrame;
@@ -3332,10 +3342,34 @@
   let spVisivel = document.visibilityState === 'visible';
   let spFila = new Map(), spLote = null, spSeq = 1e9, spGen = 0, spPend = false, spEsperando = null, spUltTs = 0;
   let spRafAntes = null, spCafAntes = null, spUltTick = 0, spUltSt = 0;
-  // o farm está jogando esta partida? (sozinho, opção ligada; no menu e no fim de partida não há o que manter)
+  // o farm está cuidando do jogo sozinho com a opção ligada? (partida, fim de partida e menu — 0.13.1: no menu também,
+  // para a rotina entre partidas rodar escondida; nunca em grupo ou sala)
   const spJogando = () => {
     if (!(cfg.segundoPlano && cfg.on && NS)) return false;
-    try { const st = NS.Game.state; return ativo(NS) && !emGrupo(NS) && !naSala(NS) && st !== 'ui' && st !== 'over'; } catch (_) { return false; }
+    try { return ativo(NS) && !emGrupo(NS) && !naSala(NS); } catch (_) { return false; }
+  };
+  // 0.13.1: com a aba escondida, a rotina entre partidas (missões, gacha, parceiro, loja, melhorias, começar a partida)
+  // roda quando o segundo plano está valendo (corpo.js consulta isto antes de bloquear por aba escondida)
+  // (só com o embrulho instalado: sem ele, os quadros do jogo — animações do gacha, a partida — ficariam congelados)
+  function spRotinaEscondida() { return !spVisivel && SP.inst && spJogando(); }
+  // esperas do piloto (sleep/waitFor/schedule) com a aba escondida: acordadas pelo relógio da partida, não pelo
+  // setTimeout freado; ao voltar a aba ou parar o recurso, as que faltam voltam para o setTimeout normal
+  let spSonos = [];
+  const spAcordaSonos = () => {
+    if (!spSonos.length) return;
+    const t = agora(), prontos = spSonos.filter((x) => x.ate <= t);
+    if (!prontos.length) return;
+    spSonos = spSonos.filter((x) => x.ate > t);
+    for (const x of prontos) { try { x.r(); } catch (_) {} }
+  };
+  const spSonosParaTimer = () => {
+    if (!spSonos.length) return;
+    const t = agora(), resto = spSonos; spSonos = [];
+    for (const x of resto) setTimeout(x.r, Math.max(0, x.ate - t));
+  };
+  dormir = (ms, r) => {
+    if (!spVisivel && SP.inst && spAtivo()) { spSonos.push({ ate: agora() + (+ms || 0), r }); canal.liga(); return; }
+    setTimeout(r, ms);
   };
   // o relógio alternativo deve girar? em 'paused' só para entregar a única retomada da pausa automática do jogo
   const spAtivo = () => {
@@ -3347,9 +3381,14 @@
   const canal = (() => {
     let ch = null, rodando = false, ult = 0;
     const gira = () => {
-      if (!rodando || !spEsperando || spVisivel || !spAtivo()) { rodando = false; spParou(); return; }
-      const t = agora(); if (t - ult >= 16) { ult = t; tique(); }
-      if (rodando && spEsperando) ch.port2.postMessage(0); else rodando = false;
+      if (!rodando) return;
+      if (spVisivel || !spAtivo()) { rodando = false; if (!spVisivel) spParou(); spSonosParaTimer(); return; }
+      spAcordaSonos();
+      // (sem parada por ócio no menu: a 2ª revisão da 0.13.1 mostrou que parar ali corta o tique e o status — a rotina pode
+      // não voltar e outra aba pode assumir o mesmo save. O custo fica o mesmo avisado na opção: ~1 núcleo enquanto escondida)
+      const t = agora(); if (spEsperando && t - ult >= 16) { ult = t; tique(); }
+      // segue girando enquanto houver quadro ou espera pendente; senão para (sem gastar CPU à toa)
+      if (spEsperando || spSonos.length) ch.port2.postMessage(0); else rodando = false;
     };
     return {
       liga() { if (!ch) { ch = new MessageChannel(); ch.port1.onmessage = gira; } if (!rodando) { rodando = true; ch.port2.postMessage(0); } },
@@ -3401,7 +3440,7 @@
   // devolve os originais; o que estava na fila roda num quadro nativo só, e os cancelamentos do jogo seguem valendo
   function spDesinstala() {
     if (!SP.inst) return;
-    SP.inst = false; canal.desliga(); spEsperando = null; spPend = false; spGen++; SP.pausaAuto = false;
+    SP.inst = false; canal.desliga(); spSonosParaTimer(); spEsperando = null; spPend = false; spGen++; SP.pausaAuto = false;
     if (window.requestAnimationFrame === spRaf) window.requestAnimationFrame = spRafAntes || rafN;
     const fila = spFila; spFila = new Map();
     const devolveCancel = () => { if (window.cancelAnimationFrame === spCaf) window.cancelAnimationFrame = spCafAntes || cafN; };
@@ -3414,11 +3453,11 @@
       devolveCancel();
     });
   }
-  // liga/desliga conforme o farm e a partida: instala só com a partida do farm em curso e a aba visível (a próxima
-  // chamada do jogo já passa pelo embrulho); com a aba visível e fora disso, devolve os originais
+  // liga/desliga conforme o farm: instala com o farm cuidando do jogo sozinho (partida, fim de partida e menu) e a aba
+  // visível (a próxima chamada do jogo já passa pelo embrulho); com a aba visível e fora disso, devolve os originais
   function spSincroniza() {
     SP.on = !!cfg.segundoPlano;
-    if (!spAtivo()) { canal.desliga(); spEsperando = null; if (!spVisivel) spParou(); }
+    if (!spAtivo()) { canal.desliga(); spSonosParaTimer(); spEsperando = null; if (!spVisivel) spParou(); }
     if (spVisivel) { if (SP.on && spJogando()) spInstala(); else spDesinstala(); }
     else if (SP.inst && spAtivo()) { spPend = false; spAgenda(); }   // escondida e valendo: reagenda pelo relógio certo
   }
@@ -3431,7 +3470,7 @@
   window.addEventListener('focus', (e) => { if (e.target === window && spVisivel) SP.pausaAuto = false; }, true);
   window.addEventListener('visibilitychange', () => {
     spVisivel = document.visibilityState === 'visible';
-    if (spVisivel) { SP.pausaAuto = false; SP.retomei = false; canal.desliga(); }
+    if (spVisivel) { SP.pausaAuto = false; SP.retomei = false; canal.desliga(); spSonosParaTimer(); }
     else marcaPausa();
     if (!SP.inst) return;
     spEsperando = null; spPend = false; spAgenda();   // o quadro que esperava o outro relógio passa para o certo

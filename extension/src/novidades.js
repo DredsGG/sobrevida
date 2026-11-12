@@ -2,9 +2,11 @@
 // Frases curtas, do ponto de vista de quem usa. Aparece uma vez, na primeira abertura depois da atualização.
 globalThis.SV_NOVIDADES = {
   pt: {
+    '0.13.1': [
+      "Com \"Continuar em segundo plano\" ligada, a rotina entre partidas também roda com a aba escondida: missões, gacha, troca de parceiro, loja, melhorias e começar a próxima partida. Antes, ela esperava você voltar para a aba.",
+    ],
     '0.13.0': [
-      "Nova opção (desligada por padrão): \"Continuar a partida em segundo plano\". Com ela ligada, a partida do farm continua com a aba escondida ou a janela minimizada. Usa cerca de 1 núcleo do processador enquanto escondida.",
-      "Entre uma partida e outra, a aba ainda precisa estar à vista para o farm cuidar do parceiro, da loja, das melhorias e do gacha e começar a próxima partida.",
+      "Nova opção (desligada por padrão): \"Continuar em segundo plano\". Com ela ligada, o farm continua com a aba escondida ou a janela minimizada. Usa cerca de 1 núcleo do processador enquanto escondida.",
     ],
     '0.12.6': [
       "O farm gasta todas as moedas antes de começar a partida: trabalha um parceiro depois do outro até não sobrar o que comprar (fica só a reserva). O painel mostra quanto gastou e em quantos parceiros.",
@@ -139,9 +141,11 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   en: {
+    '0.13.1': [
+      "With \"Keep going in the background\" on, the routine between runs also runs with the tab hidden: missions, gacha, switching partner, shop, upgrades and starting the next run. Before, it waited for you to come back to the tab.",
+    ],
     '0.13.0': [
-      "New option (off by default): \"Keep the run going in the background\". With it on, the farm's run keeps going with the tab hidden or the window minimized. It uses about one CPU core while hidden.",
-      "Between runs, the tab still needs to be visible for the farm to handle the partner, the shop, upgrades and gacha and to start the next run.",
+      "New option (off by default): \"Keep going in the background\". With it on, the farm keeps going with the tab hidden or the window minimized. It uses about one CPU core while hidden.",
     ],
     '0.12.6': [
       "The farm spends all your coins before starting a run: it works on one partner after another until there's nothing left to buy (only the reserve stays). The panel shows how much it spent and on how many partners.",
@@ -276,9 +280,11 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   es: {
+    '0.13.1': [
+      "Con \"Seguir en segundo plano\" encendida, la rutina entre partidas también funciona con la pestaña oculta: misiones, gacha, cambio de compañero, tienda, mejoras y empezar la siguiente partida. Antes esperaba a que volvieras a la pestaña.",
+    ],
     '0.13.0': [
-      "Nueva opción (apagada por defecto): \"Seguir la partida en segundo plano\". Con ella encendida, la partida del farm sigue con la pestaña oculta o la ventana minimizada. Usa cerca de un núcleo del procesador mientras está oculta.",
-      "Entre una partida y otra, la pestaña aún tiene que estar a la vista para que el farm se ocupe del compañero, la tienda, las mejoras y el gacha y empiece la siguiente partida.",
+      "Nueva opción (apagada por defecto): \"Seguir en segundo plano\". Con ella encendida, el farm sigue con la pestaña oculta o la ventana minimizada. Usa cerca de un núcleo del procesador mientras está oculta.",
     ],
     '0.12.6': [
       "El farm gasta todas las monedas antes de empezar la partida: trabaja un compañero tras otro hasta que no quede nada que comprar (solo queda la reserva). El panel muestra cuánto gastó y en cuántos compañeros.",

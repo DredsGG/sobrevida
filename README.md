@@ -8,7 +8,7 @@
 Choose your partner Pokémon before the 8-question personality quiz and get exactly that one. Then let the auto farm play runs, claim missions, pull the gacha and buy upgrades while you watch.
 
 ![Manifest V3](https://img.shields.io/badge/Manifest-V3-4285F4?logo=googlechrome&logoColor=white)
-![Version](https://img.shields.io/badge/version-0.13.0-f4b400)
+![Version](https://img.shields.io/badge/version-0.13.1-f4b400)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 **Works on:** Chrome · Edge · Brave · Opera GX
@@ -53,7 +53,7 @@ Open the heart menu and press **Start farm** (or **Alt+F** anywhere in the game)
 
 **Co-op.** The farm has a separate **Group** mode (a tab next to **Solo** in the heart menu) for runs with your friends, as the host or as a guest: each player steers their own Pokémon, so it only plays yours. In a group run it plays as a teammate: when a friend goes down it goes to them and stays close until they're back up (the game needs you right next to them for 3 seconds), it keeps near the group without sticking to anyone, and it leaves gems, chests, altars and thieves that are closer to a friend to them (XP is shared by the team). As a guest, turn it on **before** the group run starts (a group run that started with the farm off is left alone); the host can turn it on at any time. In a room it never touches the menu between runs (no gacha, partner switch or solo run) and doesn't leave the results screen by itself. A group run with the farm on never reaches the leaderboard, for anyone in the group: the game only posts a group run with every member's seal, and Sobrevida blocks yours.
 
-**Hidden tab.** Browsers pause a game in a hidden tab and in a minimized or covered window. With the option **Keep the run going in the background** (off by default), the farm's run keeps going there at about 60 frames per second, never faster than real time; it uses about one CPU core while the tab is hidden, so it costs more power and battery. Between runs the tab still needs to be visible: that's when the farm handles missions, gacha, the partner and upgrades and starts the next run. Without the option, keep the game tab visible; the panel tells you when it's hidden. Only one PokéSurvivor tab farms at a time; a second tab says the farm is running in the first one.
+**Hidden tab.** Browsers pause a game in a hidden tab and in a minimized or covered window. With the option **Keep going in the background** (off by default), the farm keeps playing there: the run goes on at about 60 frames per second, never faster than real time, and between runs it also handles missions, gacha, the partner and upgrades and starts the next run, all with the tab hidden. It uses about one CPU core while the tab is hidden (in the menu too), so it costs more power and battery. Without the option, keep the game tab visible; the panel tells you when it's hidden. Only one PokéSurvivor tab farms at a time; a second tab says the farm is running in the first one.
 
 ### Cheat sheet in the collection
 

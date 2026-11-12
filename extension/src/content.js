@@ -600,9 +600,13 @@
   const onSt = (e) => {
     try {
       pst = JSON.parse(e.detail); pstAt = Date.now(); if (pst && pst.partner && pst.partner.meta) metaExtra[pst.partner.dex] = pst.partner.meta;
-      // 0.13.0: com a partida seguindo em segundo plano, os timers desta aba ficam freados (1 por minuto depois de 5 min
-      // escondida); o status do piloto chega pelo relógio da partida e renova a posse, para outra aba não assumir o save
-      if (dono && farm.on && pst && pst.ok && pst.run && Date.now() - donoRenovadoEm > 3000) { donoRenovadoEm = Date.now(); Promise.resolve(ext.storage.local.set({ 'sv.dono': { id: PAGE_ID, at: Date.now() } })).catch(() => {}); }
+      // 0.13.0/0.13.1: em segundo plano (partida e rotina), os timers desta aba ficam freados (1 por minuto depois de 5 min
+      // escondida); o status do piloto chega pelo relógio do segundo plano e renova a posse, para outra aba não assumir o save
+      // (revisão da 0.13.1: só com a opção ligada e a aba escondida, e só se a posse ainda é desta aba — lê antes de gravar)
+      if (dono && farm.on && farm.segundoPlano && pst && pst.ok && pst.hidden && Date.now() - donoRenovadoEm > 3000) {
+        donoRenovadoEm = Date.now();
+        Promise.resolve(ext.storage.local.get('sv.dono')).then((o) => { const d = o && o['sv.dono']; if (!d || d.id === PAGE_ID) return ext.storage.local.set({ 'sv.dono': { id: PAGE_ID, at: Date.now() } }); }).catch(() => {});
+      }
     } catch (_) {}
   };
   document.addEventListener('sobrevida:st', onSt);
