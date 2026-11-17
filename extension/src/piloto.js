@@ -14,7 +14,7 @@
 //  - partida que o farm tocou NUNCA vai para o ranking (Ranking.submit* bloqueado + selo bloqueado pelo fundo).
 (() => {
   'use strict';
-  const VERSAO = '0.13.2';
+  const VERSAO = '0.13.3';
   // 0.12.2: marca de "já carregou" num Symbol (não aparece como nome no window)
   const MARCA = Symbol.for('sv.p');
   if (window[MARCA]) return;
@@ -98,6 +98,11 @@
     gachaShiny: true,   // 0.12.4: com a coleção completa, continua tirando gacha atrás dos shinies que faltam
     shinyParceiro: true, // 0.12.6: o parceiro usa a versão shiny quando a pessoa tem o shiny dele
     segundoPlano: false, // 0.13.0: a partida continua com a aba escondida (gasta ~1 núcleo de CPU enquanto escondida)
+    // 0.13.3 (build afdb307d50, 16/11)
+    dificil: false,     // jogar no modo mais difícil já liberado (Difícil ×1,5 e Pesadelo ×2 de moedas; inimigos mais fortes)
+    poder: true,        // usar o poder da partida (Mega, Dinamax, Z, Teracristal) pela tecla do jogo quando estiver pronto
+    ovos: true,         // abrir os ovos prontos na Mochila (botão "Abrir" do jogo)
+    itemInicial: true,  // "Objeto inicial" = Moneda Amuleto, comprada na loja só quando a partida do farm rende o dobro do preço
     partner: true,      // trocar de parceiro sozinho: o melhor que ainda não está 100%
     skins: true,        // Halloween: comprar as skins de bruja com os doces
     cola: true,         // 0.7.0/0.8.0: colinha (coleção, cartas de nível, pausa e faixa no HUD)
@@ -116,7 +121,7 @@
     try {
       const c = JSON.parse(e.detail || '{}');
       const was = cfg.on, shinyWas = cfg.gachaShiny;
-      for (const k of ['on', 'upgrades', 'gacha', 'partner', 'skins', 'missions', 'shop', 'hud', 'cola', 'gachaMenos', 'gachaShiny', 'shinyParceiro', 'segundoPlano']) if (typeof c[k] === 'boolean') cfg[k] = c[k];
+      for (const k of ['on', 'upgrades', 'gacha', 'partner', 'skins', 'missions', 'shop', 'hud', 'cola', 'gachaMenos', 'gachaShiny', 'shinyParceiro', 'segundoPlano', 'dificil', 'poder', 'ovos', 'itemInicial']) if (typeof c[k] === 'boolean') cfg[k] = c[k];
       if (shinyWas !== cfg.gachaShiny) M.shiny = null;   // ligar/desligar a opção recomeça a contagem do modo shiny
       if (typeof c.reserve === 'number' && c.reserve >= 0) cfg.reserve = c.reserve;
       if (c.modo === 'solo' || c.modo === 'grupo') cfg.modo = c.modo;
@@ -125,6 +130,7 @@
         for (const [k, v] of Object.entries(c.learn)) if (v && v.eff > 0 && v.eff < 60 && v.n > 0 && !(k in KB.learn)) KB.learn[k] = { eff: +v.eff, n: Math.min(5000, v.n | 0) };
         KB.plans = {}; KB.vals = {};
       } catch (_) {}
+      if (!cfg.on) M.robo = false;   // 0.13.3: o aviso do Turnstile vale até a pessoa desligar (e ligar de novo)
       if (cfg.on && !was) { M.needMaint = true; M.lastPlay = -1e9; sess.start = sess.start || Date.now(); }
       if (cfg.on && NS && NS.Game && NS.Game.state !== 'ui' && NS.Game.state !== 'over') M.touched = true;
     } catch (_) {}
@@ -220,6 +226,13 @@
     Gacha: (v) => svObj(v) && svTem(v, 'BANNERS', 'pull', 'isOpen'),
     HUD: (v) => svObj(v) && svTem(v, 'bar', 'draw', 'roundRect') && Object.keys(v).length <= 5,
   };
+  // 0.13.3: módulos novos do build afdb307d50 (16/11), em claro hoje; a forma vale se o nome sumir
+  const SV_OPCIONAL = {
+    Modes: (v) => svObj(v) && svTem(v, 'NAMES', 'unlocked', 'current', 'need'),
+    Power: (v) => svObj(v) && svTem(v, 'CFG', 'options', 'typeOptions', 'ready'),
+    Eggs: (v) => svObj(v) && svTem(v, 'NEED', 'anyReady', 'hatch', 'ready'),
+    Casino: (v) => svObj(v) && svTem(v, 'BETS', 'visit', 'jackpot', 'payOf'),
+  };
   // funções soltas no topo: sem chaves internas, então vale a forma do CÓDIGO delas (lido, nunca chamado — uma função
   // desconhecida pode mexer no save). A fonte é normalizada: textos do ofuscador decodificados pelo próprio
   // decodificador do jogo, chaves reais trocadas pelos nomes lógicos já achados, identificadores _0x… viram "$".
@@ -298,6 +311,9 @@
     }
     // 2) objetos, arrays e classes
     for (const [nome, pred] of Object.entries(SV_FORMA)) resolver(nome, pred);
+    // 0.13.3: módulos opcionais (dificuldade, poder, ovos, cassino): faltar um deles não derruba o mapa, só desliga o
+    // que depende dele; ambíguo continua derrubando (nunca chamar o módulo errado)
+    for (const [nome, pred] of Object.entries(SV_OPCIONAL)) { const f = faltam.length; resolver(nome, pred); if (faltam.length > f) faltam.length = f; }
     // 3) funções soltas, pela forma do código (precisa dos nomes da etapa 2)
     const nomeDe = {};
     for (const [n, k] of Object.entries(chaves)) if (k !== n) nomeDe[k] = n;
@@ -474,15 +490,15 @@
       if (ativo(ns) && cfg.bonds) schedule(() => chooseBond(ns, opt), 700);
       return r;
     };
+    // 0.13.3: no build afdb307d50 (16/11) a tela de item recebe a LISTA dos itens que você leva (até 4), o item novo, a
+    // resposta e a vaga livre (−1 sem vaga); a carta 0 virou "Levar". Antes o farm comparava a lista inteira com o item
+    // novo (sempre 99) e recusava todo item conhecido. A escolha fica em itemAlvo (motor.js), a mesma da colinha.
     const origItem = R.showItemChoice;
-    R.showItemChoice = function (cur, next) {
+    R.showItemChoice = function (cur, next, take, free) {
       const r = origItem.apply(this, arguments);
-      try { colaItem(ns, cur, next); } catch (e) { log('colaItem', e); }
-      if (ativo(ns) && cfg.items) schedule(() => {
-        const keep = itemRank(ns, cur) <= itemRank(ns, next);
-        const el = document.querySelectorAll('#item-cards .card')[keep ? 0 : 1];
-        el && el.click();
-      }, 700);
+      M.itemArgs = [Array.isArray(cur) ? cur.slice() : cur, next, typeof free === 'number' ? free : -1]; M.itemAt = now();
+      try { colaItem(ns, M.itemArgs[0], next, M.itemArgs[2]); } catch (e) { log('colaItem', e); }
+      if (ativo(ns) && cfg.items) schedule(() => escolherItem(ns), 700);   // 700 ms: o jogo ignora cliques nos primeiros 0,6 s
       return r;
     };
     // 0.13.2: telas novas no meio da partida (builds de 14–16/11): evolução e troca de forma (scr-evo), esquecer golpe
@@ -517,6 +533,10 @@
     // (os dois de sempre + qualquer submit* próprio, herdado ou não enumerável; revisão)
     const envios = new Set(['submitSolo', 'submitGroup']);
     if (ns.Ranking) { try { for (const n in ns.Ranking) if (/^submit/.test(n)) envios.add(n); for (const n of Object.getOwnPropertyNames(ns.Ranking)) if (/^submit/.test(n)) envios.add(n); } catch (_) {} }
+    // 0.13.3: o relatório de 1 em 1 minuto da partida (Ranking.beat → /v1/run/beat) também não sai de partida que o farm
+    // tocou: antes só o DNR o barrava, e só com o farm ligado (partida começada à mão, farm ligado e desligado → os
+    // relatórios seguintes saíam). Só soma: nunca tira nenhum bloqueio de antes.
+    envios.add('beat');
     if (ns.Ranking) for (const k of envios) {
       const orig = ns.Ranking[k];
       if (typeof orig !== 'function') continue;
@@ -577,6 +597,8 @@
   // ---------- 4. laço: partida e rotina entre partidas ----------
   function tick(ns) {
     const st = ns.Game.state;
+    // 0.13.3: verificação "Comprobando que no eres un robot…" na tela: o farm desliga e avisa; nunca tenta resolver
+    if (cfg.on && !M.robo && roboNaTela()) { M.robo = true; cfg.on = false; log('turnstile: farm desligado'); act('robo', {}); status(true); return; }
     const naRun = st !== 'ui' && st !== 'over';
     // começo de partida (saiu do menu): marca se o farm está nela; se o farm ligar no meio, também conta (ranking bloqueado)
     if (naRun && (M.lastState === 'ui' || !M.lastState)) { M.touched = cfg.on; M.coopRun = emGrupo(ns); M.coopOk = M.coopRun && cfg.on && grupo(); }
@@ -598,7 +620,11 @@
     if (st === 'ui') {
       if (closePopups()) return;
       if (naSala(ns)) return;                  // numa sala com amigos: nada de menu (parceiro, gacha, partida solo)
+      if (open('scr-mode')) { escolherModo(ns); return; }   // 0.13.3: "Jogar" abriu a escolha de dificuldade
       if (!open('scr-menu')) return;            // outra tela aberta (a pessoa mexendo ou o jogo trocando): espera
+      // 0.13.3: as telas novas abrem POR CIMA do menu (o menu segue "aberto" por baixo). Numa tela que o farm nunca usa
+      // (desafio da semana, vestidor, perfil, amigos, ranking…) quem está mexendo é a pessoa: o farm espera.
+      if (telaDaPessoa()) return;
       if (document.visibilityState !== 'visible' && !spRotinaEscondida()) return;   // 0.13.1: com o segundo plano, a rotina roda escondida
       M.busy = true;
       routine(ns).catch((e) => { M.err = String(e && e.message || e).slice(0, 80); log('rotina', e); })
@@ -626,7 +652,7 @@
     }
     if (ns.UI.isOpen('scr-power') && typeof R.pickPower === 'function') {
       const noTipo = aberto('pow-back');   // 2º passo (mega, Z, Teracristal): escolher o tipo
-      const i = 0;   // a 1ª opção e o 1º tipo (o mapa não guarda o módulo dos poderes; mudar isso fica para depois)
+      const i = poderEscolha(ns, noTipo, cartas('pow-cards').length);   // 0.13.3: Teracristal no tipo do golpe principal
       log('poder', noTipo ? 'tipo' : 'opção', i);
       R.pickPower(i);
       if (!noTipo) schedule(() => { if (ns.UI.isOpen('scr-power')) escolhaNova(ns); }, 700);
@@ -644,6 +670,8 @@
   // cartas abertas há muito tempo (o agendamento falhou): escolhe de novo
   function levelWatch(ns) {
     try { escolhaWatch(ns); } catch (e) { log('escolhaWatch', e); }   // revisão: um erro aqui não pode travar o resto
+    try { casinoWatch(ns); } catch (e) { log('casino', e); }
+    try { itemWatch(ns); } catch (e) { log('itemWatch', e); }
     if (!cfg.cards) return;
     if (ns.UI.isOpen('scr-levelup') && M.lvlOpenAt && now() - M.lvlOpenAt > 4000) {
       M.lvlOpenAt = now();
@@ -658,6 +686,88 @@
     return false;
   }
 
+  // 0.13.3: a escolha de item (embrulho de showItemChoice) e a vigia: tela aberta há mais de 4 s escolhe de novo
+  function escolherItem(ns) {
+    if (!ns.UI.isOpen('scr-item') || !M.itemArgs) return;
+    const [cur, next, free] = M.itemArgs, a = itemAlvo(ns, cur, next, free), el = a.el();
+    log('item', a.acao, next, a.i);
+    if (el) el.click();
+  }
+  function itemWatch(ns) {
+    if (!ns.UI.isOpen('scr-item')) { M.itemAt = 0; return; }
+    if (!cfg.items || !M.itemArgs) return;
+    if (!M.itemAt) { M.itemAt = now(); return; }
+    if (now() - M.itemAt < 4000) return;
+    M.itemAt = now();
+    escolherItem(ns);
+  }
+  // 0.13.3: Cassino da Equipe Rocket (scr-casino, build afdb307d50). No meio da partida solo a Rocket leva o jogador para
+  // lá e a partida fica parada até alguém sair. O farm NUNCA aposta nem navega pelos jogos: só o botão "Salir"
+  // (#casino-exit), e só quando o jogo o deixa ativo (ele fica desativado durante uma jogada).
+  function casinoWatch(ns) {
+    if (!ns.UI.isOpen('scr-casino')) { M.casinoAt = 0; M.casinoLog = false; return; }
+    if (!M.casinoAt) { M.casinoAt = now(); return; }
+    if (now() - M.casinoAt < 1500) return;
+    const b = document.getElementById('casino-exit');
+    if (!b || b.disabled) return;
+    M.casinoAt = now();
+    if (!M.casinoLog) { M.casinoLog = true; act('casino', {}); }
+    log('cassino: sair');
+    b.click();
+  }
+  // 0.13.3: o jogo pode pedir a verificação da Cloudflare em qualquer chamada ao servidor: uma camada fixa por cima de
+  // tudo (z-index 2147483646, translate="no", um <p> "Comprobando que no eres un robot…" e o quadro do Turnstile)
+  function roboNaTela() {
+    const b = document.body;
+    if (!b) return false;
+    for (const el of b.children) if (el.tagName === 'DIV' && el.style && el.style.zIndex === '2147483646' && el.getAttribute('translate') === 'no' && el.firstElementChild && el.firstElementChild.tagName === 'P') return true;
+    return false;
+  }
+  // 0.13.3: telas que o farm nunca abre; abertas por cima do menu = a pessoa está nelas. O desafio da semana (scr-chal,
+  // "#chal-play" gasta a única tentativa) fica de fora de tudo: o farm nunca clica nele.
+  const TELAS_DA_PESSOA = ['scr-chal', 'scr-closet', 'scr-profile', 'scr-friends', 'scr-rank', 'scr-settings', 'scr-lobby', 'scr-mod', 'scr-betatest', 'scr-legal', 'scr-support', 'scr-bond'];
+  const telaDaPessoa = () => TELAS_DA_PESSOA.some(open);
+  // 0.13.3: com a Difícil liberada e a janela estreita (o seletor #menu-modes some), "Jogar" abre scr-mode no lugar da
+  // partida e a rotina ficava clicando "Jogar" de novo a cada 6 s. O farm clica o cartão do modo (botão do jogo: grava
+  // save.mode e já começa): o que você já usa (Modes.current) ou, com a opção "modo mais difícil", o mais difícil liberado.
+  function ordemModos(ns) { try { const k = Object.keys((ns.Modes && ns.Modes.NAMES) || {}); if (k.length) return k; } catch (_) {} return ['normal', 'hard', 'nightmare']; }
+  function modoQuero(ns) {
+    const Mo = ns.Modes;
+    if (!Mo) return null;
+    let cur = null;
+    try { cur = Mo.current(); } catch (_) {}
+    if (!cfg.dificil) return cur;
+    let q = cur;
+    for (const m of ordemModos(ns)) { try { if (Mo.unlocked(m)) q = m; } catch (_) {} }
+    return q;
+  }
+  function escolherModo(ns) {
+    if (!cfg.restart || now() - (M.modoAt || 0) < 1500) return;
+    M.modoAt = now();
+    const cards = [...document.querySelectorAll('#mode-cards .card.mode-card')];
+    const i = ordemModos(ns).indexOf(modoQuero(ns));
+    const livre = (c) => c && !c.classList.contains('locked');
+    const c = livre(cards[i]) ? cards[i] : cards.find((e) => livre(e) && e.classList.contains('evo'));
+    if (!c) return;
+    log('modo', i);
+    c.click(); M.touched = true; M.lastPlay = now();
+  }
+  // no menu (janela larga): com a opção "modo mais difícil", o chip do modo no #menu-modes antes de "Jogar"
+  async function modoNoMenu(ns) {
+    if (!cfg.dificil || !ns.Modes) return;
+    const q = modoQuero(ns);
+    let cur = null;
+    try { cur = ns.Modes.current(); } catch (_) {}
+    if (!q || q === cur) return;
+    const b = $(`#menu-modes [data-mode="${q}"]`);
+    if (!b || b.classList.contains('locked') || !(b.offsetWidth || b.offsetHeight)) return;
+    b.click();
+    await waitFor(() => { try { return ns.Modes.current() === q; } catch (_) { return true; } }, 1500);
+    let nm = q;
+    try { nm = ns.Modes.name(q) || q; } catch (_) {}
+    act('modo', { m: nm });
+  }
+
   function autoResume(ns) {
     if (M.userPausedAt > 0) return;    // a pessoa pausou (Esc/P): fica pausado até ela voltar
     if (document.visibilityState !== 'visible') { M.pausedAt = 0; return; }
@@ -666,8 +776,9 @@
   }
 
   const nome = (ns, d) => { const m = ns.DEX_BY && ns.DEX_BY[d]; return m ? m.name : '#' + d; };
-  const SCR = { goals: 'scr-goals', upgrades: 'scr-upgrades', gacha: 'scr-gacha', shop: 'scr-shop', dex: 'scr-dex' };
+  const SCR = { goals: 'scr-goals', upgrades: 'scr-upgrades', gacha: 'scr-gacha', shop: 'scr-shop', dex: 'scr-dex', bag: 'scr-bag' };
   async function ir(go) {
+    if (!SCR[go]) return false;   // 0.13.3: só as telas da rotina (nunca chal: o desafio da semana tem 1 tentativa)
     const b = $(`#scr-menu [data-go="${go}"]`);
     if (!b) return false;
     b.click();
@@ -700,13 +811,17 @@
       // 0.12.6: o parceiro usa a versão shiny quando a pessoa tem o shiny dele (opção, ligada por padrão)
       if (cfg.shinyParceiro && cfg.on) { M.task = 'shiny'; await shinyParceiro(ns); }
       if (cfg.skins && ns.Halloween && ns.Halloween.on) { M.task = 'skins'; await skins(ns); }
-      M.task = 'save'; await guardar(ns);
+      if (cfg.ovos && cfg.on) { M.task = 'eggs'; await ovos(ns); }
+      if (cfg.itemInicial && cfg.on) { M.task = 'item'; await itemInicial(ns); }
+      // 0.13.3: o "Guardar" (#btn-save) saiu do jogo; ele sobe o save sozinho (~25 s)
       if (!cfg.on) return;
     }
     // começa outra partida (antes, fecha o aviso de vídeo novo do canal, se estiver aberto)
     if (open('scr-video')) { fecharVideo(); await sleep(300); }
     if (cfg.restart && open('scr-menu') && now() - M.lastPlay > 6000 && now() - M.overAt > 4000) {
       M.task = 'play';
+      try { await modoNoMenu(ns); } catch (e) { log('modo', e); }
+      if (!cfg.on || !open('scr-menu') || open('scr-mode')) return;
       M.lastPlay = now();
       const b = $('#scr-menu [data-go="play"]');
       if (b) { b.click(); M.touched = true; }
@@ -1056,7 +1171,10 @@
 
   // ---------- 8. rotina: melhorias do parceiro (valor ÷ preço, até 100%) ----------
   // 0.4.0: Golpe inicial, Segundo golpe inicial e Veto agora são configurados pela base de cálculo → valem mais
-  const UPG_VALUE = { def: 1.2, xp: 1.15, atk: 1.1, cd: 1.1, coins: 1.1, reroll: 1.0, moves: 1.0, hp: 0.9, magnet: 0.9, crit: 0.8, regen: 0.8, spd: 0.5, start: 1.2, start2: 0.9, ban: 0.8 };
+  // 0.13.3: no build afdb307d50 (16/11) os mesmos preços dão bem menos (Fuerza +4% → +1,5%, Vitalidad +3, Reflejos −1%,
+  // Crítico +1%) e a Fortuna continua +8% de moedas: ela vem primeiro. Novas: Crítico Potente, Segundo/Tercer objeto
+  // (mais vagas de item: Moneda Amuleto e um item de dano juntos), Objeto inicial (400) e Veto até 5.
+  const UPG_VALUE = { coins: 2.4, xp: 1.0, def: 0.85, reroll: 1.0, moves: 1.0, start: 1.2, start2: 0.9, ban: 0.8, startitem: 1.1, cd: 0.6, atk: 0.55, magnet: 0.6, hp: 0.45, regen: 0.45, crit: 0.4, critdmg: 0.35, spd: 0.3, item2: 1.6, item3: 1.2 };
   // reserva calculada sozinha: 10% das moedas, no máximo o preço de uma Menta (1.500). Conta nova não fica travada.
   // 0.12.6 (revisão): durante gastarTudo vale a reserva fixada no começo da rotina (M.pisoRotina); antes, a cada volta
   // ela era recalculada sobre o saldo menor e derretia até quase zero
@@ -1114,11 +1232,12 @@
   // ---------- 8a. rotina (0.5.0): Loja Kecleon — Menta, Cápsula, Cápsula Oculta e MT do parceiro ----------
   // A base de cálculo diz quanto a força do parceiro sobe com cada natureza, habilidade e MT. Compra só se:
   //   - o ganho passa do mínimo (Menta e Cápsula 3%, Cápsula Oculta 5%, MT 4%), e
-  //   - rende mais por moeda que o próximo nível de Fuerza (+4% de dano, a melhoria de dano mais direta), e
+  //   - rende mais por moeda que o próximo nível de Fuerza (+1,5% de dano desde 16/11, a melhoria de dano mais direta), e
   //   - sobra a reserva de moedas.
   // O que já está na Mochila é usado se passar do mínimo. Compra pelos botões da loja e usa pelos botões da ficha
   // do Pokémon na coleção, um item por vez (cada troca muda a conta das outras).
   const LOJA_MIN = { mint: 0.03, cap: 0.03, caph: 0.05, tm: 0.04 };
+  const FUERZA = 0.015;   // 0.13.3: +1,5% de dano por nível de Fuerza no build afdb307d50 (era +4%)
   // 0.11.3 (pedido do André): natureza e habilidade vêm ANTES de qualquer melhoria — definem a build. Menta e Cápsulas
   // passam na frente sempre que o ganho passa do mínimo e sobra moeda; só a MT continua comparada com a Fuerza por moeda.
   // A conta usa todos os inimigos possíveis (a mesma da colinha), para não trocar de natureza a cada sorteio de partida.
@@ -1126,7 +1245,7 @@
     const s = ns.DB.save, U = ns.Upgrades;
     const lv = (ns.DB.upgradesOf(dex) || {}).atk | 0;
     const u = U && U.BY && U.BY.atk;
-    const ref = u && lv < u.max ? (0.04 / (1 + 0.04 * lv)) / U.cost('atk', lv) : 0;
+    const ref = u && lv < u.max ? (FUERZA / (1 + FUERZA * lv)) / U.cost('atk', lv) : 0;
     const livre = (s.coins || 0) - reserva(ns);
     let best = null, bs = 0;
     for (const o of comGeral(ns, () => opcoesLoja(ns, dex))) {
@@ -1306,7 +1425,7 @@
     const loja = [];
     try {
       const l0 = (ns.DB.upgradesOf(dex) || {}).atk | 0, u = U.BY && U.BY.atk;
-      const ref = u && l0 < u.max ? (0.04 / (1 + 0.04 * l0)) / U.cost('atk', l0) : 0;
+      const ref = u && l0 < u.max ? (FUERZA / (1 + FUERZA * l0)) / U.cost('atk', l0) : 0;
       for (const o of comGeral(ns, () => opcoesLoja(ns, dex))) {
         if (o.ganho < (LOJA_MIN[o.tipo] || 0.05)) continue;
         if (!o.build && !o.tem && o.ganho / o.preco < ref) continue;
@@ -1406,13 +1525,70 @@
     await voltar('shop');
   }
 
-  // ---------- 10. rotina: Guardar (sobe para a nuvem uma vez por ciclo; o jogo exige 25 s entre subidas) ----------
-  async function guardar(ns) {
-    const dot = $('#user-pill i.sync');
-    if (!dot || !dot.classList.contains('pending')) return;
-    if (Date.now() - M.lastSave < 30000) return;
-    const b = document.getElementById('btn-save');
-    if (b && !b.disabled) { b.click(); M.lastSave = Date.now(); act('save'); await sleep(600); }
+  // ---------- 10. rotina (0.13.3): ovos prontos (Mochila → Incubadora → "Abrir") ----------
+  // Chocam por abates (500 a 8.000) e podem sair shiny (1/32). O botão "Abrir" ([data-hatch]) passa pela animação do
+  // jogo (#scr-hatch, ~6 s, desenhada a cada quadro: só com a aba visível) e o "¡Genial!" (.hatch-ok) fecha.
+  async function ovos(ns) {
+    let pronto = false;
+    try { pronto = !!(ns.Eggs && ns.Eggs.anyReady()); } catch (_) {}
+    if (!pronto || document.visibilityState !== 'visible') return;
+    if (!await ir('bag')) return;
+    let n = 0;
+    for (let k = 0; k < 3 && cfg.on; k++) {
+      const b = $('#scr-bag [data-hatch]');
+      if (!b || b.disabled) break;
+      b.click();
+      if (!await waitFor(() => open('scr-hatch'), 4000)) break;
+      const fim = await waitFor(() => { const o = $('#scr-hatch .hatch-ok'); return o && !o.classList.contains('hidden'); }, 25000);
+      await sleep(400);
+      const o = $('#scr-hatch .hatch-ok');
+      if (o && !o.classList.contains('hidden')) o.click();
+      await waitFor(() => !open('scr-hatch'), 3000);
+      if (!fim) break;
+      n++;
+      await sleep(400);
+    }
+    if (n) act('eggs', { n });
+    await voltar('bag');
+  }
+
+  // ---------- 10a. rotina (0.13.3): "Objeto inicial" com a Moneda Amuleto (+50% das moedas no fim da partida) ----------
+  // A melhoria (400) entra na fila das melhorias como as outras. Depois dela: escolhe a Moneda Amuleto pelo botão
+  // "Elegir" da melhoria ([data-sitem] → [data-it]) e compra uma na loja (aba de itens de partida, 500) quando falta,
+  // só se as partidas do farm renderam em média 2× o preço (assim a moeda extra paga a compra).
+  const AMULETO = 'amuletcoin';
+  function rendaMedia() {
+    if (sess.runs >= 1) return sess.coins / sess.runs;
+    const r = acts.filter((a) => a.k === 'run' && a.a).slice(0, 4);
+    return r.length ? r.reduce((t, a) => t + (a.a.c || 0), 0) / r.length : 0;
+  }
+  async function itemInicial(ns) {
+    const s = ns.DB.save, dex = s && s.partner;
+    if (!dex || !ns.Shop || !ns.Items || !ns.Items.BY || !ns.Items.BY[AMULETO]) return;
+    const lv = ns.DB.upgradesOf(dex) || {};
+    if (!lv.startitem) return;
+    const escolhido = () => ((ns.DB.save.pitem || {})[dex] || null);
+    if (escolhido() && escolhido() !== AMULETO) return;   // você escolheu outro item: não mexe
+    let qtd = 0;
+    try { qtd = ns.Shop.count(AMULETO) || 0; } catch (_) {}
+    const preco = (ns.Shop.HELD_PRICE | 0) || 500;
+    if (!qtd && rendaMedia() >= 2 * preco && moedas(ns) - reserva(ns) >= preco) {
+      if (await comprarLoja(ns, 'held:' + AMULETO)) { qtd = 1; act('amuleto', { preco }); }
+      if (open('scr-shop')) await voltar('shop');
+    }
+    if (escolhido() === AMULETO || !qtd) return;
+    if (!await ir('upgrades')) return;
+    const sel = document.getElementById('upg-mon');
+    if (sel && +sel.value !== dex) { sel.value = String(dex); sel.dispatchEvent(new Event('change')); await sleep(300); }
+    const chip = () => $(`#upg-list .ban-picker [data-it="${AMULETO}"]`);
+    if (!chip()) { const t = $('#upg-list [data-sitem]'); if (t) { t.click(); await waitFor(chip, 1500); } }
+    const c = chip();
+    if (c) { c.click(); await waitFor(() => escolhido() === AMULETO, 1500); }
+    await sleep(250);
+    const t = $('#upg-list [data-sitem]');
+    if (t && chip()) { t.click(); await sleep(250); }   // fecha a lista
+    if (escolhido() === AMULETO) act('itemInicial', { dex, nome: nome(ns, dex) });
+    await voltar('upgrades');
   }
 
   // quadros por segundo: o Chrome freia a página quando a janela está minimizada ou coberta (o jogo anda em câmera lenta)
@@ -1448,7 +1624,7 @@
     } catch (_) {}
     const scr = document.querySelector('#app > .scr:not(.hidden), body > .scr:not(.hidden), .scr:not(.hidden)');
     emit({
-      ok: true, mapaOk: MAPA_OK, v: VERSAO, on: cfg.on, st, fps: FPS.v, scr: scr ? scr.id : null, mode: inRun ? (S.mode || '') : '', task: M.task, err: M.err,
+      ok: true, mapaOk: MAPA_OK, v: VERSAO, on: cfg.on, robo: !!M.robo, st, fps: FPS.v, scr: scr ? scr.id : null, mode: inRun ? (S.mode || '') : '', task: M.task, err: M.err,
       modo: cfg.modo, coop: emGrupo(ns), coopOk: !!M.coopOk || anfitriao(ns), coopHost: !!(ns.Coop && ns.Coop.active && ns.Coop.isHost), party: naSala(ns), hidden: document.visibilityState !== 'visible', userPaused: M.userPausedAt > 0 && st === 'paused',
       run: inRun ? { hp: Math.round(p.hp), max: Math.round(p.maxHp), lv: p.level, t: Math.round((ns.Game.st && ns.Game.st.time) || 0), k: p.kills, dex: p.dex } : null,
       coins: s ? s.coins : null, t1: s && s.tickets ? s.tickets.t1 : null, t10: s && s.tickets ? s.tickets.t10 : null,
@@ -1966,7 +2142,7 @@
         build: plano ? { a: nm(plano.a), b: nm(plano.b), buffs: plano.buffs.map(nm).filter(Boolean), parceiro: nm(plano.parceiro),
                          mt: [plano.a, plano.b, plano.parceiro].concat(plano.buffs).filter((id) => id && !ns.Mons.natural(dex, id)).map(nm),
                          lado: (ns.Moves.BY_ID[plano.a] || {}).cat || '' } : null,
-        inicio: escolhas ? { a: nm(escolhas.start), b: nm(escolhas.start2), vetos: escolhas.bans.slice(0, 3).map(nm).filter(Boolean) } : null,
+        inicio: escolhas ? { a: nm(escolhas.start), b: nm(escolhas.start2), vetos: escolhas.bans.slice(0, 5).map(nm).filter(Boolean) } : null,
         mts, muda, total: dono && fHoje > 0 ? Math.round((fFinal / fHoje - 1) * 100) : null,
       };
     });
@@ -2364,7 +2540,7 @@
 
   // ======================= colinha na partida (0.8.0) =======================
   // Para quem joga na mão: marca nas cartas de nível, no vínculo e no item o que a build da Sobrevida pegaria (a
-  // mesma conta do farm: scoreCard / bondRank / itemRank), e desenha uma faixa da build embaixo do card do HUD.
+  // mesma conta do farm: scoreCard / bondRank / itemAlvo), e desenha uma faixa da build embaixo do card do HUD.
   const COLA_TXT = { pt: { selo: 'Colinha', trocar: 'Colinha: trocar as cartas', faixa: 'Colinha' },
                      en: { selo: 'Cheat sheet', trocar: 'Cheat sheet: reroll', faixa: 'Cheat sheet' },
                      es: { selo: 'Chuleta', trocar: 'Chuleta: cambiar cartas', faixa: 'Chuleta' } };
@@ -2406,10 +2582,11 @@
     const order = opt.loose.map((m, i) => ({ m, i })).sort((a, b) => bondRank(ns, p, a.m) - bondRank(ns, p, b.m));
     setTimeout(() => marcar(document.querySelectorAll('#bond-cards .card')[order[0] ? order[0].i : -1] || null, ct().selo), 30);
   }
-  function colaItem(ns, cur, next) {
+  // 0.13.3: a mesma escolha do farm (itemAlvo), no formato novo da tela (lista dos itens + vaga livre)
+  function colaItem(ns, cur, next, free) {
     if (!cfg.cola) return;
-    const keep = itemRank(ns, cur) <= itemRank(ns, next);
-    setTimeout(() => marcar(document.querySelectorAll('#item-cards .card')[keep ? 0 : 1] || null, ct().selo), 30);
+    const a = itemAlvo(ns, cur, next, free);
+    setTimeout(() => marcar(a.el(), ct().selo), 30);
   }
   // faixa da build no HUD: os 2 ataques, o de troca e os buffs; aceso = já tem nesta partida
   function desenharFaixaCola(ns, ctx, pl, L) {
@@ -2514,7 +2691,10 @@
   }
 
   // ======================= motor da partida (adaptado do PSBot, MIT) =======================
-  const STAT_PRI = { xp: 74, atk: 60, cd: 55, def: 45, hp: 40, rgn: 35, mag: 25, spd: 15, heal: 5 };
+  // 0.13.3 (build afdb307d50): 4 cartas por nível, bônus de atributo agora SOMAM (Potencia +8% cada, sem teto) e cartas
+  // novas: Racha de suerte (+10% de moedas na partida, até 5), Bolsa de monedas (+60), Cazador (+6% em chefe), Esquiva,
+  // Ojo Crítico, Golpe Brutal, Poder rápido
+  const STAT_PRI = { luck: 78, xp: 74, atk: 60, cd: 55, hunt: 50, def: 45, dodge: 44, hp: 40, crit: 38, rgn: 35, critd: 32, coin: 30, mag: 25, pwr: 20, spd: 15, heal: 5 };
   const KIND_PRI = { homing: 13, nova: 12, aura: 12, orbit: 11, chain: 10, projectile: 9, boomerang: 8, beam: 8, meteor: 8, turret: 7, mine: 6, cone: 6, melee: 4, dash: 3, trail: 3 };
 
   function profileOf(ns) {
@@ -2590,7 +2770,10 @@
     const [type, id] = [c.type, String(c.key).split(':').slice(1).join(':')];
     const lowHp = p.hp / p.maxHp < 0.35;
     if (type === 'evo') return 1000;
-    if (type === 'new') return scoreNewMove(ns, p, id);
+    if (type === 'new' || type === 'excl') return scoreNewMove(ns, p, id);   // 0.13.3: 'excl' = golpe exclusivo do Pokémon
+    if (type === 'forget') return -200;   // 0.13.3: Quitamovimientos só abre "esquecer golpe" (o farm não esquece nada)
+    if (c.key === 'item4') return 960;    // 0.13.3: carta rara "Cuarto objeto" (mais uma vaga de item)
+    if (c.key === 'wis') return 300 + STAT_PRI.xp;   // 0.13.3: carta rara "Sabiduría" (+15% de experiência)
     const EVO = ns.Moves.EVO || {};
     const evoNeeds = new Set(p.moves.filter(m => !m.evolved && EVO[m.id] && !(p.statsTaken || {})[EVO[m.id]]).map(m => EVO[m.id]));
     if (type === 'stat') {
@@ -2664,12 +2847,59 @@
     }, 250);
   }
 
-  const ITEM_PRI = ['shellbell', 'luckyegg', 'leftovers', 'quickclaw', 'focussash', 'assaultvest', 'rockyhelmet', 'amuletcoin', 'choicescarf', 'lifeorb', 'choiceband'];
-  function itemRank(ns, id) {
+  // 0.13.3: valor de cada item para o farm (24 itens no build afdb307d50; moeda primeiro: o farm joga por moedas).
+  // Item que não está aqui vale 30 (leva com vaga livre, troca por um melhor).
+  const ITEM_VAL = { amuletcoin: 95, luckincense: 90, expcharm: 80, shellbell: 70, luckyegg: 68, leftovers: 66, quickclaw: 64, focussash: 62, assaultvest: 60, loadeddice: 56, metronome: 55, lifeorb: 45, choicescarf: 44, rockyhelmet: 42, throatspray: 40, punchingglove: 38, superpads: 35, heavydutyboots: 34, safetygoggles: 33, choiceband: 30, rareincense: 25, mirrorherb: 22, covertcloak: 20, radargoggles: 5 };
+  function itemVal(ns, id) {
     const prof = profileOf(ns);
-    if (prof && prof.item === id) return -1;
-    const i = ITEM_PRI.indexOf(id);
-    return i < 0 ? 99 : i;
+    if (prof && prof.item === id) return 1000;
+    // com a rotação de ataques ligada, o Metrónomo zera a cada troca e a Cinta Elección trava a troca
+    if (cfg.weave && (id === 'metronome' || id === 'choiceband')) return 8;
+    return ITEM_VAL[id] != null ? ITEM_VAL[id] : 30;
+  }
+  // Escolha na tela de item (o farm e a colinha usam a mesma). Os 3 formatos do jogo:
+  //   vaga livre: cartas "Levar" (0) e "Dejarlo" (1) · 1 item sem vaga: "Levar" (troca, 0) e "Quedarme con X" (1)
+  //   2 a 4 itens: uma carta por item (.item-slots .card.item-slot: troca aquele) e "Quedarme con los que llevo" (a última)
+  function itemAlvo(ns, cur, next, free) {
+    const lista = Array.isArray(cur) ? cur.filter(Boolean) : cur ? [cur] : [];
+    const vn = itemVal(ns, next);
+    const cartas = () => [...document.querySelectorAll('#item-cards > .card')];
+    if (free >= 0 || !lista.length) {
+      const levar = vn > 10;
+      return { acao: levar ? 'levar' : 'deixar', el: () => cartas()[levar ? 0 : 1] || null };
+    }
+    let pior = 0;
+    lista.forEach((id, i) => { if (itemVal(ns, id) < itemVal(ns, lista[pior])) pior = i; });
+    const trocar = vn > itemVal(ns, lista[pior]);
+    if (lista.length === 1) return { acao: trocar ? 'trocar' : 'ficar', i: 0, el: () => cartas()[trocar ? 0 : 1] || null };
+    return { acao: trocar ? 'trocar' : 'ficar', i: pior, el: () => (trocar ? document.querySelectorAll('#item-cards .item-slots .card.item-slot')[pior] : cartas().slice(-1)[0]) || null };
+  }
+  // 0.13.3: poder da partida (depois de vencer Eternatus). Teracristal no tipo do golpe principal da build: o golpe do
+  // tipo tera pega ×1,8 se o Pokémon já é desse tipo (×1,5 se não), 30 s a cada 75 s; o mais forte em média. Sem Tera, a
+  // 1ª opção. Pela lista do próprio jogo (Power.options / typeOptions), na ordem das cartas da tela.
+  function tipoPrincipal(ns, p) {
+    try { const pl = planoDe(ns, p.mon.dex), d = pl && pl.a && ns.Moves.BY_ID[pl.a]; if (d && d.type) return d.type; } catch (_) {}
+    const m = (p.moves || []).find((x) => x.kind !== 'buff' && x.type);
+    return m ? m.type : ((p.mon && p.mon.types) || [])[0] || null;
+  }
+  function poderEscolha(ns, noTipo, nCartas) {
+    const P = ns.Power, p = ns.Game.player;
+    if (!P || !p) return 0;
+    const dex = p.dex != null ? p.dex : p.mon.dex;
+    try {
+      if (!noTipo) {
+        const o = P.options(dex) || [];
+        if (o.length !== nCartas) return 0;   // a tela não é a lista que conhecemos: a 1ª
+        const i = o.findIndex((x) => x.kind === 'tera');
+        S.poderKind = i >= 0 ? 'tera' : (o[0] && o[0].kind) || null;
+        return i >= 0 ? i : 0;
+      }
+      if (S.poderKind !== 'tera') return 0;
+      const t = P.typeOptions('tera', dex) || [];
+      if (t.length !== nCartas) return 0;
+      const i = t.findIndex((x) => x.type === tipoPrincipal(ns, p));
+      return i >= 0 ? i : 0;
+    } catch (e) { log('poder', e); return 0; }
   }
 
   // Sobrevida 0.2.2: alcance de cada golpe, igual ao reach() de systems/combat.js do jogo; os que não miram
@@ -2762,6 +2992,10 @@
     if (best >= 0) swapTo(ns, p, best);
   }
 
+  function teclaJogo(ns, acao) {
+    if (!ns.Input || typeof ns.Input.virtualAct !== 'function') return false;
+    try { ns.Input.virtualAct(acao); return true; } catch (e) { log('tecla', e); return false; }
+  }
   function housekeeping(ns) {
     const p = ns.Game.player;
     if (!p || p.dead || ns.Game.state !== 'playing') return;
@@ -2783,8 +3017,17 @@
       p.orbs.forEach((o, i) => {
         if (!o || now - S.lastOrb < 1500) return;
         const kind = ns.Orbs.BY && ns.Orbs.BY[o.id] && ns.Orbs.BY[o.id].kind;
-        if ((kind === 'foe' && danger) || (kind === 'buff' && boss)) { ns.Orbs.use(p, i); S.lastOrb = now; }
+        // 0.13.3: pela tecla da esfera (Input.virtualAct, a mesma dos botões de toque): o jogo usa a esfera DENTRO do
+        // quadro, como faria com a pessoa. Antes o farm chamava Orbs.use daqui (fora do quadro), e a Focosfera mudava o
+        // crítico do jogador entre dois quadros (o anti-trapaça do jogo conta isso). Sem a tecla virtual, não usa.
+        if ((kind === 'foe' && danger) || (kind === 'buff' && boss)) { if (teclaJogo(ns, 'orb' + (i + 1))) S.lastOrb = now; }
       });
+    }
+    // 0.13.3: o poder (Mega, Dinamax, Z, Teracristal) assim que fica pronto, pela tecla do poder (lida no quadro)
+    if (cfg.poder && ns.Power && p.epower && now - (S.lastPower || 0) > 1500) {
+      let pronto = false;
+      try { pronto = !!ns.Power.ready(p); } catch (_) {}
+      if (pronto && teclaJogo(ns, 'power')) S.lastPower = now;
     }
   }
 

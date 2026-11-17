@@ -2,6 +2,16 @@
 // Frases curtas, do ponto de vista de quem usa. Aparece uma vez, na primeira abertura depois da atualização.
 globalThis.SV_NOVIDADES = {
   pt: {
+    '0.13.3': [
+      "A partida não trava mais no Cassino da Equipe Rocket: o farm sai na hora pelo botão \"Sair\" e nunca aposta.",
+      "Escolha de item no formato novo do jogo (até 4 itens): fica com o melhor, troca o pior, e itens de moeda (Moneda Amuleto, Incienso Suerte, Amuleto Exp.) vêm primeiro. Antes ele recusava todo item que já conhecia.",
+      "Com a janela estreita, \"Jogar\" abre a escolha de dificuldade: o farm escolhe o modo que você já usa e a partida começa.",
+      "Esferas e poder (Mega, Dinamax, Z, Teracristal) pela tecla do próprio jogo. O poder é usado assim que fica pronto; na escolha, Teracristal no tipo do golpe principal.",
+      "Opções novas: modo mais difícil liberado (desligada), abrir ovos prontos, usar o poder e começar com a Moneda Amuleto (só quando a partida rende o dobro do preço).",
+      "Melhorias e cartas na conta nova do jogo: Fortuna primeiro, Segundo objeto, Veto até 5, cartas de moeda (Racha de suerte, Bolsa de monedas), e nunca a carta que só esquece golpe.",
+      "Se o jogo pedir a verificação \"não sou um robô\", o farm desliga e avisa: quem resolve é você.",
+      "Partida tocada pelo farm também não manda o relatório de cada minuto ao ranking; o desafio semanal fica fora do farm.",
+    ],
     '0.13.2': [
       "Volta a funcionar com a atualização do jogo de 14 a 16/11: o farm e a colinha reconhecem de novo as partes do jogo que mudaram.",
       "A Loja Kecleon agora tem abas: o farm e o ⚡ Aplicar a colinha acham a Menta, as Cápsulas e as MT na aba certa.",
@@ -148,6 +158,16 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   en: {
+    '0.13.3': [
+      "The run no longer stalls in the Team Rocket Casino: the farm leaves right away with the \"Exit\" button and never bets.",
+      "Item choice in the game's new layout (up to 4 items): keeps the best, swaps the worst, and coin items (Amulet Coin, Luck Incense, Exp. Charm) come first. It used to turn down every item it already knew.",
+      "In a narrow window \"Play\" opens the difficulty choice: the farm picks the mode you already use and the run starts.",
+      "Orbs and power (Mega, Dynamax, Z, Terastal) through the game's own key. The power is used as soon as it is ready; when choosing, Terastal in the type of the main move.",
+      "New options: hardest unlocked mode (off), hatch ready eggs, use the power, and start with the Amulet Coin (only when a run earns twice its price).",
+      "Upgrades and cards follow the game's new numbers: Fortune first, Second item, Bans up to 5, coin cards (Lucky streak, Coin pouch), and never the card that only forgets a move.",
+      "If the game asks for the \"I am not a robot\" check, the farm turns off and tells you: you solve it yourself.",
+      "A run touched by the farm also skips the every-minute leaderboard report; the weekly challenge stays out of the farm.",
+    ],
     '0.13.2': [
       "Works again after the game update of Nov 14–16: the farm and the cheat sheet recognize the parts of the game that changed.",
       "The Kecleon Shop now has tabs: the farm and ⚡ Apply the cheat sheet find the Mint, Capsules and TMs in the right tab.",
@@ -294,6 +314,16 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   es: {
+    '0.13.3': [
+      "La partida ya no se queda en el Casino del Team Rocket: el farm sale enseguida con el botón \"Salir\" y nunca apuesta.",
+      "Elección de objeto en el formato nuevo del juego (hasta 4 objetos): se queda con el mejor, cambia el peor y los objetos de monedas (Moneda Amuleto, Incienso Suerte, Amuleto Exp.) van primero. Antes rechazaba todo objeto que ya conocía.",
+      "Con la ventana estrecha, \"Jugar\" abre la elección de dificultad: el farm elige el modo que ya usas y la partida empieza.",
+      "Esferas y poder (Mega, Dinamax, Z, Teracristal) con la tecla del propio juego. El poder se usa en cuanto está listo; al elegir, Teracristal del tipo del ataque principal.",
+      "Opciones nuevas: modo más difícil desbloqueado (desactivada), abrir huevos listos, usar el poder y empezar con la Moneda Amuleto (solo cuando la partida rinde el doble del precio).",
+      "Mejoras y cartas con las cuentas nuevas del juego: Fortuna primero, Segundo objeto, Veto hasta 5, cartas de monedas (Racha de suerte, Bolsa de monedas) y nunca la carta que solo quita movimientos.",
+      "Si el juego pide la verificación \"no soy un robot\", el farm se desactiva y avisa: la resuelves tú.",
+      "La partida tocada por el farm tampoco manda el informe de cada minuto al ranking; el desafío semanal queda fuera del farm.",
+    ],
     '0.13.2': [
       "Vuelve a funcionar con la actualización del juego del 14 al 16/11: el farm y la chuleta reconocen de nuevo las partes del juego que cambiaron.",
       "La Tienda Kecleon ahora tiene pestañas: el farm y ⚡ Aplicar la chuleta encuentran la Menta, las Cápsulas y las MT en la pestaña correcta.",

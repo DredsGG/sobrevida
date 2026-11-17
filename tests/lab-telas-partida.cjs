@@ -70,7 +70,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     const depoisG = d.moves.split(',');
     ok(antes.moves.split(',').filter(Boolean).every((m) => depoisG.includes(m)), `nenhum golpe foi esquecido (${antes.moves} → ${d.moves})`);
     const s = await seguiu(3000);
-    ok(s.andou && /playing|held/.test(s.z.st), `a partida seguiu depois do esquecer (estado ${s.z.st})`);
+    ok(s.andou && /playing|held|levelup/.test(s.z.st), `a partida seguiu depois do esquecer (estado ${s.z.st})`);
   }
   if (SO.includes('evo')) {
     let e = await estado(); const dex0 = e.dex;

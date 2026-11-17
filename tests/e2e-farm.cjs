@@ -167,6 +167,17 @@ const CT = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
   ok(runSeen, 'começou partida sozinho');
   ok(s.touched === true, 'partida marcada como do farm (não sobe ao ranking)');
   ok((s.acts || []).some((a) => a.k === 'gacha') && (s.acts || []).some((a) => a.k === 'upgrades'), 'painel registrou gacha e melhorias');
+  // 0.13.3: fim de partida → menu → próxima partida, sozinho (Game.quit encerra a partida como a morte encerraria)
+  {
+    const emPartida = await esperar(async () => await page.evaluate(() => !['ui', 'over'].includes(window.__NS.Game.state)), 60000);
+    ok(emPartida, 'fim→menu: há uma partida rodando para encerrar');
+    const tQuit = Date.now();
+    await page.evaluate(() => window.__NS.Game.quit());
+    ok(await esperar(async () => await page.evaluate(() => window.__NS.Game.state) === 'over', 10000), 'fim→menu: Game.quit leva à tela de fim (state over)');
+    ok(await esperar(async () => await page.evaluate(() => window.__NS.Game.state === 'ui'), 30000), 'fim→menu: o farm sai da tela de fim sozinho e volta ao menu (state ui)');
+    ok(await esperar(async () => await page.evaluate((t) => (window.__st.acts || []).some((a) => a.k === 'run' && a.t >= t), tQuit), 15000),'fim→menu: o painel registrou a partida encerrada (act "run")');
+    ok(await esperar(async () => await page.evaluate(() => !['ui', 'over'].includes(window.__NS.Game.state)), 120000), 'fim→menu: começa a próxima partida sozinho');
+  }
   // segunda aba do jogo: não joga junto (uma aba por vez)
   const p2 = await ctx.newPage();
   await p2.addInitScript(() => { window.__st = null; document.addEventListener('sobrevida:st', (e) => { window.__st = JSON.parse(e.detail); }); });

@@ -562,7 +562,7 @@
 
   // ───────────────────────── farm automático (v0.2.0) ─────────────────────────
   // O piloto (src/piloto.js, mundo da página) joga e cuida da rotina; aqui ficam a configuração, a ponte e o painel.
-  const FARM_DEF = { on: false, modo: 'solo', upgrades: true, gacha: true, partner: true, missions: true, skins: true, shop: true, hud: true, cola: true, gachaMenos: false, gachaShiny: true, shinyParceiro: true, segundoPlano: false, barra: 'botao' };
+  const FARM_DEF = { on: false, modo: 'solo', upgrades: true, gacha: true, partner: true, missions: true, skins: true, shop: true, hud: true, cola: true, gachaMenos: false, gachaShiny: true, shinyParceiro: true, segundoPlano: false, barra: 'botao', dificil: false, poder: true, ovos: true, itemInicial: true };
   let farm = Object.assign({}, FARM_DEF), pst = null, pstAt = 0, farmCanvas = null, farmSig = '';
   const mmss = I.mmss;
   // 0.4.0: o que o farm aprendeu nas partidas (acertos reais por golpe) fica guardado aqui e volta para o piloto
@@ -596,10 +596,14 @@
   // a parte que joga (src/piloto.js) só entra quando a página carrega: depois de atualizar a Sobrevida com a aba aberta,
   // ela não está aqui e é preciso recarregar a página
   const semPiloto = () => !pst && Date.now() - INICIO > 8000 && !!document.getElementById('scr-menu');
-  let donoRenovadoEm = 0;
+  let donoRenovadoEm = 0, roboAvisado = false;
   const onSt = (e) => {
     try {
       pst = JSON.parse(e.detail); pstAt = Date.now(); if (pst && pst.partner && pst.partner.meta) metaExtra[pst.partner.dex] = pst.partner.meta;
+      // 0.13.3: o jogo pediu a verificação da Cloudflare ("no soy un robot"): o piloto já parou; aqui o farm desliga de vez
+      // (a pessoa resolve na tela e liga de novo). Nunca tenta resolver.
+      if (pst && pst.robo && farm.on && !roboAvisado) { roboAvisado = true; Promise.resolve(setFarm({ on: false })).then(() => toast(L().f.roboToast, false)).catch(() => {}); }
+      if (pst && !pst.robo) roboAvisado = false;
       // 0.13.0/0.13.1: em segundo plano (partida e rotina), os timers desta aba ficam freados (1 por minuto depois de 5 min
       // escondida); o status do piloto chega pelo relógio do segundo plano e renova a posse, para outra aba não assumir o save
       // (revisão da 0.13.1: só com a opção ligada e a aba escondida, e só se a posse ainda é desta aba — lê antes de gravar)
@@ -901,6 +905,12 @@
       case 'missions': return T.aMissions(x.n);
       case 'gacha': return x.modo === 'shiny' ? T.aGachaS(nGen(x.gen), x.n, x.sh, x.tem, x.de) : T.aGacha(nGen(x.gen), x.n, x.nn, x.sh, (x.novos || []).join(', '));
       case 'partner': return T.aPartner(x.deN, x.paraN);
+      case 'casino': return T.aCasino();
+      case 'robo': return T.aRobo();
+      case 'eggs': return T.aEggs(x.n);
+      case 'amuleto': return T.aAmuleto(x.preco);
+      case 'itemInicial': return T.aItemIni(x.nome);
+      case 'modo': return T.aModo(x.m);
       case 'upgrades': return T.aUpgrades(x.n, x.nome);
       case 'moves': return T.aMoves(x.nome, x.start, x.start2, (x.bans || []).join(', '));
       case 'shop': return T.aShop(x.nome, x.tipo, x.alvo, x.ganho, x.preco);
@@ -940,7 +950,7 @@
       ${p && p.rotinaUlt && !G ? `<div class="kv">${esc(F.rotinaLn(p.rotinaUlt))}</div>` : ''}
       ${p && p.acts && p.acts.length ? `<div class="acts">${p.acts.slice(0, 4).map((a) => `<div>· ${esc(actTxt(a))}</div>`).join('')}</div>` : ''}
       ${G ? '' : `<details class="fopts"${farmOptsOpen ? ' open' : ''}><summary>${esc(F.opts)}</summary><div class="opts">
-        ${['upgrades', 'shop', 'gacha', 'gachaMenos', 'gachaShiny', 'partner', 'shinyParceiro', 'segundoPlano', 'missions', 'skins'].map((k) => `<label class="sw"><input type="checkbox" data-f="${k}"${farm[k] ? ' checked' : ''}> ${esc(F.opt[k])}</label>`).join('')}
+        ${['upgrades', 'shop', 'gacha', 'gachaMenos', 'gachaShiny', 'partner', 'shinyParceiro', 'itemInicial', 'ovos', 'poder', 'dificil', 'segundoPlano', 'missions', 'skins'].map((k) => `<label class="sw"><input type="checkbox" data-f="${k}"${farm[k] ? ' checked' : ''}> ${esc(F.opt[k])}</label>`).join('')}
       </div></details>`}
       <div class="barsel"><span class="note">${esc(F.auto.barra)}</span><div class="modos" role="radiogroup" aria-label="${esc(F.auto.barra)}">${['botao', 'completa'].map((m) => `<button type="button" role="radio" data-barra="${m}" class="${farm.barra === m ? 'on' : ''}" aria-checked="${farm.barra === m}">${esc(m === 'botao' ? F.auto.soBotao : F.auto.completa)}</button>`).join('')}</div></div>
       <label class="sw hudsw"><input type="checkbox" data-f="hud"${farm.hud ? ' checked' : ''}> ${esc(F.hud)}</label>
