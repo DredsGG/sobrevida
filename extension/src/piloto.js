@@ -14,7 +14,7 @@
 //  - partida que o farm tocou NUNCA vai para o ranking (Ranking.submit* bloqueado + selo bloqueado pelo fundo).
 (() => {
   'use strict';
-  const VERSAO = '0.13.1';
+  const VERSAO = '0.13.2';
   // 0.12.2: marca de "já carregou" num Symbol (não aparece como nome no window)
   const MARCA = Symbol.for('sv.p');
   if (window[MARCA]) return;
@@ -161,6 +161,7 @@
     if (ks.length < min || !/^\d+$/.test(ks[0])) return false;
     try { return item(v[ks[0]]); } catch (_) { return false; }
   };
+  const svChaveDex = (v) => { try { const ks = Object.keys(v).slice(0, 5); return ks.length > 0 && ks.every((k) => svObj(v[k]) && String(v[k].dex) === k); } catch (_) { return false; } };
   const SV_FORMA = {
     // módulos de objeto: as menores combinações de chaves internas que só aquele módulo tem (conferido no dump de 2026-11-05)
     U: (v) => svObj(v) && svTem(v, 'TYPE_COLOR', 'mmss', 'clamp', 'pickN'),
@@ -195,7 +196,9 @@
     Player: (v) => typeof v === 'function' && svTem(v, 'REVIVE_TIME', 'BOND_MAX'),
     // dados
     DEX: (v) => Array.isArray(v) && v.length >= 100 && svTem(v[0], 'dex', 'bst', 'types', 'gen'),
-    DEX_BY: (v) => svDic(v, 100, (x) => svObj(x) && svTem(x, 'dex', 'bst', 'types')),
+    // 0.13.2: o build afdb307d50 (16/11) trouxe outro dicionário com a mesma forma, o das formas alternativas
+    // (Pikachu Belle…), com chaves como 510025; no da Pokédex a chave é o próprio número do Pokémon
+    DEX_BY: (v) => svDic(v, 100, (x) => svObj(x) && svTem(x, 'dex', 'bst', 'types')) && svChaveDex(v),
     SPRITE_META: (v) => svDic(v, 100, (x) => svObj(x) && svTem(x, 'a', 'sh')),
     DEX_ABIL: (v) => svDic(v, 100, (x) => Array.isArray(x) && x.length <= 4 && x.every((y) => !y || typeof y === 'string') && x.some((y) => typeof y === 'string')),
     NATURES: (v) => Array.isArray(v) && v.length >= 10 && svTem(v[0], 'id', 'up', 'down', 'n'),
@@ -225,10 +228,12 @@
   const svSoLe = (s) => !/\.(commit|grant\w*|saveNow|flush|merge|set[A-Z]\w*|take\w*|buy\w*|claim\w*)\(/.test(s) &&
     !/[\w$\]]\s*\.[\w$]+\s*(=(?![=>])|\+=|-=|\+\+|--)|\]\s*(=(?![=>])|\+=|-=|\+\+|--)/.test(s) && !/'(rescue|wild)'/.test(s);
   const SV_FUNCAO = {
-    startChoices: (f, s) => svSoLe(s) && f.length === 1 && /\.Moves\.poolFor\(/.test(s) && /'buff'/.test(s) && /\.push\(/.test(s),
+    // 0.13.2: no build afdb307d50 o filtro dos golpes de status passou de 'buff' para Moves.isStatus
+    startChoices: (f, s) => svSoLe(s) && f.length === 1 && /\.Moves\.poolFor\(/.test(s) && (/'buff'/.test(s) || /\.Moves\.isStatus\(/.test(s)) && /\.push\(/.test(s),
     startMoveOf: (f, s) => svSoLe(s) && f.length === 1 && /\.DB\.save\b/.test(s) && /\.pstart\b/.test(s) && /\.pupg\b/.test(s) && !/pstart2/.test(s),
     startMove2Of: (f, s) => svSoLe(s) && f.length === 1 && /\.pstart2\b/.test(s) && /\.start2\b/.test(s),
-    TM_OF: (f, s) => svSoLe(s) && f.length === 1 && /^\(?\$\)?=>\$\[\$\]\|\|\[\]$/.test(s.replace(/\s+/g, '')),
+    // 0.13.2: no build afdb307d50 vira "d => X.tms[d] && DEX_BY[d] ? X.tms[d] : reserva(d)" (tabela de TMs nova)
+    TM_OF: (f, s) => { const n = s.replace(/\s+/g, ''); return svSoLe(s) && f.length === 1 && (/^\(?\$\)?=>\$\[\$\]\|\|\[\]$/.test(n) || /^\(?\$\)?=>\$\.tms\[\$\]&&\$\.DEX_BY\[\$\]\?\$\.tms\[\$\]:\$\(\$\)$/.test(n)); },
   };
   // primitivos, pela posição entre os valores primitivos do topo (na ordem em que o jogo cria) e validados pelo valor
   const SV_PRIM = { LIFT: { pos: 2, ok: (v) => v === 18 } };
@@ -480,6 +485,20 @@
       }, 700);
       return r;
     };
+    // 0.13.2: telas novas no meio da partida (builds de 14–16/11): evolução e troca de forma (scr-evo), esquecer golpe
+    // (scr-forget) e poder (scr-power: mega, Z, Teracristal). Sem resposta a partida ficava parada nelas para sempre.
+    // O farm escolhe o que não mexe na build planejada: não evoluir / manter a forma, não esquecer nenhum golpe; no
+    // poder (que não tem "pular"), a primeira opção e, se pedir o tipo, o primeiro tipo da lista.
+    for (const nome of ['showEvo', 'showForm', 'showForget', 'showPower']) {
+      const orig = R[nome];
+      if (typeof orig !== 'function') continue;
+      R[nome] = function () {
+        const r = orig.apply(this, arguments);
+        M.escolhaAt = performance.now();
+        if (ativo(ns) && cfg.cards) schedule(() => escolhaNova(ns), 700);
+        return r;
+      };
+    }
     // fim da partida: conta para o painel e marca a rotina
     const origOver = R.showOver;
     R.showOver = function (d) {
@@ -494,7 +513,11 @@
       return r;
     };
     // ranking: partida que o farm tocou não sobe (o selo também é bloqueado pela extensão enquanto o farm está ligado)
-    if (ns.Ranking) for (const k of ['submitSolo', 'submitGroup']) {
+    // 0.13.2: o build afdb307d50 (16/11) ganhou Ranking.submitChallenge (desafio da semana): vale todo submit*
+    // (os dois de sempre + qualquer submit* próprio, herdado ou não enumerável; revisão)
+    const envios = new Set(['submitSolo', 'submitGroup']);
+    if (ns.Ranking) { try { for (const n in ns.Ranking) if (/^submit/.test(n)) envios.add(n); for (const n of Object.getOwnPropertyNames(ns.Ranking)) if (/^submit/.test(n)) envios.add(n); } catch (_) {} }
+    if (ns.Ranking) for (const k of envios) {
       const orig = ns.Ranking[k];
       if (typeof orig !== 'function') continue;
       ns.Ranking[k] = function () {
@@ -569,7 +592,9 @@
     if (st === 'paused') return autoResume(ns);
     if (M.busy) return;
     if (st === 'over' && M.coopRun) return;     // em grupo: o resumo é do time; quem volta para a sala é você
-    if (st === 'over') { if (open('scr-over') && now() - M.overAt > 3500) $('#btn-again') && $('#btn-again').click(); return; }
+    // 0.13.2: o menu da tela final passou a ser montado na hora (#over-menu); "Voltar ao menu" agora é #over-back
+    // (o #btn-again antigo sumiu e o farm ficava parado na tela final). Volta ao menu, onde a rotina roda.
+    if (st === 'over') { if (open('scr-over') && now() - M.overAt > 3500) { const v = $('#btn-again') || $('#over-back'); if (v) v.click(); } return; }
     if (st === 'ui') {
       if (closePopups()) return;
       if (naSala(ns)) return;                  // numa sala com amigos: nada de menu (parceiro, gacha, partida solo)
@@ -581,8 +606,44 @@
     }
   }
 
+  // 0.13.2: as telas novas da partida (ver os embrulhos de showEvo/showForm/showForget/showPower)
+  function escolhaNova(ns) {
+    const R = ns.RunUI, cartas = (id) => { const c = document.getElementById(id); return c ? [...c.children] : []; };
+    const aberto = (id) => { const e = document.getElementById(id); return !!e && !e.classList.contains('hidden'); };
+    if (ns.UI.isOpen('scr-evo') && typeof R.pickEvo === 'function') {
+      // evolução e forma: a lista do jogo é "opções + [0]", e a última carta (0) é "não mudar" (revisão: não depende da classe)
+      const i = cartas('evo-cards').length - 1;
+      if (i < 0) return;
+      log('evo fica', i);
+      return R.pickEvo(i);
+    }
+    if (ns.UI.isOpen('scr-forget') && typeof R.pickForget === 'function') {
+      // no 2º passo (já marcou um golpe) volta para a lista dos golpes, cuja última carta é "manter todos"
+      // (revisão: volta e escolhe na próxima, para o clique nunca cair na lista do 2º passo)
+      if (aberto('forget-back')) { if (typeof R.forgetBack === 'function') R.forgetBack(); return schedule(() => { if (ns.UI.isOpen('scr-forget')) escolhaNova(ns); }, 700); }
+      log('esquecer nenhum');
+      return R.pickForget(Math.max(0, cartas('forget-cards').length - 1));
+    }
+    if (ns.UI.isOpen('scr-power') && typeof R.pickPower === 'function') {
+      const noTipo = aberto('pow-back');   // 2º passo (mega, Z, Teracristal): escolher o tipo
+      const i = 0;   // a 1ª opção e o 1º tipo (o mapa não guarda o módulo dos poderes; mudar isso fica para depois)
+      log('poder', noTipo ? 'tipo' : 'opção', i);
+      R.pickPower(i);
+      if (!noTipo) schedule(() => { if (ns.UI.isOpen('scr-power')) escolhaNova(ns); }, 700);
+    }
+  }
+  function escolhaWatch(ns) {
+    if (!cfg.cards) return;
+    if (!['scr-evo', 'scr-forget', 'scr-power'].some((s) => ns.UI.isOpen(s))) { M.escolhaAt = 0; return; }   // revisão: relógio novo a cada tela
+    if (!M.escolhaAt) { M.escolhaAt = performance.now(); return; }   // aberta antes do farm ligar: conta daqui
+    if (performance.now() - M.escolhaAt < 4000) return;
+    M.escolhaAt = performance.now();
+    escolhaNova(ns);
+  }
+
   // cartas abertas há muito tempo (o agendamento falhou): escolhe de novo
   function levelWatch(ns) {
+    try { escolhaWatch(ns); } catch (e) { log('escolhaWatch', e); }   // revisão: um erro aqui não pode travar o resto
     if (!cfg.cards) return;
     if (ns.UI.isOpen('scr-levelup') && M.lvlOpenAt && now() - M.lvlOpenAt > 4000) {
       M.lvlOpenAt = now();
@@ -1083,11 +1144,25 @@
     M.dexBusca = false;
     await voltar('dex');
   }
+  // 0.13.2: no build afdb307d50 (16/11) a loja ganhou abas (itens de partida, MT/Menta/Cápsula, fotos, skins) e
+  // lembra a última aberta; cada botão só existe na aba dele. Passa pelas abas até achar (pelo data-tab, não pelo texto).
+  async function abaDaLoja(sel) {
+    await waitFor(() => $(sel) || $('#shop-body [data-tab]'), 3000);
+    for (const t of [...document.querySelectorAll('#shop-body [data-tab]')].map((e) => e.dataset.tab)) {
+      if ($(sel)) break;
+      const aba = $(`#shop-body [data-tab="${t}"]`);
+      if (!aba || aba.classList.contains('on')) continue;
+      aba.click();
+      await waitFor(() => $(sel) || $(`#shop-body [data-tab="${t}"].on`), 1500);
+      await sleep(150);
+    }
+    return !!$(sel);
+  }
   async function comprarLoja(ns, key) {
     await sairDaColecao();
     if (!open('scr-shop') && !await ir('shop')) return false;
     const sel = `#shop-body [data-buy="${key}"]`;
-    await waitFor(() => $(sel), 3000);
+    await abaDaLoja(sel);
     const b = $(sel);
     if (!b || b.disabled) return false;
     const antes = ns.DB.save.coins;
@@ -1312,7 +1387,10 @@
 
   // ---------- 9. rotina: Halloween (skins de bruja por 300 doces) ----------
   async function skins(ns) {
-    const s = ns.DB.save, have = (s && s.bag && s.bag.candy) || 0, P = ns.Halloween.SKIN_PRICE || 300;
+    // 0.13.2: no build afdb307d50 (16/11) a compra com doces acabou (Halloween.SKIN_PRICE sumiu) e a aba de skins da
+    // loja vende skins por MOEDAS com o mesmo [data-skin]. Sem o preço em doces, não faz nada (nunca gasta moedas aqui).
+    if (!ns.Halloween || typeof ns.Halloween.SKIN_PRICE !== 'number') return;
+    const s = ns.DB.save, have = (s && s.bag && s.bag.candy) || 0, P = ns.Halloween.SKIN_PRICE;
     const falta = (ns.Skins && ns.Skins.LIST || []).filter((id) => !ns.Skins.owns(s, id));
     if (!falta.length || have < P) return;
     if (!await ir('shop')) return;

@@ -2,6 +2,13 @@
 // Frases curtas, do ponto de vista de quem usa. Aparece uma vez, na primeira abertura depois da atualização.
 globalThis.SV_NOVIDADES = {
   pt: {
+    '0.13.2': [
+      "Volta a funcionar com a atualização do jogo de 14 a 16/11: o farm e a colinha reconhecem de novo as partes do jogo que mudaram.",
+      "A Loja Kecleon agora tem abas: o farm e o ⚡ Aplicar a colinha acham a Menta, as Cápsulas e as MT na aba certa.",
+      "A partida não para mais nas telas novas do jogo: na evolução e na troca de forma o farm mantém o parceiro como está, no esquecer golpe não esquece nenhum e no poder (mega, Z, Teracristal) escolhe a primeira opção.",
+      "Depois do fim da partida o farm volta ao menu de novo (o jogo trocou o botão da tela final) e a rotina e a próxima partida seguem sozinhas.",
+      "Partida do farm continua fora do ranking, inclusive no desafio semanal: o bloqueio acompanha o novo endereço do selo do jogo.",
+    ],
     '0.13.1': [
       "Com \"Continuar em segundo plano\" ligada, a rotina entre partidas também roda com a aba escondida: missões, gacha, troca de parceiro, loja, melhorias e começar a próxima partida. Antes, ela esperava você voltar para a aba.",
     ],
@@ -141,6 +148,13 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   en: {
+    '0.13.2': [
+      "Works again after the game update of Nov 14–16: the farm and the cheat sheet recognize the parts of the game that changed.",
+      "The Kecleon Shop now has tabs: the farm and ⚡ Apply the cheat sheet find the Mint, Capsules and TMs in the right tab.",
+      "Runs no longer stop at the game's new screens: on evolution and form change the farm keeps the partner as it is, on forget a move it forgets none, and on power (Mega, Z, Terastal) it picks the first option.",
+      "After a run ends the farm goes back to the menu again (the game changed the button on the end screen), so the routine and the next run carry on by themselves.",
+      "Farm runs still stay off the leaderboard, including the weekly challenge: the block follows the game's new seal address.",
+    ],
     '0.13.1': [
       "With \"Keep going in the background\" on, the routine between runs also runs with the tab hidden: missions, gacha, switching partner, shop, upgrades and starting the next run. Before, it waited for you to come back to the tab.",
     ],
@@ -280,6 +294,13 @@ globalThis.SV_NOVIDADES = {
     ],
   },
   es: {
+    '0.13.2': [
+      "Vuelve a funcionar con la actualización del juego del 14 al 16/11: el farm y la chuleta reconocen de nuevo las partes del juego que cambiaron.",
+      "La Tienda Kecleon ahora tiene pestañas: el farm y ⚡ Aplicar la chuleta encuentran la Menta, las Cápsulas y las MT en la pestaña correcta.",
+      "La partida ya no se detiene en las pantallas nuevas del juego: en la evolución y el cambio de forma el farm deja al compañero como está, en olvidar movimiento no olvida ninguno y en el poder (mega, Z, Teracristal) elige la primera opción.",
+      "Al terminar la partida el farm vuelve otra vez al menú (el juego cambió el botón de la pantalla final) y la rutina y la siguiente partida siguen solas.",
+      "Las partidas del farm siguen fuera del ranking, también en el desafío semanal: el bloqueo sigue la nueva dirección del sello del juego.",
+    ],
     '0.13.1': [
       "Con \"Seguir en segundo plano\" encendida, la rutina entre partidas también funciona con la pestaña oculta: misiones, gacha, cambio de compañero, tienda, mejoras y empezar la siguiente partida. Antes esperaba a que volvieras a la pestaña.",
     ],

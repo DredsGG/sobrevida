@@ -19,8 +19,8 @@ const CT = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'svf-'));
   const ctx = await chromium.launchPersistentContext(dir, { headless: true, channel: 'chromium', viewport: { width: 1366, height: 768 }, locale: 'pt-BR',
     args: [`--disable-extensions-except=${EXT}`, `--load-extension=${EXT}`, '--lang=pt-BR', '--disable-background-timer-throttling', '--disable-renderer-backgrounding'] });
-  let selos = 0;
-  await ctx.route('https://ice.pokesurvivor.com/**', (r) => { selos++; r.fulfill({ status: 200, contentType: 'application/json', body: '{"s":1,"g":"0"}' }); });
+  let selos = 0, outros = 0;   // selos = pedidos de selo/envio que chegaram à rede; outros = o resto do mesmo servidor
+  await ctx.route('https://ice.pokesurvivor.com/**', (r) => { if (/\/v1\/(seal|run\/|rank\/submit)/.test(r.request().url())) selos++; else outros++; r.fulfill({ status: 200, contentType: 'application/json', body: '{"s":1,"g":"0"}' }); });
   await jl.servirJogo(ctx, GAME, { semIce: true });
   const sw = ctx.serviceWorkers()[0] || await ctx.waitForEvent('serviceworker');
   await sw.evaluate(() => chrome.storage.local.set({ 'sv.onboard': { tutorial: 'visto', visto: '0.2.0', novLidas: '0.2.0' }, 'sv.alvo': 54 }));
@@ -79,11 +79,30 @@ const CT = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
   await shadow('.menu .farm .fgo').click(); await sleep(1200);
   ok((await sw.evaluate(() => chrome.storage.local.get('sv.farm')))['sv.farm'].on === true, 'Ligar farm grava o estado');
   const regras = await sw.evaluate(() => chrome.declarativeNetRequest.getDynamicRules());
-  ok(regras.some((r) => r.action.type === 'block' && /ice\.pokesurvivor\.com\/v1\/seal/.test(r.condition.urlFilter)), 'selo do ranking bloqueado com o farm ligado');
+  // 0.13.2: o selo do jogo é /v1/run/start (+ /v1/run/beat) e o envio é /v1/rank/submit (builds de 09/11 e 16/11)
+  const SELO = ['/v1/seal', '/v1/run/start', '/v1/run/beat', '/v1/rank/submit'];
+  ok(SELO.every((u) => regras.some((r) => r.action.type === 'block' && r.condition.urlFilter === '||ice.pokesurvivor.com' + u)), 'selo e envio do ranking bloqueados com o farm ligado (' + SELO.join(' ') + ')');
   const antes = selos;
-  await page.evaluate(() => fetch('https://ice.pokesurvivor.com/v1/seal', { method: 'POST' }).catch(() => null));
+  await page.evaluate((us) => Promise.all(us.map((u) => fetch('https://ice.pokesurvivor.com' + u, { method: 'POST' }).catch(() => null))), SELO);
   await sleep(500);
-  ok(selos === antes, 'pedido de selo não sai (bloqueado antes da rede)');
+  ok(selos === antes, 'pedidos de selo e de envio não saem (bloqueados antes da rede)');
+  // controle: outro pedido ao mesmo servidor passa (o bloqueio é só do selo e do envio)
+  const outros0 = outros;
+  await page.evaluate(() => fetch('https://ice.pokesurvivor.com/v1/rank/top').catch(() => null)); await sleep(500);
+  ok(outros > outros0, 'controle: /v1/rank/top passa (a rota simulada recebe)');
+  // o jogo novo tem Ranking.submitChallenge (desafio da semana): todo submit* do piloto devolve null com o farm ligado
+  // revisão: prova que cada submit* é o embrulho do piloto (o código dele tem "ranking bloqueado") e devolve null sem
+  // chamar o original; no jogo novo submitChallenge tem que estar entre eles
+  const subs = await page.evaluate(async () => { const R = window.__NS && window.__NS.Ranking; if (!R) return null; const out = {}; const ns = new Set(); for (const n in R) if (/^submit/.test(n)) ns.add(n); for (const n of Object.getOwnPropertyNames(R)) if (/^submit/.test(n)) ns.add(n); for (const k of ns) { const emb = /ranking bloqueado/.test(Function.prototype.toString.call(R[k])); let v; try { v = await R[k]({}); } catch (e) { v = 'erro ' + e.message; } out[k] = { emb, v }; } return out; });
+  const subsOk = subs && ['submitSolo', 'submitGroup', 'submitChallenge'].every((k) => subs[k]) && Object.values(subs).every((x) => x.emb && x.v === null);
+  ok(subsOk, 'Ranking.submit* embrulhados pelo piloto e devolvendo null com o farm ligado: ' + JSON.stringify(subs));
+  const antesB = selos;
+  await page.evaluate((us) => us.forEach((u) => { try { navigator.sendBeacon('https://ice.pokesurvivor.com' + u, '{}'); } catch (_) {} }), SELO);
+  await sleep(800);
+  ok(selos === antesB, 'sendBeacon para o selo e o envio também não sai (bloqueado antes da rede)');
+  const outrosB = outros;
+  await page.evaluate(() => { try { navigator.sendBeacon('https://ice.pokesurvivor.com/v1/rank/top', '{}'); } catch (_) {} }); await sleep(800);
+  ok(outros > outrosB, 'controle: sendBeacon para /v1/rank/top chega (o teste enxerga beacons)');
   // rotina + partida
   const t0 = Date.now(); let pillShot = false, runSeen = false, maint = new Set();
   while (Date.now() - t0 < MIN * 60000) {

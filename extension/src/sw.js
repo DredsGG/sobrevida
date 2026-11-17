@@ -154,16 +154,20 @@ ext.runtime.onInstalled.addListener(async (d) => {
   procurar();
 });
 // ───────────────────────── farm: selo do ranking bloqueado enquanto o farm está ligado ─────────────────────────
-// O jogo pede um "selo" ao servidor (ice.pokesurvivor.com/v1/seal) no começo de cada partida; sem ele a marca não entra
-// no ranking. Com o farm ligado a Sobrevida bloqueia esse pedido (além de bloquear o envio no próprio jogo, em src/piloto.js).
+// O jogo pede um "selo" ao servidor no começo de cada partida; sem ele a marca não entra no ranking. Com o farm ligado
+// a Sobrevida bloqueia esse pedido e o envio ao ranking (além de bloquear o envio no próprio jogo, em src/piloto.js).
+// 0.13.2: o selo saiu de /v1/seal e foi para /v1/run/start (+ /v1/run/beat); o envio é /v1/rank/submit (visto nos
+// builds 876c33ea8a de 09/11 e afdb307d50 de 16/11). A regra de /v1/seal fica para builds antigos.
 const SELO_REGRA = 1;
+const SELO_URLS = ['||ice.pokesurvivor.com/v1/seal', '||ice.pokesurvivor.com/v1/run/start', '||ice.pokesurvivor.com/v1/run/beat', '||ice.pokesurvivor.com/v1/rank/submit'];
+const SELO_IDS = SELO_URLS.map((_, i) => SELO_REGRA + i);
 async function seloBloqueado(on) {
   if (!ext.declarativeNetRequest) return;
   try {
     await ext.declarativeNetRequest.updateDynamicRules({
-      removeRuleIds: [SELO_REGRA],
-      addRules: on ? [{ id: SELO_REGRA, priority: 1, action: { type: 'block' },
-        condition: { urlFilter: '||ice.pokesurvivor.com/v1/seal', resourceTypes: ['xmlhttprequest', 'other'] } }] : [],
+      removeRuleIds: SELO_IDS,
+      addRules: on ? SELO_URLS.map((u, i) => ({ id: SELO_IDS[i], priority: 1, action: { type: 'block' },
+        condition: { urlFilter: u, resourceTypes: ['xmlhttprequest', 'ping', 'other'] } })) : [],
     });
   } catch (_) {}
 }
